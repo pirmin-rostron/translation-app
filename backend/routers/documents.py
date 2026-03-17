@@ -122,7 +122,27 @@ def _execute_parsing_stage(db: Session, document_id: int):
     if not parsed_blocks:
         raise ValueError("Parsed document has no blocks")
 
-    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete()
+    # Clear dependent rows first to satisfy FK document_segments.block_id -> document_blocks.id.
+    # We delete by block IDs as well to handle stale rows that might reference these blocks.
+    block_ids = [
+        block_id
+        for (block_id,) in db.query(DocumentBlock.id).filter(DocumentBlock.document_id == document_id).all()
+    ]
+    segments_to_delete_query = db.query(DocumentSegment.id).filter(
+        (DocumentSegment.document_id == document_id)
+        | (DocumentSegment.block_id.in_(block_ids) if block_ids else False)
+    )
+    existing_segment_ids = [segment_id for (segment_id,) in segments_to_delete_query.all()]
+    if existing_segment_ids:
+        db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(existing_segment_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(DocumentSegment).filter(DocumentSegment.id.in_(existing_segment_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete(
+        synchronize_session=False
+    )
 
     for block_index, parsed_block in enumerate(parsed_blocks):
         block = DocumentBlock(
