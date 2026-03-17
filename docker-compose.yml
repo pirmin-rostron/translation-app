@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: translation
+      POSTGRES_PASSWORD: translation
+      POSTGRES_DB: translation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U translation"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://translation:translation@postgres:5432/translation
+      UPLOAD_DIR: /app/uploads
+      TRANSLATION_PROVIDER: ${TRANSLATION_PROVIDER:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TRANSLATION_BATCH_SIZE: ${TRANSLATION_BATCH_SIZE:-5}
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_uploads:
