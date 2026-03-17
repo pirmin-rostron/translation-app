@@ -1,21 +1,24 @@
 import logging
+from datetime import datetime
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import SessionLocal, get_db
 from models import (
     ApprovedTranslation,
     Document,
     DocumentBlock,
     DocumentSegment,
     GlossaryTerm,
+    ProcessingStageJob,
     SegmentAnnotation,
     TranslationJob,
     TranslationResult,
 )
 from schemas import (
+    ProcessingStageJobResponse,
     ReviewBlockResponse,
     ReviewSegmentResponse,
     SegmentAnnotationResponse,
@@ -35,6 +38,104 @@ from services.translation_memory import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["translation-jobs"])
+
+TRANSLATION_STAGE = "translation"
+AMBIGUITY_STAGE = "ambiguity_detection"
+RECONSTRUCTION_STAGE = "reconstruction"
+
+
+def _queue_stage_job(
+    db: Session,
+    document_id: int,
+    translation_job_id: int,
+    stage_name: str,
+):
+    stage_job = ProcessingStageJob(
+        document_id=document_id,
+        translation_job_id=translation_job_id,
+        stage_name=stage_name,
+        status="queued",
+    )
+    db.add(stage_job)
+    return stage_job
+
+
+def _run_translation_pipeline(translation_job_id: int):
+    db = SessionLocal()
+    try:
+        job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+        if not job:
+            return
+        while True:
+            stage_job = (
+                db.query(ProcessingStageJob)
+                .filter(
+                    ProcessingStageJob.translation_job_id == translation_job_id,
+                    ProcessingStageJob.status == "queued",
+                )
+                .order_by(ProcessingStageJob.id.asc())
+                .first()
+            )
+            if not stage_job:
+                return
+
+            stage_job.status = "running"
+            stage_job.attempt_count += 1
+            stage_job.started_at = datetime.utcnow()
+            stage_job.error_message = None
+            db.commit()
+            logger.info(
+                "Stage start: stage=%s document_id=%d translation_job_id=%d attempt=%d",
+                stage_job.stage_name,
+                stage_job.document_id,
+                translation_job_id,
+                stage_job.attempt_count,
+            )
+
+            try:
+                if stage_job.stage_name == TRANSLATION_STAGE:
+                    _execute_translation_stage(db=db, translation_job_id=translation_job_id)
+                elif stage_job.stage_name == AMBIGUITY_STAGE:
+                    _execute_ambiguity_stage(db=db, translation_job_id=translation_job_id)
+                elif stage_job.stage_name == RECONSTRUCTION_STAGE:
+                    _execute_reconstruction_stage(db=db, translation_job_id=translation_job_id)
+                else:
+                    raise ValueError(f"Unknown stage: {stage_job.stage_name}")
+
+                stage_job.status = "succeeded"
+                stage_job.finished_at = datetime.utcnow()
+                db.commit()
+                logger.info(
+                    "Stage success: stage=%s document_id=%d translation_job_id=%d",
+                    stage_job.stage_name,
+                    stage_job.document_id,
+                    translation_job_id,
+                )
+            except Exception as exc:
+                db.rollback()
+                job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+                if job:
+                    job.status = "failed"
+                    job.error_message = str(exc)
+                    document = db.query(Document).filter(Document.id == job.document_id).first()
+                    if document:
+                        document.status = "failed"
+                        document.error_message = str(exc)
+                failed_stage = db.query(ProcessingStageJob).filter(ProcessingStageJob.id == stage_job.id).first()
+                if failed_stage:
+                    failed_stage.status = "failed"
+                    failed_stage.error_message = str(exc)
+                    failed_stage.finished_at = datetime.utcnow()
+                db.commit()
+                logger.exception(
+                    "Stage failure: stage=%s document_id=%d translation_job_id=%d",
+                    stage_job.stage_name,
+                    stage_job.document_id,
+                    translation_job_id,
+                )
+                return
+    finally:
+        db.close()
 
 
 def _get_glossary_candidates(
@@ -325,16 +426,247 @@ def _serialize_review_segment(
     )
 
 
+def _execute_translation_stage(db: Session, translation_job_id: int):
+    job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+    if not job:
+        raise ValueError("Translation job not found")
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise ValueError("Document not found")
+
+    doc.status = "translating"
+    doc.error_message = None
+    job.status = "translating"
+    job.error_message = None
+    db.commit()
+
+    segments = (
+        db.query(DocumentSegment)
+        .filter(DocumentSegment.document_id == doc.id)
+        .order_by(DocumentSegment.segment_index)
+        .all()
+    )
+    if not segments:
+        raise ValueError("Document has no segmented content to translate")
+
+    provider, provider_name = get_translation_provider()
+    batch_size = get_batch_size()
+    source_lang = doc.source_language or "unknown"
+    glossary_candidates = _get_glossary_candidates(
+        db=db,
+        source_language=source_lang,
+        target_language=doc.target_language,
+        industry=doc.industry,
+        domain=doc.domain,
+    )
+    logger.info(
+        "Translation stage start: provider=%s batch_size=%d segments=%d document_id=%d job_id=%d",
+        provider_name,
+        batch_size,
+        len(segments),
+        doc.id,
+        translation_job_id,
+    )
+
+    db.query(TranslationResult).filter(TranslationResult.job_id == translation_job_id).delete(
+        synchronize_session=False
+    )
+    db.commit()
+
+    translated_results: list[tuple[DocumentSegment, object, str | None, float | None, list[dict]]] = []
+    for i in range(0, len(segments), batch_size):
+        batch = segments[i : i + batch_size]
+        memory_matches: dict[int, TranslationMemoryMatch] = {}
+        missing_segments: list[DocumentSegment] = []
+        glossary_matches_by_segment: dict[int, list[dict]] = {}
+
+        for s in batch:
+            glossary_matches_by_segment[s.id] = _match_glossary_terms_for_segment(
+                source_text=s.source_text,
+                glossary_terms=glossary_candidates,
+            )
+            exact_match = find_exact_memory_match(
+                db=db,
+                source_text=s.source_text,
+                source_language=source_lang,
+                target_language=doc.target_language,
+                industry=doc.industry,
+                domain=doc.domain,
+            )
+            if exact_match:
+                memory_matches[s.id] = TranslationMemoryMatch(
+                    approved=exact_match,
+                    match_type="exact",
+                    similarity=1.0,
+                )
+                continue
+
+            semantic_match = find_semantic_memory_match(
+                db=db,
+                source_text=s.source_text,
+                source_language=source_lang,
+                target_language=doc.target_language,
+                industry=doc.industry,
+                domain=doc.domain,
+            )
+            if semantic_match:
+                memory_matches[s.id] = semantic_match
+                continue
+            missing_segments.append(s)
+
+        provider_results_by_segment_id: dict[int, object] = {}
+        if missing_segments:
+            batch_ctx = [
+                SegmentContext(
+                    segment_id=s.id,
+                    source_text=s.source_text,
+                    context_before=s.context_before,
+                    context_after=s.context_after,
+                    glossary_terms=glossary_matches_by_segment.get(s.id, []),
+                )
+                for s in missing_segments
+            ]
+            try:
+                results = provider.translate_batch(
+                    segments=batch_ctx,
+                    source_language=source_lang,
+                    target_language=doc.target_language,
+                    industry=doc.industry,
+                    domain=doc.domain,
+                )
+            except Exception as batch_err:
+                logger.warning(
+                    "Stage fallback: batch translation failed for job=%d, falling back to single segments: %s",
+                    translation_job_id,
+                    batch_err,
+                )
+                results = [
+                    provider.translate(
+                        source_text=s.source_text,
+                        source_language=source_lang,
+                        target_language=doc.target_language,
+                        industry=doc.industry,
+                        domain=doc.domain,
+                        context_before=s.context_before,
+                        context_after=s.context_after,
+                        glossary_terms=glossary_matches_by_segment.get(s.id, []),
+                    )
+                    for s in missing_segments
+                ]
+            for seg, res in zip(missing_segments, results, strict=True):
+                provider_results_by_segment_id[seg.id] = res
+
+        for seg in batch:
+            if seg.id in memory_matches:
+                match = memory_matches[seg.id]
+                translated_results.append(
+                    (seg, match.approved, match.match_type, match.similarity, glossary_matches_by_segment.get(seg.id, []))
+                )
+            else:
+                translated_results.append(
+                    (seg, provider_results_by_segment_id[seg.id], None, None, glossary_matches_by_segment.get(seg.id, []))
+                )
+
+    for seg, res, memory_type, similarity, glossary_matches in translated_results:
+        if memory_type:
+            approved = res
+            result = TranslationResult(
+                job_id=translation_job_id,
+                segment_id=seg.id,
+                primary_translation=approved.approved_translation,
+                final_translation=approved.approved_translation,
+                confidence_score=similarity,
+                review_status="memory_match" if memory_type == "exact" else "semantic_memory_match",
+                exact_memory_used=memory_type == "exact",
+                semantic_memory_used=memory_type == "semantic",
+                ambiguity_detected=False,
+                ambiguity_details=None,
+                glossary_applied=False,
+                glossary_matches=None,
+            )
+        else:
+            result = TranslationResult(
+                job_id=translation_job_id,
+                segment_id=seg.id,
+                primary_translation=res.primary_translation,
+                final_translation=res.primary_translation,
+                confidence_score=None,
+                review_status="unreviewed",
+                exact_memory_used=False,
+                semantic_memory_used=False,
+                ambiguity_detected=res.ambiguity_detected,
+                ambiguity_details=res.ambiguity_details,
+                glossary_applied=bool(glossary_matches),
+                glossary_matches=_build_glossary_matches_payload(glossary_matches),
+            )
+        db.add(result)
+
+    job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    job.translation_provider = provider_name
+    job.translation_batch_size = batch_size
+    job.status = "translated"
+    job.error_message = None
+    doc.status = "translated"
+    doc.error_message = None
+    db.commit()
+
+
+def _execute_ambiguity_stage(db: Session, translation_job_id: int):
+    job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+    if not job:
+        raise ValueError("Translation job not found")
+
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == translation_job_id).all()
+    segments_by_id = {
+        segment.id: segment
+        for segment in db.query(DocumentSegment).filter(DocumentSegment.document_id == job.document_id).all()
+    }
+    for result in results:
+        segment = segments_by_id.get(result.segment_id)
+        if not segment:
+            continue
+        _replace_segment_annotations(db, segment, result)
+    db.commit()
+
+
+def _execute_reconstruction_stage(db: Session, translation_job_id: int):
+    job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+    if not job:
+        raise ValueError("Translation job not found")
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise ValueError("Document not found")
+
+    touched_block_ids: set[int] = set()
+    segments = db.query(DocumentSegment).filter(DocumentSegment.document_id == doc.id).all()
+    for segment in segments:
+        if segment.block_id is not None:
+            touched_block_ids.add(segment.block_id)
+    for block_id in touched_block_ids:
+        _refresh_document_block_translation(db, block_id, translation_job_id)
+
+    job.status = "review_ready"
+    job.error_message = None
+    doc.status = "review_ready"
+    doc.error_message = None
+    db.commit()
+
+
 @router.post("/documents/{document_id}/translation-jobs", response_model=TranslationJobResponse)
-def create_translation_job(document_id: int, db: Session = Depends(get_db)):
-    """Create a translation job for a parsed document. Translates all segments."""
+def create_translation_job(
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Create a translation job and queue staged background processing."""
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.status != "parsed":
+    if doc.status not in {"segmented", "review_ready", "failed"}:
         raise HTTPException(
             status_code=400,
-            detail="Document must be parsed before creating a translation job",
+            detail="Document must be segmented before creating a translation job",
         )
 
     segments = (
@@ -349,217 +681,28 @@ def create_translation_job(document_id: int, db: Session = Depends(get_db)):
             detail="Document has no parsed segments",
         )
 
-    provider, provider_name = get_translation_provider()
-    batch_size = get_batch_size()
     source_lang = doc.source_language or "unknown"
-    glossary_candidates = _get_glossary_candidates(
-        db=db,
-        source_language=source_lang,
-        target_language=doc.target_language,
-        industry=doc.industry,
-        domain=doc.domain,
-    )
-
-    logger.info(
-        "Translation job starting: provider=%s, batch_size=%d, segments=%d",
-        provider_name,
-        batch_size,
-        len(segments),
-    )
-
-    translated_results: list[tuple[DocumentSegment, object, str | None, float | None, list[dict]]] = []
-    try:
-        for i in range(0, len(segments), batch_size):
-            batch = segments[i : i + batch_size]
-            memory_matches: dict[int, TranslationMemoryMatch] = {}
-            missing_segments: list[DocumentSegment] = []
-            glossary_matches_by_segment: dict[int, list[dict]] = {}
-
-            for s in batch:
-                glossary_matches_by_segment[s.id] = _match_glossary_terms_for_segment(
-                    source_text=s.source_text,
-                    glossary_terms=glossary_candidates,
-                )
-                exact_match = find_exact_memory_match(
-                    db=db,
-                    source_text=s.source_text,
-                    source_language=source_lang,
-                    target_language=doc.target_language,
-                    industry=doc.industry,
-                    domain=doc.domain,
-                )
-                if exact_match:
-                    logger.info(
-                        "Exact memory hit for segment_id=%d source_language=%s target_language=%s",
-                        s.id,
-                        source_lang,
-                        doc.target_language,
-                    )
-                    memory_matches[s.id] = TranslationMemoryMatch(
-                        approved=exact_match,
-                        match_type="exact",
-                        similarity=1.0,
-                    )
-                    continue
-
-                logger.info(
-                    "Exact memory miss for segment_id=%d source_language=%s target_language=%s",
-                    s.id,
-                    source_lang,
-                    doc.target_language,
-                )
-                semantic_match = find_semantic_memory_match(
-                    db=db,
-                    source_text=s.source_text,
-                    source_language=source_lang,
-                    target_language=doc.target_language,
-                    industry=doc.industry,
-                    domain=doc.domain,
-                )
-                if semantic_match:
-                    logger.info(
-                        "Semantic memory hit for segment_id=%d source_language=%s target_language=%s score=%.4f",
-                        s.id,
-                        source_lang,
-                        doc.target_language,
-                        semantic_match.similarity or 0.0,
-                    )
-                    memory_matches[s.id] = semantic_match
-                    continue
-
-                missing_segments.append(s)
-
-            logger.info(
-                "Translating batch %d/%d (%d segments) with provider=%s",
-                i // batch_size + 1,
-                (len(segments) + batch_size - 1) // batch_size,
-                len(missing_segments),
-                provider_name,
-            )
-
-            provider_results_by_segment_id: dict[int, object] = {}
-            if missing_segments:
-                batch_ctx = [
-                    SegmentContext(
-                        segment_id=s.id,
-                        source_text=s.source_text,
-                        context_before=s.context_before,
-                        context_after=s.context_after,
-                        glossary_terms=glossary_matches_by_segment.get(s.id, []),
-                    )
-                    for s in missing_segments
-                ]
-                try:
-                    results = provider.translate_batch(
-                        segments=batch_ctx,
-                        source_language=source_lang,
-                        target_language=doc.target_language,
-                        industry=doc.industry,
-                        domain=doc.domain,
-                    )
-                except Exception as batch_err:
-                    logger.warning(
-                        "Batch failed in router with provider=%s, falling back to single-segment: %s",
-                        provider_name,
-                        batch_err,
-                    )
-                    results = [
-                        provider.translate(
-                            source_text=s.source_text,
-                            source_language=source_lang,
-                            target_language=doc.target_language,
-                            industry=doc.industry,
-                            domain=doc.domain,
-                            context_before=s.context_before,
-                            context_after=s.context_after,
-                            glossary_terms=glossary_matches_by_segment.get(s.id, []),
-                        )
-                        for s in missing_segments
-                    ]
-
-                for seg, res in zip(missing_segments, results, strict=True):
-                    provider_results_by_segment_id[seg.id] = res
-
-            for seg in batch:
-                if seg.id in memory_matches:
-                    match = memory_matches[seg.id]
-                    translated_results.append(
-                        (seg, match.approved, match.match_type, match.similarity, glossary_matches_by_segment.get(seg.id, []))
-                    )
-                else:
-                    translated_results.append(
-                        (seg, provider_results_by_segment_id[seg.id], None, None, glossary_matches_by_segment.get(seg.id, []))
-                    )
-    except Exception as e:
-        logger.exception(
-            "Translation job failed completely with provider=%s; no usable translation could be recovered",
-            provider_name,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail=f"Translation provider failed: {str(e)}",
-        ) from e
-
     job = TranslationJob(
         document_id=document_id,
         source_language=source_lang,
         target_language=doc.target_language,
         industry=doc.industry,
         domain=doc.domain,
-        status="completed",
-        translation_provider=provider_name,
-        translation_batch_size=batch_size,
+        status="translation_queued",
+        translation_provider=None,
+        translation_batch_size=None,
+        error_message=None,
     )
     db.add(job)
+    db.flush()
+    _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=TRANSLATION_STAGE)
+    _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=AMBIGUITY_STAGE)
+    _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=RECONSTRUCTION_STAGE)
+    doc.status = "translation_queued"
+    doc.error_message = None
     db.commit()
     db.refresh(job)
-
-    touched_block_ids: set[int] = set()
-    for seg, res, memory_type, similarity, glossary_matches in translated_results:
-        if memory_type:
-            approved = res
-            result = TranslationResult(
-                job_id=job.id,
-                segment_id=seg.id,
-                primary_translation=approved.approved_translation,
-                final_translation=approved.approved_translation,
-                confidence_score=similarity,
-                review_status="memory_match" if memory_type == "exact" else "semantic_memory_match",
-                exact_memory_used=memory_type == "exact",
-                semantic_memory_used=memory_type == "semantic",
-                ambiguity_detected=False,
-                ambiguity_details=None,
-                glossary_applied=False,
-                glossary_matches=None,
-            )
-            db.add(result)
-        else:
-            result = TranslationResult(
-                job_id=job.id,
-                segment_id=seg.id,
-                primary_translation=res.primary_translation,
-                final_translation=res.primary_translation,
-                confidence_score=None,
-                review_status="unreviewed",
-                exact_memory_used=False,
-                semantic_memory_used=False,
-                ambiguity_detected=res.ambiguity_detected,
-                ambiguity_details=res.ambiguity_details,
-                glossary_applied=bool(glossary_matches),
-                glossary_matches=_build_glossary_matches_payload(glossary_matches),
-            )
-            db.add(result)
-
-        db.flush()
-        _replace_segment_annotations(db, seg, result)
-        if seg.block_id is not None:
-            touched_block_ids.add(seg.block_id)
-
-    for block_id in touched_block_ids:
-        _refresh_document_block_translation(db, block_id, job.id)
-
-    db.commit()
-    db.refresh(job)
+    background_tasks.add_task(_run_translation_pipeline, job.id)
     return job
 
 
@@ -745,6 +888,20 @@ def update_translation_result(
             result.id,
             result.review_status,
         )
+        remaining_unapproved = (
+            db.query(TranslationResult)
+            .filter(
+                TranslationResult.job_id == job.id,
+                TranslationResult.review_status != "approved",
+            )
+            .count()
+        )
+        if remaining_unapproved == 0:
+            job.status = "approved"
+            document = db.query(Document).filter(Document.id == job.document_id).first()
+            if document:
+                document.status = "approved"
+            db.commit()
     else:
         logger.info(
             "Saved reviewed translation result_id=%d review_status=%s without storing translation memory",
@@ -769,6 +926,57 @@ def update_translation_result(
         created_at=result.created_at,
         segment=SegmentResponse.model_validate(segment),
     )
+
+
+@router.get("/translation-jobs/{job_id}/stages", response_model=list[ProcessingStageJobResponse])
+def list_translation_stage_jobs(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    return (
+        db.query(ProcessingStageJob)
+        .filter(ProcessingStageJob.translation_job_id == job_id)
+        .order_by(ProcessingStageJob.id.asc())
+        .all()
+    )
+
+
+@router.post("/translation-jobs/{job_id}/retry", response_model=TranslationJobResponse)
+def retry_translation_job(job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    failed_jobs = (
+        db.query(ProcessingStageJob)
+        .filter(
+            ProcessingStageJob.translation_job_id == job_id,
+            ProcessingStageJob.status == "failed",
+        )
+        .all()
+    )
+    if not failed_jobs:
+        raise HTTPException(status_code=400, detail="No failed stage to retry")
+
+    for stage_job in failed_jobs:
+        if stage_job.attempt_count >= stage_job.max_attempts:
+            raise HTTPException(status_code=400, detail="One or more stages exceeded retry limit")
+        stage_job.status = "queued"
+        stage_job.error_message = None
+        stage_job.started_at = None
+        stage_job.finished_at = None
+
+    job.status = "translation_queued"
+    job.error_message = None
+    document = db.query(Document).filter(Document.id == job.document_id).first()
+    if document:
+        document.status = "translation_queued"
+        document.error_message = None
+    db.commit()
+    db.refresh(job)
+    logger.info("Retry queued for translation_job_id=%d with %d failed stages", job_id, len(failed_jobs))
+    background_tasks.add_task(_run_translation_pipeline, job.id)
+    return job
 
 
 @router.get("/documents/{document_id}/translation-jobs", response_model=list[TranslationJobResponse])

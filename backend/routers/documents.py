@@ -1,23 +1,210 @@
 import os
 import uuid
+import logging
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Document, DocumentBlock, DocumentSegment, SegmentAnnotation
-from schemas import DocumentBlockResponse, DocumentResponse, DocumentSourceLanguageUpdate, SegmentResponse
+from database import SessionLocal, get_db
+from models import Document, DocumentBlock, DocumentSegment, ProcessingStageJob, SegmentAnnotation
+from schemas import (
+    DocumentBlockResponse,
+    DocumentResponse,
+    DocumentSourceLanguageUpdate,
+    ProcessingStageJobResponse,
+    SegmentResponse,
+)
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf"}
 ALLOWED_SOURCE_LANGUAGES = {"en", "de", "fr", "es", "it", "nl", "pt", "zh", "ja", "ko", "ar"}
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+PARSING_STAGE = "parsing"
+SEGMENT_STAGE = "segmenting"
+FAILED_STATUS = "failed"
+PARSED_STATUS = "parsed"
+SEGMENTED_STATUS = "segmented"
+
+
+def _queue_stage_job(
+    db: Session,
+    document_id: int,
+    stage_name: str,
+    translation_job_id: int | None = None,
+):
+    stage_job = ProcessingStageJob(
+        document_id=document_id,
+        translation_job_id=translation_job_id,
+        stage_name=stage_name,
+        status="queued",
+    )
+    db.add(stage_job)
+    return stage_job
+
+
+def _run_document_pipeline(document_id: int):
+    db = SessionLocal()
+    try:
+        while True:
+            stage_job = (
+                db.query(ProcessingStageJob)
+                .filter(
+                    ProcessingStageJob.document_id == document_id,
+                    ProcessingStageJob.translation_job_id.is_(None),
+                    ProcessingStageJob.status == "queued",
+                )
+                .order_by(ProcessingStageJob.id.asc())
+                .first()
+            )
+            if not stage_job:
+                return
+
+            stage_job.status = "running"
+            stage_job.attempt_count += 1
+            stage_job.started_at = datetime.utcnow()
+            stage_job.error_message = None
+            db.commit()
+            logger.info(
+                "Stage start: stage=%s document_id=%d attempt=%d",
+                stage_job.stage_name,
+                document_id,
+                stage_job.attempt_count,
+            )
+
+            try:
+                if stage_job.stage_name == PARSING_STAGE:
+                    _execute_parsing_stage(db, document_id)
+                elif stage_job.stage_name == SEGMENT_STAGE:
+                    _execute_segment_stage(db, document_id)
+                else:
+                    raise ValueError(f"Unknown stage: {stage_job.stage_name}")
+
+                stage_job.status = "succeeded"
+                stage_job.finished_at = datetime.utcnow()
+                db.commit()
+                logger.info("Stage success: stage=%s document_id=%d", stage_job.stage_name, document_id)
+            except Exception as exc:
+                db.rollback()
+                doc = db.query(Document).filter(Document.id == document_id).first()
+                if doc:
+                    doc.status = FAILED_STATUS
+                    doc.error_message = str(exc)
+                failed_stage = db.query(ProcessingStageJob).filter(ProcessingStageJob.id == stage_job.id).first()
+                if failed_stage:
+                    failed_stage.status = "failed"
+                    failed_stage.error_message = str(exc)
+                    failed_stage.finished_at = datetime.utcnow()
+                db.commit()
+                logger.exception("Stage failure: stage=%s document_id=%d", stage_job.stage_name, document_id)
+                return
+    finally:
+        db.close()
+
+
+def _execute_parsing_stage(db: Session, document_id: int):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise ValueError("Document not found")
+
+    filepath = UPLOAD_DIR / doc.stored_filename
+    if not filepath.exists():
+        raise ValueError("File not found on disk")
+
+    parsed_blocks = parse_document(filepath, doc.file_type)
+    if not parsed_blocks:
+        raise ValueError("Parsed document has no blocks")
+
+    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete()
+
+    for block_index, parsed_block in enumerate(parsed_blocks):
+        block = DocumentBlock(
+            document_id=document_id,
+            block_index=block_index,
+            block_type=parsed_block.block_type,
+            text_original=parsed_block.text_original,
+            text_translated=None,
+            formatting_json=parsed_block.formatting_json,
+        )
+        db.add(block)
+
+    doc.status = PARSED_STATUS
+    doc.error_message = None
+    db.commit()
+
+
+def _execute_segment_stage(db: Session, document_id: int):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise ValueError("Document not found")
+
+    existing_segments = (
+        db.query(DocumentSegment.id).filter(DocumentSegment.document_id == document_id).all()
+    )
+    existing_segment_ids = [segment_id for (segment_id,) in existing_segments]
+    if existing_segment_ids:
+        db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(existing_segment_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete()
+
+    blocks = (
+        db.query(DocumentBlock)
+        .filter(DocumentBlock.document_id == document_id)
+        .order_by(DocumentBlock.block_index)
+        .all()
+    )
+    if not blocks:
+        raise ValueError("No parsed blocks available for segmentation")
+
+    segment_specs: list[tuple[DocumentBlock, str, str | None]] = []
+    for block in blocks:
+        segment_texts = split_block_into_segments(
+            type(
+                "ParsedBlockCompat",
+                (),
+                {
+                    "block_type": block.block_type,
+                    "text_original": block.text_original,
+                },
+            )()
+        )
+        for segment_text in segment_texts:
+            heading_path = block.text_original if block.block_type == "heading" else None
+            segment_specs.append((block, segment_text, heading_path))
+
+    if not segment_specs:
+        raise ValueError("No segments generated from parsed blocks")
+
+    all_segment_texts = [segment_text for _, segment_text, _ in segment_specs]
+    segments: list[DocumentSegment] = []
+    for segment_index, (block, segment_text, heading_path) in enumerate(segment_specs):
+        context_before = all_segment_texts[segment_index - 1] if segment_index > 0 else None
+        context_after = all_segment_texts[segment_index + 1] if segment_index < len(all_segment_texts) - 1 else None
+        segments.append(
+            DocumentSegment(
+                document_id=document_id,
+                block_id=block.id,
+                segment_index=segment_index,
+                segment_type=block.block_type,
+                source_text=segment_text,
+                context_before=context_before,
+                context_after=context_after,
+                heading_path=heading_path,
+            )
+        )
+
+    db.add_all(segments)
+    doc.status = SEGMENTED_STATUS
+    doc.error_message = None
+    db.commit()
 
 
 def validate_file(file: UploadFile) -> tuple[str, str]:
@@ -114,73 +301,33 @@ def update_document_source_language(
 
 
 @router.post("/{document_id}/parse", response_model=DocumentResponse)
-def parse_document_by_id(document_id: int, db: Session = Depends(get_db)):
-    """Parse a document into blocks and segments. Updates status to 'parsed'."""
+def parse_document_by_id(
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Queue parse + segment background stages for a document."""
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    filepath = UPLOAD_DIR / doc.stored_filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    if doc.status in {"translation_queued", "translating"}:
+        raise HTTPException(status_code=409, detail="Cannot parse while translation is in progress")
 
-    parsed_blocks = parse_document(filepath, doc.file_type)
+    db.query(ProcessingStageJob).filter(
+        ProcessingStageJob.document_id == document_id,
+        ProcessingStageJob.translation_job_id.is_(None),
+        ProcessingStageJob.status.in_(["queued", "running"]),
+    ).delete(synchronize_session=False)
 
-    existing_segments = (
-        db.query(DocumentSegment.id).filter(DocumentSegment.document_id == document_id).all()
-    )
-    existing_segment_ids = [segment_id for (segment_id,) in existing_segments]
-    if existing_segment_ids:
-        db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(existing_segment_ids)).delete(
-            synchronize_session=False
-        )
-
-    db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete()
-    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete()
-
-    blocks: list[DocumentBlock] = []
-    segment_specs: list[tuple[DocumentBlock, str, str | None]] = []
-    for block_index, parsed_block in enumerate(parsed_blocks):
-        block = DocumentBlock(
-            document_id=document_id,
-            block_index=block_index,
-            block_type=parsed_block.block_type,
-            text_original=parsed_block.text_original,
-            text_translated=None,
-            formatting_json=parsed_block.formatting_json,
-        )
-        db.add(block)
-        blocks.append(block)
-
-        segment_texts = split_block_into_segments(parsed_block)
-        for segment_text in segment_texts:
-            heading_path = parsed_block.text_original if parsed_block.block_type == "heading" else None
-            segment_specs.append((block, segment_text, heading_path))
-
-    db.flush()
-
-    segments = []
-    all_segment_texts = [segment_text for _, segment_text, _ in segment_specs]
-    for segment_index, (block, segment_text, heading_path) in enumerate(segment_specs):
-        context_before = all_segment_texts[segment_index - 1] if segment_index > 0 else None
-        context_after = all_segment_texts[segment_index + 1] if segment_index < len(all_segment_texts) - 1 else None
-        seg = DocumentSegment(
-            document_id=document_id,
-            block_id=block.id,
-            segment_index=segment_index,
-            segment_type=block.block_type,
-            source_text=segment_text,
-            context_before=context_before,
-            context_after=context_after,
-            heading_path=heading_path,
-        )
-        segments.append(seg)
-
-    if segments:
-        db.add_all(segments)
-    doc.status = "parsed"
+    _queue_stage_job(db=db, document_id=document_id, stage_name=PARSING_STAGE)
+    _queue_stage_job(db=db, document_id=document_id, stage_name=SEGMENT_STAGE)
+    doc.error_message = None
+    # Keep status explicit and deterministic between stages.
+    doc.status = "uploaded"
     db.commit()
     db.refresh(doc)
+    background_tasks.add_task(_run_document_pipeline, document_id)
     return doc
 
 
@@ -212,3 +359,58 @@ def list_document_blocks(document_id: int, db: Session = Depends(get_db)):
         .all()
     )
     return blocks
+
+
+@router.get("/{document_id}/stages", response_model=list[ProcessingStageJobResponse])
+def list_document_stage_jobs(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return (
+        db.query(ProcessingStageJob)
+        .filter(
+            ProcessingStageJob.document_id == document_id,
+            ProcessingStageJob.translation_job_id.is_(None),
+        )
+        .order_by(ProcessingStageJob.id.asc())
+        .all()
+    )
+
+
+@router.post("/{document_id}/retry", response_model=DocumentResponse)
+def retry_document_pipeline(
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    failed_stages = (
+        db.query(ProcessingStageJob)
+        .filter(
+            ProcessingStageJob.document_id == document_id,
+            ProcessingStageJob.translation_job_id.is_(None),
+            ProcessingStageJob.status == "failed",
+        )
+        .all()
+    )
+    if not failed_stages:
+        raise HTTPException(status_code=400, detail="No failed stage to retry")
+
+    for stage_job in failed_stages:
+        if stage_job.attempt_count >= stage_job.max_attempts:
+            raise HTTPException(status_code=400, detail="One or more stages exceeded retry limit")
+        stage_job.status = "queued"
+        stage_job.error_message = None
+        stage_job.started_at = None
+        stage_job.finished_at = None
+
+    doc.status = "uploaded"
+    doc.error_message = None
+    db.commit()
+    db.refresh(doc)
+    logger.info("Retry queued for document_id=%d with %d failed stages", document_id, len(failed_stages))
+    background_tasks.add_task(_run_document_pipeline, document_id)
+    return doc

@@ -12,6 +12,8 @@ type TranslationJob = {
   document_id: number;
   source_language: string;
   target_language: string;
+  status: string;
+  error_message: string | null;
   translation_provider: string | null;
   created_at: string;
 };
@@ -301,6 +303,15 @@ export default function TranslationReviewPage() {
     setBlocks(payload);
   }
 
+  async function loadJobMeta() {
+    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}`).then(async (res) => {
+      if (!res.ok) throw new Error("Job not found");
+      return res.json();
+    });
+    setJob(payload);
+    return payload as TranslationJob;
+  }
+
   useEffect(() => {
     if (Number.isNaN(jobId)) {
       setError("Invalid job ID");
@@ -308,15 +319,8 @@ export default function TranslationReviewPage() {
       return;
     }
 
-    Promise.all([
-      fetch(`${API_URL}/api/translation-jobs/${jobId}`).then(async (res) => {
-        if (!res.ok) throw new Error("Job not found");
-        return res.json();
-      }),
-      loadReviewBlocks(),
-    ])
+    Promise.all([loadJobMeta(), loadReviewBlocks()])
       .then(async ([loadedJob]) => {
-        setJob(loadedJob);
         const docRes = await fetch(`${API_URL}/api/documents/${loadedJob.document_id}`);
         if (!docRes.ok) return null;
         return docRes.json();
@@ -325,6 +329,16 @@ export default function TranslationReviewPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load review"))
       .finally(() => setLoading(false));
   }, [jobId]);
+
+  useEffect(() => {
+    if (!job) return;
+    if (!["translation_queued", "translating", "translated"].includes(job.status)) return;
+    const timer = window.setInterval(() => {
+      void loadJobMeta();
+      void loadReviewBlocks();
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [job?.status]);
 
   async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
     const res = await fetch(`${API_URL}/api/translation-results/${resultId}`, {
@@ -429,6 +443,29 @@ export default function TranslationReviewPage() {
     }
   }
 
+  async function handleRetryJob() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/retry`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.detail || `Retry failed (${res.status})`);
+      }
+      const updated = await res.json();
+      setJob(updated);
+      setMessage("Retry queued.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
   if (error && !job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
@@ -452,8 +489,22 @@ export default function TranslationReviewPage() {
             {getLanguageDisplayName(job.target_language)}
           </p>
           <p className="mt-2 text-sm text-slate-600">
+            Job status: <span className="font-medium">{job.status}</span>
+          </p>
+          {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
+          <p className="mt-2 text-sm text-slate-600">
             Headings, paragraphs, and bullet lists render as continuous documents on both sides.
           </p>
+          {job.status === "failed" && (
+            <button
+              type="button"
+              onClick={handleRetryJob}
+              disabled={actionLoading}
+              className="mt-3 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Retry failed stages
+            </button>
+          )}
         </div>
 
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

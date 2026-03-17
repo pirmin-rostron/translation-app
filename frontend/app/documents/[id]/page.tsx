@@ -23,6 +23,7 @@ type TranslationJob = {
   id: number;
   document_id: number;
   status: string;
+  error_message?: string | null;
   created_at: string;
 };
 
@@ -50,6 +51,14 @@ type DocumentBlock = {
   created_at: string;
 };
 
+type ProcessingStageJob = {
+  id: number;
+  stage_name: string;
+  status: string;
+  error_message: string | null;
+  attempt_count: number;
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
@@ -61,6 +70,7 @@ export default function DocumentDetailPage() {
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
+  const [docStages, setDocStages] = useState<ProcessingStageJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingSourceLanguage, setEditingSourceLanguage] = useState(false);
@@ -104,6 +114,13 @@ export default function DocumentDetailPage() {
       .catch(() => setJobs([]));
   };
 
+  const fetchDocStages = () => {
+    fetch(`${API_URL}/api/documents/${id}/stages`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setDocStages)
+      .catch(() => setDocStages([]));
+  };
+
   useEffect(() => {
     if (Number.isNaN(id)) {
       setError("Invalid document ID");
@@ -126,16 +143,33 @@ export default function DocumentDetailPage() {
       fetch(`${API_URL}/api/documents/${id}/translation-jobs`).then((r) =>
         r.ok ? r.json() : []
       ),
+      fetch(`${API_URL}/api/documents/${id}/stages`).then((r) => (r.ok ? r.json() : [])),
     ])
-      .then(([d, b, s, j]) => {
+      .then(([d, b, s, j, ds]) => {
         setDoc(d);
         setBlocks(b);
         setSegments(s);
         setJobs(j);
+        setDocStages(ds);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!doc) return;
+    const activeStage = docStages.find((stage) => stage.status === "queued" || stage.status === "running");
+    const activeJob = jobs.find((job) => job.status === "translation_queued" || job.status === "translating");
+    if (!activeStage && !activeJob) return;
+    const timer = window.setInterval(() => {
+      fetchDoc();
+      fetchBlocks();
+      fetchSegments();
+      fetchJobs();
+      fetchDocStages();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [doc, docStages, jobs]);
 
   const handleCreateJob = async () => {
     setError("");
@@ -191,14 +225,33 @@ export default function DocumentDetailPage() {
       setDoc(updated);
       fetchBlocks();
       fetchSegments();
+      fetchDocStages();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Parse failed");
+    }
+  };
+
+  const handleRetryDoc = async () => {
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/api/documents/${id}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Retry failed (${res.status})`);
+      }
+      const updated = await res.json();
+      setDoc(updated);
+      fetchDocStages();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
     }
   };
 
   if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
   if (error && !doc) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
   if (!doc) return null;
+  const latestDocStage = docStages[docStages.length - 1];
+  const latestJob = jobs[0];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -286,6 +339,12 @@ export default function DocumentDetailPage() {
                 <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">
                   {doc.status}
                 </span>
+                {doc.error_message && <p className="mt-1 text-xs text-red-600">{doc.error_message}</p>}
+                {latestDocStage && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Stage: {latestDocStage.stage_name} ({latestDocStage.status})
+                  </p>
+                )}
               </dd>
             </div>
             <div>
@@ -294,15 +353,15 @@ export default function DocumentDetailPage() {
             </div>
           </dl>
           <div className="mt-4 flex flex-wrap gap-3">
-            {doc.status === "uploaded" && (
+            {(doc.status === "uploaded" || doc.status === "failed") && (
               <button
-                onClick={handleParse}
+                onClick={doc.status === "failed" ? handleRetryDoc : handleParse}
                 className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
               >
-                Parse document
+                {doc.status === "failed" ? "Retry document processing" : "Parse document"}
               </button>
             )}
-            {doc.status === "parsed" && segments.length > 0 && (
+            {doc.status === "segmented" && segments.length > 0 && (
               <button
                 onClick={handleCreateJob}
                 className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
@@ -318,6 +377,7 @@ export default function DocumentDetailPage() {
                 View translation results
               </Link>
             )}
+            {latestJob?.error_message && <p className="text-red-600 text-sm w-full">{latestJob.error_message}</p>}
             {error && <p className="text-red-600 text-sm w-full">{error}</p>}
             {sourceLanguageSuccess && <p className="text-green-600 text-sm w-full">{sourceLanguageSuccess}</p>}
           </div>
@@ -325,12 +385,12 @@ export default function DocumentDetailPage() {
 
         <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Parsed blocks</h2>
-          {blocks.length === 0 && doc.status === "uploaded" && (
+          {blocks.length === 0 && (doc.status === "uploaded" || doc.status === "failed") && (
             <p className="text-slate-600">
               Parse the document to view headings, paragraphs, and bullet items.
             </p>
           )}
-          {blocks.length === 0 && doc.status === "parsed" && (
+          {blocks.length === 0 && (doc.status === "parsed" || doc.status === "segmented") && (
             <p className="text-slate-600">No parsed blocks (document may be empty).</p>
           )}
           {blocks.length > 0 && (

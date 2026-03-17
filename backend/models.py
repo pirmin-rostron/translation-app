@@ -15,12 +15,14 @@ class TranslationJob(Base):
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
     status = Column(String(50), nullable=False, default="queued")
+    error_message = Column(Text, nullable=True)
     translation_provider = Column(String(50), nullable=True)  # "mock" | "openai"
     translation_batch_size = Column(Integer, nullable=True)  # batch size used
     created_at = Column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", backref="translation_jobs")
     results = relationship("TranslationResult", back_populates="job")
+    stage_jobs = relationship("ProcessingStageJob", back_populates="translation_job")
 
 
 class TranslationResult(Base):
@@ -84,10 +86,31 @@ class Document(Base):
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
     status = Column(String(50), nullable=False, default="uploaded")
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     blocks = relationship("DocumentBlock", back_populates="document")
     segments = relationship("DocumentSegment", back_populates="document")
+    stage_jobs = relationship("ProcessingStageJob", back_populates="document")
+
+
+class ProcessingStageJob(Base):
+    __tablename__ = "processing_stage_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    translation_job_id = Column(Integer, ForeignKey("translation_jobs.id"), nullable=True)
+    stage_name = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False, default="queued")
+    attempt_count = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    document = relationship("Document", back_populates="stage_jobs")
+    translation_job = relationship("TranslationJob", back_populates="stage_jobs")
 
 
 class DocumentBlock(Base):

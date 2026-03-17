@@ -15,6 +15,7 @@ type Document = {
   industry: string | null;
   domain: string | null;
   status: string;
+  error_message?: string | null;
   created_at: string;
 };
 
@@ -148,19 +149,20 @@ export default function AllTranslationsPage() {
                       <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-800">
                         {doc.status}
                       </span>
+                      {doc.error_message && <p className="mt-1 text-xs text-red-600">{doc.error_message}</p>}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatDate(doc.created_at)}</td>
                     <td className="px-6 py-4 flex gap-2">
                       <Link href={`/documents/${doc.id}`} className="text-sm text-slate-600 hover:text-slate-900">
                         View
                       </Link>
-                      {doc.status === "uploaded" && (
+                      {(doc.status === "uploaded" || doc.status === "failed") && (
                         <button
                           onClick={() => handleParse(doc.id)}
                           disabled={parsingId === doc.id}
                           className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
                         >
-                          {parsingId === doc.id ? "Parsing…" : "Parse"}
+                          {parsingId === doc.id ? "Processing…" : doc.status === "failed" ? "Retry" : "Parse"}
                         </button>
                       )}
                     </td>

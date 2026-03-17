@@ -62,6 +62,41 @@ def _migrate_schema():
             if "glossary_matches" not in result_columns:
                 conn.execute(text("ALTER TABLE translation_results ADD COLUMN glossary_matches JSONB"))
 
+    if "documents" in table_names:
+        document_columns = {column["name"] for column in inspector.get_columns("documents")}
+        if "error_message" not in document_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE documents ADD COLUMN error_message TEXT"))
+
+    if "translation_jobs" in table_names:
+        job_columns = {column["name"] for column in inspector.get_columns("translation_jobs")}
+        if "error_message" not in job_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN error_message TEXT"))
+
+    if "processing_stage_jobs" not in table_names:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE processing_stage_jobs (
+                        id SERIAL PRIMARY KEY,
+                        document_id INTEGER NOT NULL REFERENCES documents(id),
+                        translation_job_id INTEGER REFERENCES translation_jobs(id),
+                        stage_name VARCHAR(50) NOT NULL,
+                        status VARCHAR(50) NOT NULL DEFAULT 'queued',
+                        attempt_count INTEGER NOT NULL DEFAULT 0,
+                        max_attempts INTEGER NOT NULL DEFAULT 3,
+                        error_message TEXT,
+                        started_at TIMESTAMP,
+                        finished_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX ix_processing_stage_jobs_id ON processing_stage_jobs (id)"))
+
     if "document_segments" in table_names:
         segment_columns = {column["name"] for column in inspector.get_columns("document_segments")}
         with engine.begin() as conn:

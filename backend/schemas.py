@@ -25,6 +25,7 @@ class DocumentResponse(BaseModel):
     industry: str | None
     domain: str | None
     status: str
+    error_message: str | None
     created_at: datetime
 
     class Config:
@@ -86,6 +87,7 @@ class TranslationJobResponse(BaseModel):
     industry: str | None
     domain: str | None
     status: str
+    error_message: str | None
     translation_provider: str | None
     translation_batch_size: int | None
     created_at: datetime
@@ -192,3 +194,20 @@ class ReviewBlockResponse(BaseModel):
     text_translated: str | None
     formatting_json: dict | None
     segments: list[ReviewSegmentResponse]
+
+
+class ProcessingStageJobResponse(BaseModel):
+    id: int
+    document_id: int
+    translation_job_id: int | None
+    stage_name: str
+    status: str
+    attempt_count: int
+    max_attempts: int
+    error_message: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
