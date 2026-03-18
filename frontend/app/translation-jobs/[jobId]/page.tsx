@@ -535,6 +535,8 @@ export default function TranslationReviewPage() {
   const [message, setMessage] = useState("");
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const reviewGuidanceRef = useRef<HTMLElement | null>(null);
+  const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
   const allSegments = useMemo(
     () =>
@@ -645,10 +647,13 @@ export default function TranslationReviewPage() {
       setSelectedId(null);
       return;
     }
+    if (reviewCompleteState && reviewMode === "document" && selectedId == null) {
+      return;
+    }
     if (!filteredSegments.some(({ segment }) => segment.id === selectedId)) {
       setSelectedId(filteredSegments[0].segment.id);
     }
-  }, [filteredSegments, selectedId]);
+  }, [filteredSegments, selectedId, reviewCompleteState, reviewMode]);
 
   useEffect(() => {
     if (!selectedSegment) return;
@@ -914,7 +919,25 @@ export default function TranslationReviewPage() {
 
   async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
     await persistResult(resultId, finalTranslation, reviewStatus);
-    await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+    const [, summary] = await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+    return summary as ReviewSummary;
+  }
+
+  function focusReviewGuidance() {
+    setSelectedIssueKey(null);
+    setSelectedId(null);
+    setIsEditing(false);
+    setReviewMode("document");
+    setActiveFilter("all");
+    reviewGuidanceRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  function transitionToReviewCompleteState(summary: ReviewSummary | null | undefined) {
+    if (!summary?.review_complete) return false;
+    focusReviewGuidance();
+    setMessage("Review complete. Continue in Review Guidance to export.");
+    setError("");
+    return true;
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
@@ -1071,8 +1094,11 @@ export default function TranslationReviewPage() {
     setMessage("");
     setError("");
     try {
-      await saveResult(selectedSegment.id, draftTranslation, "edited");
+      const summary = await saveResult(selectedSegment.id, draftTranslation, "edited");
       setIsEditing(false);
+      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
+        return;
+      }
       if (reviewMode === "document") {
         moveToBlockById(nextBlockId);
         setMessage("Edited and saved. Moved to next block.");
@@ -1093,8 +1119,11 @@ export default function TranslationReviewPage() {
     setMessage("");
     setError("");
     try {
-      await saveResult(selectedSegment.id, draftTranslation, "approved");
+      const summary = await saveResult(selectedSegment.id, draftTranslation, "approved");
       setIsEditing(false);
+      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
+        return;
+      }
       if (reviewMode === "document") {
         moveToBlockById(nextBlockId);
         setMessage("Block approved. Moved to next block.");
@@ -1121,7 +1150,10 @@ export default function TranslationReviewPage() {
       for (const segment of toApprove) {
         await persistResult(segment.id, segment.final_translation, "approved");
       }
-      await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+      const [, summary] = await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+      if (transitionToReviewCompleteState(summary as ReviewSummary)) {
+        return;
+      }
       moveToBlockById(nextBlockId);
       setMessage(
         toApprove.length > 0
@@ -1182,8 +1214,11 @@ export default function TranslationReviewPage() {
     setMessage("");
     setError("");
     try {
-      await saveResult(selectedSegment.id, chosenTranslation, chosenStatus);
+      const summary = await saveResult(selectedSegment.id, chosenTranslation, chosenStatus);
       setIsEditing(false);
+      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
+        return;
+      }
       if (hasAmbiguityChoice && reviewMode === "document" && nextAmbiguityIssue) {
         setSelectedIssueKey(nextAmbiguityIssue.key);
         setSelectedId(nextAmbiguityIssue.segmentId);
@@ -1572,7 +1607,7 @@ export default function TranslationReviewPage() {
           </section>
         )}
 
-        <section className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
+        <section ref={reviewGuidanceRef} className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Guidance</p>
@@ -1868,7 +1903,21 @@ export default function TranslationReviewPage() {
 
           <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {!selectedSegment || !selectedBlock ? (
-              <div className="text-sm text-slate-600">Select highlighted text to review details.</div>
+              reviewComplete ? (
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium text-slate-900">Review complete.</p>
+                  <p className="text-slate-600">Use Review Guidance to continue with export.</p>
+                  <button
+                    type="button"
+                    onClick={focusReviewGuidance}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Go to Review Guidance
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-600">Select highlighted text to review details.</div>
+              )
             ) : (
               <>
                 <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
