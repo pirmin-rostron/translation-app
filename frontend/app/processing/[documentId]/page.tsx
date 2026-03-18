@@ -178,45 +178,59 @@ export default function ProcessingPage() {
   const steps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
     {
       title: "Upload",
-      subtitle: "Uploading document",
+      subtitle: "Done",
       status: "complete",
     },
     {
       title: "Parse",
-      subtitle: parseFailed ? "Could not extract content" : parsingDone ? "Content extracted" : "Extracting content",
+      subtitle: parseFailed ? "Failed" : parsingDone ? "Done" : "In progress",
       status: parseFailed ? "failed" : parsingDone ? "complete" : currentStep === 1 ? "current" : "upcoming",
     },
     {
       title: "Translate",
       subtitle: translationFailed
-        ? "Could not finish translation"
+        ? "Failed"
         : translationDone
-          ? "Translation completed"
-          : translationProgress
-            ? `Translating ${translationProgress.completed_segments} of ${translationProgress.total_segments} segments`
-            : translationStarted
-              ? "Starting translation"
-              : "Waiting for parsing to finish",
+          ? "Done"
+          : translationStarted
+            ? "In progress"
+            : "Waiting",
       status: translationFailed ? "failed" : translationDone ? "complete" : currentStep === 2 ? "current" : "upcoming",
     },
     {
       title: "Review ready",
-      subtitle: translationDone ? "Your document is ready for review" : "Preparing review",
+      subtitle: translationDone ? "Ready" : "Waiting",
       status: translationDone ? "complete" : currentStep === 3 ? "current" : "upcoming",
     },
   ];
 
-  const currentStatusText = hasFailure
+  const currentStatusHeading = hasFailure
     ? parseFailed
-      ? "We could not finish extracting content."
-      : "We could not finish translating your document."
+      ? "Parsing needs attention"
+      : "Translation needs attention"
     : translationDone
       ? "Review ready"
       : translationProgress
-        ? `Translating ${translationProgress.completed_segments} of ${translationProgress.total_segments} segments`
+        ? "Translating your document"
         : docProgress?.is_active
-          ? "Extracting content"
-          : "Uploading document";
+          ? "Parsing your document"
+          : "Uploading your document";
+
+  const currentStatusSupport = hasFailure
+    ? "Please retry the failed step to continue."
+    : translationDone
+      ? "Your document is ready for review."
+      : translationProgress
+        ? `${translationProgress.completed_segments} of ${translationProgress.total_segments} segments translated • ${
+            translationProgress.eta_seconds == null
+              ? "Calculating remaining time"
+              : formatEta(translationProgress.eta_seconds)
+          }`
+        : docProgress?.is_active
+          ? `${docProgress.stage_label} • ${
+              docProgress.eta_seconds == null ? "Calculating remaining time" : formatEta(docProgress.eta_seconds)
+            }`
+          : "This usually takes a minute or two. You can stay on this page.";
 
   useEffect(() => {
     if (!translationDone || !latestJob) return;
@@ -236,14 +250,8 @@ export default function ProcessingPage() {
         <p className="mt-1 text-sm text-slate-600">{doc.filename}</p>
 
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium text-slate-900">{currentStatusText}</p>
-          <p className="mt-1 text-xs text-slate-600">
-            {hasFailure
-              ? "Please retry the failed step to continue."
-              : translationDone
-                ? "Your document is ready for review."
-                : "This usually takes a minute or two. You can stay on this page."}
-          </p>
+          <p className="text-lg font-semibold text-slate-900">{currentStatusHeading}</p>
+          <p className="mt-1 text-sm text-slate-600">{currentStatusSupport}</p>
 
           <div className="mt-4">
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
@@ -253,12 +261,6 @@ export default function ProcessingPage() {
               />
             </div>
             <p className="mt-1 text-xs text-slate-600">{overallProgress}% complete</p>
-            {!hasFailure && translationProgress && !translationDone && (
-              <p className="mt-1 text-xs text-slate-600">
-                {translationProgress.stage_label} • {translationProgress.completed_segments}/
-                {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
-              </p>
-            )}
           </div>
 
           <ol className="mt-5 space-y-3">
