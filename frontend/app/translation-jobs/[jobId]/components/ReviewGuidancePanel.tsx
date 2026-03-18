@@ -39,6 +39,7 @@ type ReviewGuidancePanelProps = {
   unresolvedGlossaryReviews: number;
   unresolvedMemoryReviews: number;
   unresolvedSemanticReviews: number;
+  translationStyle: "natural" | "literal";
   reviewComplete: boolean;
   resolvedItemsCount: number;
   startHereActionLabel: string;
@@ -79,6 +80,7 @@ export function ReviewGuidancePanel({
   unresolvedGlossaryReviews,
   unresolvedMemoryReviews,
   unresolvedSemanticReviews,
+  translationStyle,
   reviewComplete,
   resolvedItemsCount,
   startHereActionLabel,
@@ -194,6 +196,9 @@ export function ReviewGuidancePanel({
             <p className="mt-2 text-sm text-slate-600">
               Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> • Semantic
               memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Style: <span className="font-medium text-slate-900">{translationStyle === "literal" ? "Literal" : "Natural"}</span>
             </p>
             <p className="mt-1 text-sm text-slate-600">
               Glossary issues remaining: <span className="font-semibold text-slate-900">{unresolvedGlossaryReviews}</span> •

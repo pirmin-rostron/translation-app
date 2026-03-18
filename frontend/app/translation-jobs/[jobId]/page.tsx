@@ -1610,9 +1610,6 @@ export default function TranslationReviewPage() {
           </p>
           <p className="mt-2 text-sm text-slate-600">
             Follow the workflow below to save, finalize, and export.
-            <span className="ml-2 text-slate-500">
-              Style: {job.translation_style === "literal" ? "Literal" : "Natural"}
-            </span>
           </p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
           <div className="mt-4 inline-flex rounded-lg border border-slate-300 bg-white p-1">
@@ -1661,6 +1658,7 @@ export default function TranslationReviewPage() {
           unresolvedGlossaryReviews={unresolvedGlossaryReviews}
           unresolvedMemoryReviews={unresolvedMemoryReviews}
           unresolvedSemanticReviews={unresolvedSemanticReviews}
+          translationStyle={job.translation_style === "literal" ? "literal" : "natural"}
           reviewComplete={reviewComplete}
           resolvedItemsCount={resolvedItemsCount}
           startHereActionLabel={startHereActionLabel}
