@@ -535,13 +535,14 @@ export default function TranslationReviewPage() {
     if (reviewMode !== "document") return;
     if (!orderedBlocks.length) return;
     if (selectedBlockPosition !== -1) return;
-    const firstBlock = orderedBlocks[0];
+    const firstBlock = orderedBlocks.find((block) => !isBlockResolved(block)) ?? orderedBlocks[0];
     setSelectedIssueKey(null);
     setSelectedId(firstBlock.segments[0]?.id ?? null);
     blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [reviewMode, orderedBlocks, selectedBlockPosition]);
 
   useEffect(() => {
+    if (reviewMode !== "issues") return;
     if (!visibleIssues.length) {
       setSelectedIssueKey(null);
       return;
@@ -549,16 +550,17 @@ export default function TranslationReviewPage() {
     if (!selectedIssueKey || !visibleIssues.some((issue) => issue.key === selectedIssueKey)) {
       setSelectedIssueKey(visibleIssues[0].key);
     }
-  }, [visibleIssues, selectedIssueKey]);
+  }, [reviewMode, visibleIssues, selectedIssueKey]);
 
   useEffect(() => {
+    if (reviewMode !== "issues") return;
     if (!selectedIssueKey) return;
     const issue = issuesByKey.get(selectedIssueKey);
     if (!issue) return;
     if (selectedId !== issue.segmentId) {
       setSelectedId(issue.segmentId);
     }
-  }, [selectedIssueKey, issuesByKey, selectedId]);
+  }, [reviewMode, selectedIssueKey, issuesByKey, selectedId]);
 
   function selectIssue(issueKey: string) {
     const issue = issuesByKey.get(issueKey);
@@ -581,10 +583,14 @@ export default function TranslationReviewPage() {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
     if (!block || !block.segments.length) return;
     const fallbackSegmentId = preferredSegmentId ?? block.segments[0].id;
-    const firstIssue = block.segments
-      .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
-      .sort((a, b) => a.segmentIndex - b.segmentIndex)[0];
-    setSelectedIssueKey(firstIssue?.key ?? null);
+    if (reviewMode === "issues") {
+      const firstIssue = block.segments
+        .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
+        .sort((a, b) => a.segmentIndex - b.segmentIndex)[0];
+      setSelectedIssueKey(firstIssue?.key ?? null);
+    } else {
+      setSelectedIssueKey(null);
+    }
     setSelectedId(fallbackSegmentId);
     setMessage("");
     setError("");
@@ -606,9 +612,21 @@ export default function TranslationReviewPage() {
     blockRefs.current[nextBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
-  function getNextBlockIdFromCurrent() {
+  function getNextUnresolvedBlockIdFromCurrent() {
     if (selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1) return null;
-    return orderedBlocks[selectedBlockPosition + 1].id;
+    for (let idx = selectedBlockPosition + 1; idx < orderedBlocks.length; idx += 1) {
+      const candidate = orderedBlocks[idx];
+      if (!isBlockResolved(candidate)) {
+        return candidate.id;
+      }
+    }
+    return null;
+  }
+
+  function getFirstBlockForDocumentReview() {
+    if (!orderedBlocks.length) return null;
+    const firstUnresolved = orderedBlocks.find((block) => !isBlockResolved(block));
+    return firstUnresolved?.id ?? orderedBlocks[0].id;
   }
 
   function moveToBlockById(blockId: number | null) {
@@ -650,11 +668,12 @@ export default function TranslationReviewPage() {
   function switchToDocumentMode() {
     setReviewMode("document");
     setActiveFilter("all");
-    if (orderedBlocks.length > 0) {
-      const firstBlock = orderedBlocks[0];
+    const firstBlockId = getFirstBlockForDocumentReview();
+    if (firstBlockId != null) {
+      const firstBlock = orderedBlocks.find((block) => block.id === firstBlockId);
       setSelectedIssueKey(null);
-      setSelectedId(firstBlock.segments[0]?.id ?? null);
-      blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setSelectedId(firstBlock?.segments[0]?.id ?? null);
+      blockRefs.current[firstBlockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }
 
@@ -857,7 +876,7 @@ export default function TranslationReviewPage() {
 
   async function handleSaveSegmentDraft() {
     if (!selectedSegment) return;
-    const nextBlockId = reviewMode === "document" ? getNextBlockIdFromCurrent() : null;
+    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
     setActionLoading(true);
     setMessage("");
     setError("");
@@ -879,7 +898,7 @@ export default function TranslationReviewPage() {
 
   async function handleApprove() {
     if (!selectedSegment) return;
-    const nextBlockId = reviewMode === "document" ? getNextBlockIdFromCurrent() : null;
+    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
     setActionLoading(true);
     setMessage("");
     setError("");
@@ -901,7 +920,7 @@ export default function TranslationReviewPage() {
 
   async function handleApproveCurrentBlock() {
     if (!selectedBlock) return;
-    const nextBlockId = getNextBlockIdFromCurrent();
+    const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     setActionLoading(true);
     setMessage("");
     setError("");
@@ -927,7 +946,7 @@ export default function TranslationReviewPage() {
   }
 
   function handleSkipBlock() {
-    const nextBlockId = getNextBlockIdFromCurrent();
+    const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     if (nextBlockId == null) {
       setMessage("Reached the end of the document.");
       return;
