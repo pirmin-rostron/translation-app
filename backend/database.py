@@ -198,6 +198,6 @@ def _normalize_status_values():
         )
         conn.execute(
             text(
-                "UPDATE translation_jobs SET status = 'translating' WHERE status = 'translated'"
+                "UPDATE translation_jobs SET status = 'in_review' WHERE status = 'translated'"
             )
         )
