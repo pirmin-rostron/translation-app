@@ -35,14 +35,11 @@ export default function AllTranslationsPage() {
   const [parsingId, setParsingId] = useState<number | null>(null);
   const [openingDocId, setOpeningDocId] = useState<number | null>(null);
 
-  const fetchDocs = () => {
-    fetch(`${API_URL}/api/documents`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
-        return res.json();
-      })
-      .then(setDocs)
-      .catch((err) => setError(err.message));
+  const fetchDocs = async () => {
+    const res = await fetch(`${API_URL}/api/documents`);
+    if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+    const payload = (await res.json()) as Document[];
+    setDocs(payload);
   };
 
   const handleParse = async (docId: number) => {
@@ -56,7 +53,7 @@ export default function AllTranslationsPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `Parse failed (${res.status})`);
       }
-      fetchDocs();
+      await fetchDocs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Parse failed");
     } finally {
@@ -90,13 +87,8 @@ export default function AllTranslationsPage() {
   };
 
   useEffect(() => {
-    fetch(`${API_URL}/api/documents`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
-        return res.json();
-      })
-      .then(setDocs)
-      .catch((err) => setError(err.message))
+    fetchDocs()
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load documents"))
       .finally(() => setLoading(false));
   }, []);
 

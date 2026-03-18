@@ -23,13 +23,6 @@ const DOMAIN_OPTIONS = [
   { value: "Marketing Content", label: "Marketing Content" },
 ];
 
-const ALLOWED_TYPES = [
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-  "application/rtf",
-  "text/rtf",
-];
-
 export default function UploadPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
