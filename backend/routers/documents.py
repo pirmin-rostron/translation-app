@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, get_db
 from models import Document, DocumentBlock, DocumentSegment, ProcessingStageJob, SegmentAnnotation
 from schemas import (
+    DocumentProgressResponse,
     DocumentBlockResponse,
     DocumentResponse,
     DocumentSourceLanguageUpdate,
@@ -227,6 +228,82 @@ def _execute_segment_stage(db: Session, document_id: int):
     db.commit()
 
 
+def _seconds_between(started_at: datetime | None, finished_at: datetime | None = None) -> float:
+    if not started_at:
+        return 0.0
+    end = finished_at or datetime.utcnow()
+    return max((end - started_at).total_seconds(), 0.0)
+
+
+def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStageJob]) -> DocumentProgressResponse:
+    status = doc.status
+    parsing_job = next((job for job in stage_jobs if job.stage_name == PARSING_STAGE), None)
+    segment_job = next((job for job in stage_jobs if job.stage_name == SEGMENT_STAGE), None)
+
+    if status == SEGMENTED_STATUS:
+        return DocumentProgressResponse(
+            document_id=doc.id,
+            stage_label="Parsing complete",
+            percentage=100.0,
+            eta_seconds=0,
+            is_complete=True,
+        )
+    if status == FAILED_STATUS:
+        return DocumentProgressResponse(
+            document_id=doc.id,
+            stage_label="Parsing failed",
+            percentage=100.0,
+            eta_seconds=None,
+            is_complete=False,
+        )
+
+    if parsing_job and parsing_job.status == "running":
+        elapsed = _seconds_between(parsing_job.started_at)
+        if elapsed < 2:
+            return DocumentProgressResponse(
+                document_id=doc.id,
+                stage_label="Parsing document",
+                percentage=35.0,
+                eta_seconds=max(int(12 - elapsed), 1),
+                is_complete=False,
+            )
+        return DocumentProgressResponse(
+            document_id=doc.id,
+            stage_label="Extracting blocks",
+            percentage=60.0,
+            eta_seconds=max(int(8 - min(elapsed, 7)), 1),
+            is_complete=False,
+        )
+
+    if segment_job and segment_job.status in {"queued", "running"}:
+        elapsed = _seconds_between(segment_job.started_at)
+        eta = max(int(6 - min(elapsed, 5)), 1) if segment_job.status == "running" else 6
+        return DocumentProgressResponse(
+            document_id=doc.id,
+            stage_label="Creating segments",
+            percentage=85.0 if segment_job.status == "running" else 75.0,
+            eta_seconds=eta,
+            is_complete=False,
+        )
+
+    if parsing_job and parsing_job.status == "queued":
+        return DocumentProgressResponse(
+            document_id=doc.id,
+            stage_label="Upload received",
+            percentage=10.0,
+            eta_seconds=18,
+            is_complete=False,
+        )
+
+    return DocumentProgressResponse(
+        document_id=doc.id,
+        stage_label="Upload received",
+        percentage=5.0,
+        eta_seconds=None,
+        is_complete=False,
+    )
+
+
 def validate_file(file: UploadFile) -> tuple[str, str]:
     """Validate file type and return (filename, file_type)."""
     if not file.filename:
@@ -395,6 +472,23 @@ def list_document_stage_jobs(document_id: int, db: Session = Depends(get_db)):
         .order_by(ProcessingStageJob.id.asc())
         .all()
     )
+
+
+@router.get("/{document_id}/progress", response_model=DocumentProgressResponse)
+def get_document_progress(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    stage_jobs = (
+        db.query(ProcessingStageJob)
+        .filter(
+            ProcessingStageJob.document_id == document_id,
+            ProcessingStageJob.translation_job_id.is_(None),
+        )
+        .order_by(ProcessingStageJob.id.asc())
+        .all()
+    )
+    return _calculate_document_progress(doc, stage_jobs)
 
 
 @router.post("/{document_id}/retry", response_model=DocumentResponse)

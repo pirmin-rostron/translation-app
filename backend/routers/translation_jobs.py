@@ -24,6 +24,7 @@ from schemas import (
     ExportResponse,
     ProcessingStageJobResponse,
     ReviewSummaryResponse,
+    TranslationProgressResponse,
     ReviewBlockResponse,
     ReviewSegmentResponse,
     SegmentAnnotationResponse,
@@ -539,6 +540,95 @@ def _build_export_text(db: Session, job: TranslationJob) -> str:
     return "\n".join(output_lines).strip() + "\n"
 
 
+def _estimate_translation_eta_seconds(job: TranslationJob, total_segments: int, completed_segments: int) -> int | None:
+    if total_segments <= 0 or completed_segments <= 0 or not job.progress_started_at:
+        return None
+    elapsed = (datetime.utcnow() - job.progress_started_at).total_seconds()
+    if elapsed <= 0:
+        return None
+    rate = completed_segments / elapsed
+    if rate <= 0:
+        return None
+    remaining = total_segments - completed_segments
+    if remaining <= 0:
+        return 0
+    return max(int(remaining / rate), 1)
+
+
+def _calculate_translation_progress(db: Session, job: TranslationJob) -> TranslationProgressResponse:
+    stage_jobs = (
+        db.query(ProcessingStageJob)
+        .filter(ProcessingStageJob.translation_job_id == job.id)
+        .order_by(ProcessingStageJob.id.asc())
+        .all()
+    )
+    translation_stage = next((stage for stage in stage_jobs if stage.stage_name == TRANSLATION_STAGE), None)
+    ambiguity_stage = next((stage for stage in stage_jobs if stage.stage_name == AMBIGUITY_STAGE), None)
+    reconstruction_stage = next((stage for stage in stage_jobs if stage.stage_name == RECONSTRUCTION_STAGE), None)
+
+    total_segments = job.progress_total_segments or (
+        db.query(DocumentSegment).filter(DocumentSegment.document_id == job.document_id).count()
+    )
+    completed_segments = max(job.progress_completed_segments or 0, 0)
+    eta_seconds: int | None = None
+    stage_label = "Translation queued"
+    percentage = 0.0
+
+    completed_statuses = {"in_review", "draft_saved", "ready_for_export", "exported"}
+    if job.status in completed_statuses:
+        return TranslationProgressResponse(
+            job_id=job.id,
+            stage_label="Translation complete",
+            total_segments=total_segments,
+            completed_segments=total_segments,
+            percentage=100.0,
+            eta_seconds=0,
+            is_complete=True,
+        )
+
+    if translation_stage and translation_stage.status in {"running", "queued"}:
+        if translation_stage.status == "queued":
+            stage_label = "Preparing translation"
+            percentage = 5.0
+            eta_seconds = None
+        else:
+            stage_label = f"Translating {completed_segments} of {total_segments} segments"
+            segment_pct = (completed_segments / total_segments * 100.0) if total_segments > 0 else 0.0
+            percentage = min(segment_pct * 0.85, 85.0)
+            eta_seconds = _estimate_translation_eta_seconds(job, total_segments, completed_segments)
+    elif ambiguity_stage and ambiguity_stage.status in {"running", "queued"}:
+        stage_label = "Detecting ambiguities"
+        percentage = 92.0 if ambiguity_stage.status == "running" else 88.0
+        eta_seconds = 6 if ambiguity_stage.status == "queued" else 3
+    elif reconstruction_stage and reconstruction_stage.status in {"running", "queued"}:
+        stage_label = "Preparing review document"
+        percentage = 97.0 if reconstruction_stage.status == "running" else 95.0
+        eta_seconds = 2
+    else:
+        if job.status == "translation_queued":
+            stage_label = "Translation queued"
+            percentage = 0.0
+        elif job.status in {"translating", "translated"}:
+            segment_pct = (completed_segments / total_segments * 100.0) if total_segments > 0 else 0.0
+            stage_label = f"Translating {completed_segments} of {total_segments} segments"
+            percentage = min(segment_pct, 99.0)
+            eta_seconds = _estimate_translation_eta_seconds(job, total_segments, completed_segments)
+        elif job.status == "failed":
+            stage_label = "Translation failed"
+            percentage = 100.0
+            eta_seconds = None
+
+    return TranslationProgressResponse(
+        job_id=job.id,
+        stage_label=stage_label,
+        total_segments=total_segments,
+        completed_segments=min(completed_segments, total_segments) if total_segments > 0 else completed_segments,
+        percentage=round(max(min(percentage, 100.0), 0.0), 1),
+        eta_seconds=eta_seconds,
+        is_complete=False,
+    )
+
+
 def _execute_translation_stage(db: Session, translation_job_id: int):
     job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
     if not job:
@@ -586,7 +676,13 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     )
     db.commit()
 
-    translated_results: list[tuple[DocumentSegment, object, str | None, float | None, list[dict]]] = []
+    total_segments = len(segments)
+    completed_segments = 0
+    job.progress_total_segments = total_segments
+    job.progress_completed_segments = 0
+    job.progress_started_at = datetime.utcnow()
+    db.commit()
+
     for i in range(0, len(segments), batch_size):
         batch = segments[i : i + batch_size]
         memory_matches: dict[int, TranslationMemoryMatch] = {}
@@ -669,56 +765,59 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
             for seg, res in zip(missing_segments, results, strict=True):
                 provider_results_by_segment_id[seg.id] = res
 
+        batch_results: list[TranslationResult] = []
         for seg in batch:
             if seg.id in memory_matches:
                 match = memory_matches[seg.id]
-                translated_results.append(
-                    (seg, match.approved, match.match_type, match.similarity, glossary_matches_by_segment.get(seg.id, []))
+                approved = match.approved
+                batch_results.append(
+                    TranslationResult(
+                        job_id=translation_job_id,
+                        segment_id=seg.id,
+                        primary_translation=approved.approved_translation,
+                        final_translation=approved.approved_translation,
+                        confidence_score=match.similarity,
+                        review_status="memory_match",
+                        exact_memory_used=match.match_type == "exact",
+                        semantic_memory_used=match.match_type == "semantic",
+                        ambiguity_detected=False,
+                        ambiguity_details=None,
+                        glossary_applied=False,
+                        glossary_matches=None,
+                    )
                 )
             else:
-                translated_results.append(
-                    (seg, provider_results_by_segment_id[seg.id], None, None, glossary_matches_by_segment.get(seg.id, []))
+                res = provider_results_by_segment_id[seg.id]
+                glossary_matches = glossary_matches_by_segment.get(seg.id, [])
+                batch_results.append(
+                    TranslationResult(
+                        job_id=translation_job_id,
+                        segment_id=seg.id,
+                        primary_translation=res.primary_translation,
+                        final_translation=res.primary_translation,
+                        confidence_score=None,
+                        review_status="unreviewed",
+                        exact_memory_used=False,
+                        semantic_memory_used=False,
+                        ambiguity_detected=res.ambiguity_detected,
+                        ambiguity_details=res.ambiguity_details,
+                        glossary_applied=bool(glossary_matches),
+                        glossary_matches=_build_glossary_matches_payload(glossary_matches),
+                    )
                 )
 
-    for seg, res, memory_type, similarity, glossary_matches in translated_results:
-        if memory_type:
-            approved = res
-            result = TranslationResult(
-                job_id=translation_job_id,
-                segment_id=seg.id,
-                primary_translation=approved.approved_translation,
-                final_translation=approved.approved_translation,
-                confidence_score=similarity,
-                review_status="memory_match",
-                exact_memory_used=memory_type == "exact",
-                semantic_memory_used=memory_type == "semantic",
-                ambiguity_detected=False,
-                ambiguity_details=None,
-                glossary_applied=False,
-                glossary_matches=None,
-            )
-        else:
-            result = TranslationResult(
-                job_id=translation_job_id,
-                segment_id=seg.id,
-                primary_translation=res.primary_translation,
-                final_translation=res.primary_translation,
-                confidence_score=None,
-                review_status="unreviewed",
-                exact_memory_used=False,
-                semantic_memory_used=False,
-                ambiguity_detected=res.ambiguity_detected,
-                ambiguity_details=res.ambiguity_details,
-                glossary_applied=bool(glossary_matches),
-                glossary_matches=_build_glossary_matches_payload(glossary_matches),
-            )
-        db.add(result)
+        db.add_all(batch_results)
+        completed_segments += len(batch_results)
+        job.progress_completed_segments = completed_segments
+        db.commit()
 
     job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
     doc = db.query(Document).filter(Document.id == job.document_id).first()
     job.translation_provider = provider_name
     job.translation_batch_size = batch_size
     job.status = "translated"
+    job.progress_total_segments = total_segments
+    job.progress_completed_segments = total_segments
     job.error_message = None
     doc.status = "translated"
     doc.error_message = None
@@ -806,12 +905,17 @@ def create_translation_job(
         translation_batch_size=None,
         error_message=None,
         last_saved_at=None,
+        progress_total_segments=None,
+        progress_completed_segments=0,
+        progress_started_at=None,
     )
     db.add(job)
     db.flush()
     _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=TRANSLATION_STAGE)
     _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=AMBIGUITY_STAGE)
     _queue_stage_job(db, document_id=document_id, translation_job_id=job.id, stage_name=RECONSTRUCTION_STAGE)
+    job.progress_total_segments = len(segments)
+    job.progress_completed_segments = 0
     doc.status = "translation_queued"
     doc.error_message = None
     db.commit()
@@ -827,6 +931,14 @@ def get_translation_job(job_id: int, db: Session = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return job
+
+
+@router.get("/translation-jobs/{job_id}/progress", response_model=TranslationProgressResponse)
+def get_translation_progress(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    return _calculate_translation_progress(db, job)
 
 
 @router.get("/translation-jobs/{job_id}/results", response_model=list[TranslationResultResponse])
@@ -1246,6 +1358,8 @@ def retry_translation_job(job_id: int, background_tasks: BackgroundTasks, db: Se
 
     job.status = "translation_queued"
     job.error_message = None
+    job.progress_completed_segments = 0
+    job.progress_started_at = datetime.utcnow()
     document = db.query(Document).filter(Document.id == job.document_id).first()
     if document:
         document.status = "translation_queued"

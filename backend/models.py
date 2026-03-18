@@ -17,6 +17,9 @@ class TranslationJob(Base):
     status = Column(String(50), nullable=False, default="queued")
     error_message = Column(Text, nullable=True)
     last_saved_at = Column(DateTime, nullable=True)
+    progress_total_segments = Column(Integer, nullable=True)
+    progress_completed_segments = Column(Integer, nullable=True)
+    progress_started_at = Column(DateTime, nullable=True)
     translation_provider = Column(String(50), nullable=True)  # "mock" | "openai"
     translation_batch_size = Column(Integer, nullable=True)  # batch size used
     created_at = Column(DateTime, default=datetime.utcnow)

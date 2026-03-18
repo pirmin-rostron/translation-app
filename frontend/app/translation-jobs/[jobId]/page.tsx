@@ -127,10 +127,28 @@ type ExportResult = {
   download_url: string;
 };
 
+type TranslationProgress = {
+  job_id: number;
+  stage_label: string;
+  total_segments: number;
+  completed_segments: number;
+  percentage: number;
+  eta_seconds: number | null;
+  is_complete: boolean;
+};
+
 function normalizeSegmentStatus(status: string) {
   if (status === "reviewed") return "edited";
   if (status === "semantic_memory_match") return "memory_match";
   return status;
+}
+
+function formatEta(seconds: number | null) {
+  if (seconds == null) return "Calculating…";
+  if (seconds <= 0) return "Almost done";
+  if (seconds < 60) return `~${seconds}s remaining`;
+  const mins = Math.ceil(seconds / 60);
+  return `~${mins}m remaining`;
 }
 
 function hasMemory(segment: ReviewSegment) {
@@ -270,6 +288,7 @@ export default function TranslationReviewPage() {
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
+  const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("flagged");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
@@ -356,6 +375,15 @@ export default function TranslationReviewPage() {
     return payload as ReviewSummary;
   }
 
+  async function loadTranslationProgress() {
+    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/progress`).then(async (res) => {
+      if (!res.ok) throw new Error("Failed to load translation progress");
+      return res.json();
+    });
+    setTranslationProgress(payload);
+    return payload as TranslationProgress;
+  }
+
   useEffect(() => {
     if (Number.isNaN(jobId)) {
       setError("Invalid job ID");
@@ -363,7 +391,7 @@ export default function TranslationReviewPage() {
       return;
     }
 
-    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary()])
+    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary(), loadTranslationProgress()])
       .then(async ([loadedJob]) => {
         const docRes = await fetch(`${API_URL}/api/documents/${loadedJob.document_id}`);
         if (!docRes.ok) return null;
@@ -381,6 +409,7 @@ export default function TranslationReviewPage() {
       void loadJobMeta();
       void loadReviewBlocks();
       void loadReviewSummary();
+      void loadTranslationProgress();
     }, 2500);
     return () => window.clearInterval(timer);
   }, [job?.status]);
@@ -393,7 +422,7 @@ export default function TranslationReviewPage() {
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.detail || "Failed to save translation result");
-    await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta()]);
+    await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
@@ -524,7 +553,7 @@ export default function TranslationReviewPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to save workflow draft");
-      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
       setMessage("Review workflow draft saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save workflow draft");
@@ -544,7 +573,7 @@ export default function TranslationReviewPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to mark ready for export");
-      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
       setMessage("Marked as ready for export.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark ready for export");
@@ -564,7 +593,7 @@ export default function TranslationReviewPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to approve safe segments");
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
       setMessage("Approved all safe unresolved segments.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve safe segments");
@@ -585,7 +614,7 @@ export default function TranslationReviewPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to export document");
       setExportResult(payload as ExportResult);
-      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
       setMessage("Export completed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
@@ -605,7 +634,7 @@ export default function TranslationReviewPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to re-open review");
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
       setMessage("Review re-opened. You can edit segments again.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to re-open review");
@@ -670,6 +699,23 @@ export default function TranslationReviewPage() {
           <p className="mt-2 text-sm text-slate-600">Follow the workflow below to save, finalize, and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
         </div>
+
+        {translationProgress && !translationProgress.is_complete && (
+          <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
+            <p className="text-sm font-medium text-emerald-900">Translation in progress…</p>
+            <p className="mt-1 text-sm text-slate-700">{translationProgress.stage_label}</p>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-600">
+              {translationProgress.percentage.toFixed(0)}% • {translationProgress.completed_segments}/
+              {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
+            </p>
+          </section>
+        )}
 
         <section className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">

@@ -59,8 +59,34 @@ type ProcessingStageJob = {
   attempt_count: number;
 };
 
+type DocumentProgress = {
+  document_id: number;
+  stage_label: string;
+  percentage: number;
+  eta_seconds: number | null;
+  is_complete: boolean;
+};
+
+type TranslationProgress = {
+  job_id: number;
+  stage_label: string;
+  total_segments: number;
+  completed_segments: number;
+  percentage: number;
+  eta_seconds: number | null;
+  is_complete: boolean;
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
+}
+
+function formatEta(seconds: number | null) {
+  if (seconds == null) return "Calculating…";
+  if (seconds <= 0) return "Almost done";
+  if (seconds < 60) return `~${seconds}s remaining`;
+  const mins = Math.ceil(seconds / 60);
+  return `~${mins}m remaining`;
 }
 
 export default function DocumentDetailPage() {
@@ -71,6 +97,8 @@ export default function DocumentDetailPage() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
   const [docStages, setDocStages] = useState<ProcessingStageJob[]>([]);
+  const [docProgress, setDocProgress] = useState<DocumentProgress | null>(null);
+  const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingSourceLanguage, setEditingSourceLanguage] = useState(false);
@@ -121,6 +149,20 @@ export default function DocumentDetailPage() {
       .catch(() => setDocStages([]));
   };
 
+  const fetchDocProgress = () => {
+    fetch(`${API_URL}/api/documents/${id}/progress`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setDocProgress)
+      .catch(() => setDocProgress(null));
+  };
+
+  const fetchTranslationProgress = (jobId: number) => {
+    fetch(`${API_URL}/api/translation-jobs/${jobId}/progress`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setTranslationProgress)
+      .catch(() => setTranslationProgress(null));
+  };
+
   useEffect(() => {
     if (Number.isNaN(id)) {
       setError("Invalid document ID");
@@ -144,13 +186,18 @@ export default function DocumentDetailPage() {
         r.ok ? r.json() : []
       ),
       fetch(`${API_URL}/api/documents/${id}/stages`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_URL}/api/documents/${id}/progress`).then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([d, b, s, j, ds]) => {
+      .then(([d, b, s, j, ds, dp]) => {
         setDoc(d);
         setBlocks(b);
         setSegments(s);
         setJobs(j);
         setDocStages(ds);
+        setDocProgress(dp);
+        if (j.length > 0) {
+          fetchTranslationProgress(j[0].id);
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -167,6 +214,10 @@ export default function DocumentDetailPage() {
       fetchSegments();
       fetchJobs();
       fetchDocStages();
+      fetchDocProgress();
+      if (jobs.length > 0) {
+        fetchTranslationProgress(jobs[0].id);
+      }
     }, 3000);
     return () => window.clearInterval(timer);
   }, [doc, docStages, jobs]);
@@ -352,6 +403,37 @@ export default function DocumentDetailPage() {
               <dd className="font-medium">{formatDate(doc.created_at)}</dd>
             </div>
           </dl>
+          {docProgress && !docProgress.is_complete && (
+            <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4">
+              <p className="text-sm font-medium text-indigo-900">Parsing document…</p>
+              <p className="mt-1 text-sm text-slate-700">{docProgress.stage_label}</p>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+                <div
+                  className="h-full rounded-full bg-indigo-500 transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, docProgress.percentage))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-600">
+                {docProgress.percentage.toFixed(0)}% • {formatEta(docProgress.eta_seconds)}
+              </p>
+            </div>
+          )}
+          {translationProgress && !translationProgress.is_complete && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <p className="text-sm font-medium text-emerald-900">Translating document…</p>
+              <p className="mt-1 text-sm text-slate-700">{translationProgress.stage_label}</p>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-600">
+                {translationProgress.percentage.toFixed(0)}% • {translationProgress.completed_segments}/
+                {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
+              </p>
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-3">
             {(doc.status === "uploaded" || doc.status === "failed") && (
               <button

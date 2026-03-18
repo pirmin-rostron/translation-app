@@ -89,6 +89,9 @@ class TranslationJobResponse(BaseModel):
     status: str
     error_message: str | None
     last_saved_at: datetime | None
+    progress_total_segments: int | None
+    progress_completed_segments: int | None
+    progress_started_at: datetime | None
     translation_provider: str | None
     translation_batch_size: int | None
     created_at: datetime
@@ -238,3 +241,21 @@ class ExportResponse(BaseModel):
     export_format: str
     filename: str
     download_url: str
+
+
+class DocumentProgressResponse(BaseModel):
+    document_id: int
+    stage_label: str
+    percentage: float
+    eta_seconds: int | None
+    is_complete: bool
+
+
+class TranslationProgressResponse(BaseModel):
+    job_id: int
+    stage_label: str
+    total_segments: int
+    completed_segments: int
+    percentage: float
+    eta_seconds: int | None
+    is_complete: bool

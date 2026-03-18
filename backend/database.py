@@ -75,6 +75,12 @@ def _migrate_schema():
                 conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN error_message TEXT"))
             if "last_saved_at" not in job_columns:
                 conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN last_saved_at TIMESTAMP"))
+            if "progress_total_segments" not in job_columns:
+                conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN progress_total_segments INTEGER"))
+            if "progress_completed_segments" not in job_columns:
+                conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN progress_completed_segments INTEGER"))
+            if "progress_started_at" not in job_columns:
+                conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN progress_started_at TIMESTAMP"))
 
     if "processing_stage_jobs" not in table_names:
         with engine.begin() as conn:
