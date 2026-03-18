@@ -160,6 +160,20 @@ function normalizeSegmentStatus(status: string) {
   return status;
 }
 
+function isAcceptableFinalStatus(status: string) {
+  const normalized = normalizeSegmentStatus(status);
+  return normalized === "approved" || normalized === "edited" || normalized === "memory_match";
+}
+
+function isSafeSegment(segment: ReviewSegment) {
+  return (
+    !isAcceptableFinalStatus(segment.review_status) &&
+    !segment.ambiguity_detected &&
+    !segment.semantic_memory_used &&
+    Boolean((segment.final_translation || "").trim())
+  );
+}
+
 function formatEta(seconds: number | null) {
   if (seconds == null) return "Calculating…";
   if (seconds <= 0) return "Almost done";
@@ -405,6 +419,13 @@ export default function TranslationReviewPage() {
   const allNodes = useMemo(() => buildDocumentNodes(blocks), [blocks]);
   const displayedNodes = useMemo(() => buildDocumentNodes(filteredBlocks), [filteredBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
+  const safeSegments = useMemo(
+    () =>
+      allSegments
+        .filter(({ segment }) => isSafeSegment(segment))
+        .sort((a, b) => a.segment.segment_index - b.segment.segment_index),
+    [allSegments]
+  );
   const issues = useMemo(() => {
     const collected: ReviewIssue[] = [];
     for (const { segment } of allSegments) {
@@ -465,6 +486,7 @@ export default function TranslationReviewPage() {
   const selectedSegment = selectedEntry?.segment ?? null;
   const selectedBlock = selectedEntry?.block ?? null;
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
+  const selectedSafeIndex = safeSegments.findIndex(({ segment }) => segment.id === selectedSegment?.id);
 
   useEffect(() => {
     if (!filteredSegments.length) {
@@ -528,6 +550,25 @@ export default function TranslationReviewPage() {
     if (firstAmbiguity) {
       selectIssue(firstAmbiguity.key);
     }
+  }
+
+  function handleReviewSafeSegments() {
+    setActiveFilter("all");
+    if (!safeSegments.length) return;
+    setSelectedIssueKey(null);
+    setSelectedId(safeSegments[0].segment.id);
+    setMessage("");
+    setError("");
+  }
+
+  function handleNextSafeSegment() {
+    if (!safeSegments.length) return;
+    const start = selectedSafeIndex === -1 ? 0 : selectedSafeIndex;
+    const nextIndex = (start + 1) % safeSegments.length;
+    setSelectedIssueKey(null);
+    setSelectedId(safeSegments[nextIndex].segment.id);
+    setMessage("");
+    setError("");
   }
 
   async function loadReviewBlocks() {
@@ -613,6 +654,7 @@ export default function TranslationReviewPage() {
 
     return block.segments.map((segment, idx) => {
       const isSelected = selectedSegment?.id === segment.id;
+      const isSafe = isSafeSegment(segment);
       const segmentHasSelectedIssue = Boolean(
         selectedIssueKey && issuesBySegmentId.get(segment.id)?.some((issue) => issue.key === selectedIssueKey)
       );
@@ -641,6 +683,8 @@ export default function TranslationReviewPage() {
           className={`rounded-md transition-colors cursor-pointer ${
             segmentHasSelectedIssue
               ? "bg-slate-100/90 ring-1 ring-slate-400"
+              : isSafe
+                ? "bg-emerald-50/60 ring-1 ring-emerald-100"
               : isSelected
                 ? "bg-slate-100/80"
                 : "hover:bg-slate-100/70"
@@ -895,6 +939,7 @@ export default function TranslationReviewPage() {
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
   const isReadOnly = workflowStatus === "exported";
   const selectedSegmentStatus = normalizeSegmentStatus(selectedSegment?.review_status ?? "unreviewed");
+  const selectedSegmentIsSafe = Boolean(selectedSegment && isSafeSegment(selectedSegment));
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
@@ -916,6 +961,8 @@ export default function TranslationReviewPage() {
     unresolvedSegments > 0 &&
     safeUnresolvedSegments > 0 &&
     !["ready_for_export", "exported"].includes(workflowStatus);
+  const showReviewSafeSegments =
+    safeUnresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
   const showDownloadLink = workflowStatus === "exported" && exportResult?.download_url;
   const guidanceTitle =
     workflowStatus === "exported"
@@ -1016,6 +1063,16 @@ export default function TranslationReviewPage() {
                   className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-60"
                 >
                   Review ambiguity
+                </button>
+              )}
+              {showReviewSafeSegments && (
+                <button
+                  type="button"
+                  onClick={handleReviewSafeSegments}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                >
+                  Review safe segments
                 </button>
               )}
               {showSaveWorkflowDraft && (
@@ -1239,6 +1296,17 @@ export default function TranslationReviewPage() {
               <>
                 <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
                 <p className="mt-1 text-sm text-slate-500">Block {selectedBlock.block_index + 1}</p>
+                {selectedSegmentIsSafe && (
+                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                    <span className="inline-flex rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-medium text-emerald-800">
+                      Safe segment
+                    </span>
+                    <p className="mt-2 text-sm text-slate-700">No ambiguity or conflicts detected.</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Safe queue position: {selectedSafeIndex + 1} / {safeSegments.length}
+                    </p>
+                  </div>
+                )}
                 {selectedIssue && (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -1393,6 +1461,16 @@ export default function TranslationReviewPage() {
                       className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                     >
                       Save segment edit
+                    </button>
+                  )}
+                  {!isReadOnly && selectedSegmentIsSafe && safeSegments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleNextSafeSegment}
+                      disabled={actionLoading}
+                      className="w-full rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                    >
+                      Next safe segment
                     </button>
                   )}
                   {isReadOnly && (
