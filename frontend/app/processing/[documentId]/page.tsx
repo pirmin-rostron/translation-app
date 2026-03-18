@@ -36,6 +36,8 @@ type TranslationProgress = {
   is_complete: boolean;
 };
 
+type PipelineStepStatus = "complete" | "current" | "upcoming" | "failed";
+
 function formatEta(seconds: number | null) {
   if (seconds == null) return "Calculating…";
   if (seconds <= 0) return "Almost done";
@@ -89,9 +91,6 @@ export default function ProcessingPage() {
         setTranslationProgress(null);
       }
 
-      if (nextJobs.length > 0 && reviewReadyStatuses.has(nextJobs[0].status)) {
-        router.replace(`/translation-jobs/${nextJobs[0].id}`);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load processing state");
     } finally {
@@ -150,112 +149,197 @@ export default function ProcessingPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-50 p-6">Preparing translation pipeline…</div>;
-  if (!doc) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Document not found.</div>;
-
+  const docStatus = doc?.status ?? "uploaded";
   const uploadDone = true;
-  const parsingDone = ["parsed", "segmented", "translation_queued", "translating", "translated", "in_review", "draft_saved", "ready_for_export", "exported"].includes(doc.status);
+  const parsingDone = ["parsed", "segmented", "translation_queued", "translating", "translated", "in_review", "draft_saved", "ready_for_export", "exported"].includes(docStatus);
   const translationStarted = Boolean(latestJob);
   const translationDone = Boolean(latestJob && reviewReadyStatuses.has(latestJob.status));
+  const parseFailed = docStatus === "failed";
+  const translationFailed = latestJob?.status === "failed";
+  const hasFailure = parseFailed || translationFailed;
+
+  const parseProgressValue = parsingDone ? 100 : docProgress?.is_active ? Math.max(0, Math.min(100, docProgress.percentage)) : 0;
+  const translationProgressValue = translationDone
+    ? 100
+    : translationProgress
+      ? Math.max(0, Math.min(100, translationProgress.percentage))
+      : translationStarted
+        ? 10
+        : 0;
+  const reviewProgressValue = translationDone ? 100 : 0;
+  const overallProgress = Math.round((100 * 10 + parseProgressValue * 30 + translationProgressValue * 50 + reviewProgressValue * 10) / 100);
+
+  let currentStep = 0;
+  if (hasFailure) currentStep = parseFailed ? 1 : 2;
+  else if (translationDone) currentStep = 3;
+  else if (translationStarted) currentStep = 2;
+  else if (docProgress?.is_active || parsingDone) currentStep = 1;
+
+  const steps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
+    {
+      title: "Upload",
+      subtitle: "Uploading document",
+      status: "complete",
+    },
+    {
+      title: "Parse",
+      subtitle: parseFailed ? "Could not extract content" : parsingDone ? "Content extracted" : "Extracting content",
+      status: parseFailed ? "failed" : parsingDone ? "complete" : currentStep === 1 ? "current" : "upcoming",
+    },
+    {
+      title: "Translate",
+      subtitle: translationFailed
+        ? "Could not finish translation"
+        : translationDone
+          ? "Translation completed"
+          : translationProgress
+            ? `Translating ${translationProgress.completed_segments} of ${translationProgress.total_segments} segments`
+            : translationStarted
+              ? "Starting translation"
+              : "Waiting for parsing to finish",
+      status: translationFailed ? "failed" : translationDone ? "complete" : currentStep === 2 ? "current" : "upcoming",
+    },
+    {
+      title: "Review ready",
+      subtitle: translationDone ? "Your document is ready for review" : "Preparing review",
+      status: translationDone ? "complete" : currentStep === 3 ? "current" : "upcoming",
+    },
+  ];
+
+  const currentStatusText = hasFailure
+    ? parseFailed
+      ? "We could not finish extracting content."
+      : "We could not finish translating your document."
+    : translationDone
+      ? "Review ready"
+      : translationProgress
+        ? `Translating ${translationProgress.completed_segments} of ${translationProgress.total_segments} segments`
+        : docProgress?.is_active
+          ? "Extracting content"
+          : "Uploading document";
+
+  useEffect(() => {
+    if (!translationDone || !latestJob) return;
+    const timer = window.setTimeout(() => {
+      router.replace(`/translation-jobs/${latestJob.id}`);
+    }, 2200);
+    return () => window.clearTimeout(timer);
+  }, [latestJob, router, translationDone]);
+
+  if (loading) return <div className="min-h-screen bg-slate-50 p-6">Preparing translation pipeline...</div>;
+  if (!doc) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Document not found.</div>;
 
   return (
     <div className="min-h-screen bg-slate-50">
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-2xl font-bold text-slate-900">Preparing your review workspace</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {doc.filename} - We are running upload, parsing, translation, and review preparation automatically.
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">Preparing your translation review</h1>
+        <p className="mt-1 text-sm text-slate-600">{doc.filename}</p>
 
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <ol className="space-y-4">
-            <li className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-900">Uploading</p>
-                <p className="text-xs text-slate-600">File is received and validated.</p>
-              </div>
-              <span className={`rounded px-2 py-0.5 text-xs font-medium ${uploadDone ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{uploadDone ? "Done" : "Pending"}</span>
-            </li>
-            <li className="flex items-start justify-between gap-3">
-              <div className="w-full">
-                <p className="text-sm font-medium text-slate-900">Parsing document</p>
-                <p className="text-xs text-slate-600">{docProgress?.stage_label ?? "Waiting to start parsing"}</p>
-                {docProgress?.is_active && (
-                  <div className="mt-2">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-                      <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(0, Math.min(100, docProgress.percentage))}%` }} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {docProgress.percentage.toFixed(0)}% - {formatEta(docProgress.eta_seconds)}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <span className={`rounded px-2 py-0.5 text-xs font-medium ${parsingDone ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{parsingDone ? "Done" : "Running"}</span>
-            </li>
-            <li className="flex items-start justify-between gap-3">
-              <div className="w-full">
-                <p className="text-sm font-medium text-slate-900">Translating document</p>
-                <p className="text-xs text-slate-600">
-                  {translationProgress
-                    ? `${translationProgress.stage_label} (${translationProgress.completed_segments}/${translationProgress.total_segments})`
-                    : translationStarted
-                      ? "Translation is starting"
-                      : "Waiting for parsing to finish"}
-                </p>
-                {translationProgress && !translationProgress.is_complete && (
-                  <div className="mt-2">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-                      <div
-                        className="h-full rounded-full bg-emerald-500"
-                        style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {translationProgress.percentage.toFixed(0)}% - {formatEta(translationProgress.eta_seconds)}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-medium ${
-                  translationDone ? "bg-emerald-100 text-emerald-700" : translationStarted ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {translationDone ? "Done" : translationStarted ? "Running" : "Pending"}
-              </span>
-            </li>
-            <li className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-900">Preparing review</p>
-                <p className="text-xs text-slate-600">You will be redirected automatically when review is ready.</p>
-              </div>
-              <span className={`rounded px-2 py-0.5 text-xs font-medium ${translationDone ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{translationDone ? "Done" : "Waiting"}</span>
-            </li>
+          <p className="text-sm font-medium text-slate-900">{currentStatusText}</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {hasFailure
+              ? "Please retry the failed step to continue."
+              : translationDone
+                ? "Your document is ready for review."
+                : "This usually takes a minute or two. You can stay on this page."}
+          </p>
+
+          <div className="mt-4">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-all ${hasFailure ? "bg-amber-500" : "bg-indigo-600"}`}
+                style={{ width: `${Math.max(0, Math.min(100, overallProgress))}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-600">{overallProgress}% complete</p>
+          </div>
+
+          <ol className="mt-5 space-y-3">
+            {steps.map((step, index) => (
+              <li key={step.title} className="flex items-start gap-3">
+                <span
+                  className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                    step.status === "complete"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : step.status === "current"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : step.status === "failed"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {step.status === "complete" ? "✓" : index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${step.status === "upcoming" ? "text-slate-500" : "text-slate-900"}`}>
+                    {step.title}
+                  </p>
+                  <p className={`text-xs ${step.status === "upcoming" ? "text-slate-400" : "text-slate-600"}`}>{step.subtitle}</p>
+                </div>
+              </li>
+            ))}
           </ol>
 
-          {(doc.status === "failed" || latestJob?.status === "failed") && (
+          {!hasFailure && translationProgress && !translationDone && (
+            <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Translation progress</p>
+              <p className="mt-1 text-sm text-slate-700">
+                Translating {translationProgress.completed_segments} of {translationProgress.total_segments} segments
+              </p>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {translationProgress.percentage.toFixed(0)}% • {formatEta(translationProgress.eta_seconds)}
+              </p>
+            </div>
+          )}
+
+          {translationDone && latestJob && (
+            <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm font-medium text-emerald-800">Your document is ready for review.</p>
+              <p className="mt-1 text-xs text-emerald-700">Opening review automatically…</p>
+              <button
+                type="button"
+                onClick={() => router.replace(`/translation-jobs/${latestJob.id}`)}
+                className="mt-3 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500"
+              >
+                Open review now
+              </button>
+            </div>
+          )}
+
+          {hasFailure && (
             <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-medium text-red-700">Processing failed</p>
-              <p className="mt-1 text-xs text-red-600">{latestJob?.error_message || doc.error_message || "An error occurred while processing this document."}</p>
+              <p className="text-sm font-medium text-red-700">
+                {parseFailed ? "Parsing could not be completed" : "Translation could not be completed"}
+              </p>
+              <p className="mt-1 text-xs text-red-600">
+                {latestJob?.error_message || doc.error_message || "Please retry to continue your workflow."}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {doc.status === "failed" && (
+                {parseFailed && (
                   <button
                     type="button"
                     onClick={handleRetryDocument}
                     disabled={actionLoading}
                     className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
                   >
-                    Retry parsing
+                    Retry this step
                   </button>
                 )}
-                {latestJob?.status === "failed" && (
+                {translationFailed && (
                   <button
                     type="button"
                     onClick={handleRetryTranslation}
                     disabled={actionLoading}
                     className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
                   >
-                    Retry translation
+                    Retry this step
                   </button>
                 )}
               </div>
