@@ -224,14 +224,6 @@ function normalizeChoiceText(value: string) {
   return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
-function ambiguityOptionSnippet(value: string) {
-  const cleaned = cleanChoiceTranslationText(value);
-  if (!cleaned || cleaned.length < 8) return null;
-  const firstSentence = cleaned.split(/[.!?]/)[0]?.trim() ?? cleaned;
-  const snippet = firstSentence.length > 90 ? `${firstSentence.slice(0, 90).trimEnd()}…` : firstSentence;
-  return snippet.length >= 8 ? snippet : null;
-}
-
 function replaceFirstOccurrence(haystack: string, needle: string, replacement: string) {
   const idx = haystack.indexOf(needle);
   if (idx === -1) return haystack;
@@ -1202,15 +1194,9 @@ export default function TranslationReviewPage() {
   }
 
   function handleEditSelectedTranslation() {
-    if (hasAmbiguityChoice && selectedAmbiguityTranslation.trim()) {
-      setDraftTranslation(selectedAmbiguityTranslation);
-    } else if (semanticChoice === "suggested" && semanticSuggestionText.trim()) {
-      setDraftTranslation(semanticSuggestionText);
-    } else {
-      setDraftTranslation(selectedSegment?.final_translation ?? draftTranslation);
-    }
+    setDraftTranslation("");
     setIsEditing(true);
-    setMessage("Selected translation loaded for editing.");
+    setMessage("Edit mode enabled. Update the translation and save.");
     setError("");
   }
 
@@ -2001,9 +1987,6 @@ export default function TranslationReviewPage() {
                                   ? " - Current suggestion"
                                   : ""}
                               </p>
-                              {ambiguityOptionSnippet(option.translation) && (
-                                <p className="mt-1 text-xs text-slate-600">{ambiguityOptionSnippet(option.translation)}</p>
-                              )}
                             </div>
                           </div>
                         </label>
@@ -2040,7 +2023,13 @@ export default function TranslationReviewPage() {
                     <button
                       type="button"
                       disabled={!canEditSelectedSegment}
-                      onClick={() => setIsEditing((v) => !v)}
+                      onClick={() =>
+                        setIsEditing((v) => {
+                          const next = !v;
+                          if (next) setDraftTranslation("");
+                          return next;
+                        })
+                      }
                       className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isReadOnly ? "Read only" : isEditing ? "Cancel edit" : "Edit translation"}
@@ -2098,8 +2087,7 @@ export default function TranslationReviewPage() {
                             className="mt-0.5"
                           />
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current translation</p>
-                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{semanticChoiceDetails.currentTranslation}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Use current translation decision</p>
                           </div>
                         </div>
                       </label>
@@ -2116,9 +2104,8 @@ export default function TranslationReviewPage() {
                           />
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                              Previous similar approved translation
+                              Use previous similar approved translation
                             </p>
-                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{semanticSuggestionText}</p>
                           </div>
                         </div>
                       </label>
@@ -2143,7 +2130,14 @@ export default function TranslationReviewPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={hasGuidedChoice ? handleEditSelectedTranslation : () => setIsEditing(true)}
+                        onClick={
+                          hasGuidedChoice
+                            ? handleEditSelectedTranslation
+                            : () => {
+                                setDraftTranslation("");
+                                setIsEditing(true);
+                              }
+                        }
                         disabled={actionLoading || !canEditSelectedSegment}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                       >
