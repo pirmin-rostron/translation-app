@@ -1479,8 +1479,6 @@ export default function TranslationReviewPage() {
     unresolvedSegments > 0 &&
     safeUnresolvedSegments > 0 &&
     !["ready_for_export", "exported"].includes(workflowStatus);
-  const showReviewSafeSegments =
-    safeUnresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
   const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
@@ -1517,6 +1515,8 @@ export default function TranslationReviewPage() {
           : showApproveAllSafeSegments
             ? `Approve ${safeUnresolvedSegments} safe ${safeUnresolvedSegments === 1 ? "segment" : "segments"}`
             : "Review Block 1";
+  const primaryGuidanceLabel =
+    completedBlocks > 0 || workflowStatus === "draft_saved" ? "Continue review" : "Start review";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1617,7 +1617,7 @@ export default function TranslationReviewPage() {
                 memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
               </p>
               <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Start here</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recommended next step</p>
                 <p className="mt-1 text-sm text-slate-700">{startHereActionLabel}</p>
               </div>
               <p className="mt-1 text-sm text-slate-600">
@@ -1649,45 +1649,26 @@ export default function TranslationReviewPage() {
                 </span>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex min-w-[220px] flex-col items-end gap-2">
+              {showSaveWorkflowDraft && (
+                <button
+                  type="button"
+                  onClick={handleSaveWorkflowDraft}
+                  disabled={actionLoading}
+                  className="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-800 disabled:opacity-60"
+                >
+                  Save draft
+                </button>
+              )}
+              <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={handleStartHereAction}
                 disabled={actionLoading}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
               >
-                Start here
+                {primaryGuidanceLabel}
               </button>
-              {unresolvedAmbiguities > 0 && !["ready_for_export", "exported"].includes(workflowStatus) && (
-                <button
-                  type="button"
-                  onClick={handleReviewAmbiguities}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-60"
-                >
-                  Review ambiguity
-                </button>
-              )}
-              {showReviewSafeSegments && (
-                <button
-                  type="button"
-                  onClick={handleReviewSafeSegments}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                >
-                  Review safe segments
-                </button>
-              )}
-              {showSaveWorkflowDraft && (
-                <button
-                  type="button"
-                  onClick={handleSaveWorkflowDraft}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Save draft
-                </button>
-              )}
               {showApproveAllSafeSegments && (
                 <div className="flex flex-col gap-1">
                   <button
@@ -1741,6 +1722,7 @@ export default function TranslationReviewPage() {
                   Retry failed stages
                 </button>
               )}
+              </div>
             </div>
           </div>
           <p className="mt-3 text-sm text-slate-600">
