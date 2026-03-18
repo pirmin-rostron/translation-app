@@ -249,6 +249,7 @@ class DocumentProgressResponse(BaseModel):
     percentage: float
     eta_seconds: int | None
     is_complete: bool
+    is_active: bool
 
 
 class TranslationProgressResponse(BaseModel):

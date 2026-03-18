@@ -32,7 +32,8 @@ PARSING_STAGE = "parsing"
 SEGMENT_STAGE = "segmenting"
 FAILED_STATUS = "failed"
 PARSED_STATUS = "parsed"
-SEGMENTED_STATUS = "segmented"
+SEGMENTED_STATUS = "segmented"  # backward-compatible legacy status
+PARSING_STATUS = "parsing"
 
 
 def _queue_stage_job(
@@ -72,6 +73,9 @@ def _run_document_pipeline(document_id: int):
             stage_job.attempt_count += 1
             stage_job.started_at = datetime.utcnow()
             stage_job.error_message = None
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if doc and doc.status != FAILED_STATUS:
+                doc.status = PARSING_STATUS
             db.commit()
             logger.info(
                 "Stage start: stage=%s document_id=%d attempt=%d",
@@ -223,7 +227,7 @@ def _execute_segment_stage(db: Session, document_id: int):
         )
 
     db.add_all(segments)
-    doc.status = SEGMENTED_STATUS
+    doc.status = PARSED_STATUS
     doc.error_message = None
     db.commit()
 
@@ -240,13 +244,14 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
     parsing_job = next((job for job in stage_jobs if job.stage_name == PARSING_STAGE), None)
     segment_job = next((job for job in stage_jobs if job.stage_name == SEGMENT_STAGE), None)
 
-    if status == SEGMENTED_STATUS:
+    if status in {PARSED_STATUS, SEGMENTED_STATUS}:
         return DocumentProgressResponse(
             document_id=doc.id,
             stage_label="Parsing complete",
             percentage=100.0,
             eta_seconds=0,
             is_complete=True,
+            is_active=False,
         )
     if status == FAILED_STATUS:
         return DocumentProgressResponse(
@@ -255,6 +260,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
             percentage=100.0,
             eta_seconds=None,
             is_complete=False,
+            is_active=False,
         )
 
     if parsing_job and parsing_job.status == "running":
@@ -266,6 +272,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
                 percentage=35.0,
                 eta_seconds=max(int(12 - elapsed), 1),
                 is_complete=False,
+                is_active=True,
             )
         return DocumentProgressResponse(
             document_id=doc.id,
@@ -273,6 +280,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
             percentage=60.0,
             eta_seconds=max(int(8 - min(elapsed, 7)), 1),
             is_complete=False,
+            is_active=True,
         )
 
     if segment_job and segment_job.status in {"queued", "running"}:
@@ -284,23 +292,26 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
             percentage=85.0 if segment_job.status == "running" else 75.0,
             eta_seconds=eta,
             is_complete=False,
+            is_active=True,
         )
 
-    if parsing_job and parsing_job.status == "queued":
+    if parsing_job and parsing_job.status == "queued" and status == PARSING_STATUS:
         return DocumentProgressResponse(
             document_id=doc.id,
             stage_label="Upload received",
             percentage=10.0,
             eta_seconds=18,
             is_complete=False,
+            is_active=True,
         )
 
     return DocumentProgressResponse(
         document_id=doc.id,
-        stage_label="Upload received",
-        percentage=5.0,
+        stage_label="Uploaded",
+        percentage=0.0,
         eta_seconds=None,
         is_complete=False,
+        is_active=False,
     )
 
 
@@ -420,8 +431,7 @@ def parse_document_by_id(
     _queue_stage_job(db=db, document_id=document_id, stage_name=PARSING_STAGE)
     _queue_stage_job(db=db, document_id=document_id, stage_name=SEGMENT_STAGE)
     doc.error_message = None
-    # Keep status explicit and deterministic between stages.
-    doc.status = "uploaded"
+    doc.status = PARSING_STATUS
     db.commit()
     db.refresh(doc)
     background_tasks.add_task(_run_document_pipeline, document_id)
@@ -521,7 +531,7 @@ def retry_document_pipeline(
         stage_job.started_at = None
         stage_job.finished_at = None
 
-    doc.status = "uploaded"
+    doc.status = PARSING_STATUS
     doc.error_message = None
     db.commit()
     db.refresh(doc)

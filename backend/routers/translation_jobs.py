@@ -875,7 +875,7 @@ def create_translation_job(
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.status not in {"segmented", "in_review", "draft_saved", "ready_for_export", "failed"}:
+    if doc.status not in {"parsed", "segmented", "in_review", "draft_saved", "ready_for_export", "failed"}:
         raise HTTPException(
             status_code=400,
             detail="Document must be segmented before creating a translation job",

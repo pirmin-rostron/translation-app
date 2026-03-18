@@ -16,6 +16,7 @@ type Document = {
   industry: string | null;
   domain: string | null;
   status: string;
+  error_message?: string | null;
   created_at: string;
 };
 
@@ -65,6 +66,7 @@ type DocumentProgress = {
   percentage: number;
   eta_seconds: number | null;
   is_complete: boolean;
+  is_active: boolean;
 };
 
 type TranslationProgress = {
@@ -264,6 +266,7 @@ export default function DocumentDetailPage() {
 
   const handleParse = async () => {
     setError("");
+    setDoc((prev) => (prev ? { ...prev, status: "parsing", error_message: null } : prev));
     try {
       const res = await fetch(`${API_URL}/api/documents/${id}/parse`, {
         method: "POST",
@@ -303,6 +306,7 @@ export default function DocumentDetailPage() {
   if (!doc) return null;
   const latestDocStage = docStages[docStages.length - 1];
   const latestJob = jobs[0];
+  const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -403,7 +407,7 @@ export default function DocumentDetailPage() {
               <dd className="font-medium">{formatDate(doc.created_at)}</dd>
             </div>
           </dl>
-          {docProgress && !docProgress.is_complete && (
+          {showActiveParsing && docProgress && (
             <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4">
               <p className="text-sm font-medium text-indigo-900">Parsing document…</p>
               <p className="mt-1 text-sm text-slate-700">{docProgress.stage_label}</p>
@@ -443,7 +447,7 @@ export default function DocumentDetailPage() {
                 {doc.status === "failed" ? "Retry document processing" : "Parse document"}
               </button>
             )}
-            {doc.status === "segmented" && segments.length > 0 && (
+            {(doc.status === "parsed" || doc.status === "segmented") && segments.length > 0 && (
               <button
                 onClick={handleCreateJob}
                 className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
@@ -474,6 +478,11 @@ export default function DocumentDetailPage() {
           )}
           {blocks.length === 0 && (doc.status === "parsed" || doc.status === "segmented") && (
             <p className="text-slate-600">No parsed blocks (document may be empty).</p>
+          )}
+          {(doc.status === "parsed" || doc.status === "segmented") && segments.length > 0 && (
+            <p className="mb-3 text-sm text-emerald-700">
+              Parsed successfully: {segments.length} segments ready for translation.
+            </p>
           )}
           {blocks.length > 0 && (
             <ol className="space-y-4">
