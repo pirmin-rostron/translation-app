@@ -240,6 +240,7 @@ def _serialize_translation_result(result: TranslationResult, segment: DocumentSe
         review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
+        semantic_memory_details=getattr(result, "semantic_memory_details", None),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -426,6 +427,7 @@ def _serialize_review_segment(
         review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
+        semantic_memory_details=getattr(result, "semantic_memory_details", None),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -685,7 +687,8 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
 
     for i in range(0, len(segments), batch_size):
         batch = segments[i : i + batch_size]
-        memory_matches: dict[int, TranslationMemoryMatch] = {}
+        exact_memory_matches: dict[int, TranslationMemoryMatch] = {}
+        semantic_suggestions: dict[int, TranslationMemoryMatch] = {}
         missing_segments: list[DocumentSegment] = []
         glossary_matches_by_segment: dict[int, list[dict]] = {}
 
@@ -699,11 +702,12 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                 source_text=s.source_text,
                 source_language=source_lang,
                 target_language=doc.target_language,
+                customer_id=job.customer_id,
                 industry=doc.industry,
                 domain=doc.domain,
             )
             if exact_match:
-                memory_matches[s.id] = TranslationMemoryMatch(
+                exact_memory_matches[s.id] = TranslationMemoryMatch(
                     approved=exact_match,
                     match_type="exact",
                     similarity=1.0,
@@ -715,12 +719,12 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                 source_text=s.source_text,
                 source_language=source_lang,
                 target_language=doc.target_language,
+                customer_id=job.customer_id,
                 industry=doc.industry,
                 domain=doc.domain,
             )
             if semantic_match:
-                memory_matches[s.id] = semantic_match
-                continue
+                semantic_suggestions[s.id] = semantic_match
             missing_segments.append(s)
 
         provider_results_by_segment_id: dict[int, object] = {}
@@ -767,8 +771,8 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
 
         batch_results: list[TranslationResult] = []
         for seg in batch:
-            if seg.id in memory_matches:
-                match = memory_matches[seg.id]
+            if seg.id in exact_memory_matches:
+                match = exact_memory_matches[seg.id]
                 approved = match.approved
                 batch_results.append(
                     TranslationResult(
@@ -778,8 +782,9 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                         final_translation=approved.approved_translation,
                         confidence_score=match.similarity,
                         review_status="memory_match",
-                        exact_memory_used=match.match_type == "exact",
-                        semantic_memory_used=match.match_type == "semantic",
+                        exact_memory_used=True,
+                        semantic_memory_used=False,
+                        semantic_memory_details=None,
                         ambiguity_detected=False,
                         ambiguity_details=None,
                         glossary_applied=False,
@@ -789,6 +794,17 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
             else:
                 res = provider_results_by_segment_id[seg.id]
                 glossary_matches = glossary_matches_by_segment.get(seg.id, [])
+                semantic_suggestion = semantic_suggestions.get(seg.id)
+                semantic_details = (
+                    {
+                        "match_type": "semantic_memory",
+                        "suggested_translation": semantic_suggestion.approved.approved_translation,
+                        "similarity_score": semantic_suggestion.similarity,
+                        "source_text": semantic_suggestion.approved.source_text,
+                    }
+                    if semantic_suggestion
+                    else None
+                )
                 batch_results.append(
                     TranslationResult(
                         job_id=translation_job_id,
@@ -798,7 +814,8 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                         confidence_score=None,
                         review_status="unreviewed",
                         exact_memory_used=False,
-                        semantic_memory_used=False,
+                        semantic_memory_used=bool(semantic_suggestion),
+                        semantic_memory_details=semantic_details,
                         ambiguity_detected=res.ambiguity_detected,
                         ambiguity_details=res.ambiguity_details,
                         glossary_applied=bool(glossary_matches),
@@ -898,6 +915,7 @@ def create_translation_job(
         document_id=document_id,
         source_language=source_lang,
         target_language=doc.target_language,
+        customer_id=doc.customer_id,
         industry=doc.industry,
         domain=doc.domain,
         status="translation_queued",
@@ -1262,13 +1280,14 @@ def update_translation_result(
     result.final_translation = final_translation
     result.review_status = review_status
 
-    if review_status == "approved":
+    if review_status in {"approved", "edited"}:
         embedding = generate_source_embedding(segment.source_text)
         approved = ApprovedTranslation(
             source_text=segment.source_text,
             approved_translation=final_translation,
             source_language=job.source_language,
             target_language=job.target_language,
+            customer_id=job.customer_id,
             industry=job.industry,
             domain=job.domain,
             source_embedding=embedding,
@@ -1286,9 +1305,9 @@ def update_translation_result(
     db.commit()
     db.refresh(result)
 
-    if review_status == "approved":
+    if review_status in {"approved", "edited"}:
         logger.info(
-            "Saved reviewed translation result_id=%d review_status=%s and stored approved translation",
+            "Saved reviewed translation result_id=%d review_status=%s and stored translation memory",
             result.id,
             result.review_status,
         )
@@ -1309,6 +1328,7 @@ def update_translation_result(
         review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
+        semantic_memory_details=getattr(result, "semantic_memory_details", None),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,

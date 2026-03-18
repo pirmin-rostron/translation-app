@@ -11,7 +11,7 @@ from models import ApprovedTranslation
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-SEMANTIC_MEMORY_THRESHOLD = float(os.getenv("SEMANTIC_MEMORY_THRESHOLD", "0.97"))
+SEMANTIC_MEMORY_THRESHOLD = float(os.getenv("SEMANTIC_MEMORY_THRESHOLD", "0.80"))
 
 
 @dataclass
@@ -92,6 +92,7 @@ def find_exact_memory_match(
     source_text: str,
     source_language: str,
     target_language: str,
+    customer_id: str,
     industry: str | None,
     domain: str | None,
 ) -> ApprovedTranslation | None:
@@ -104,6 +105,7 @@ def find_exact_memory_match(
             ApprovedTranslation.source_text == source_text,
             ApprovedTranslation.source_language == source_language,
             ApprovedTranslation.target_language == target_language,
+            ApprovedTranslation.customer_id == customer_id,
             ApprovedTranslation.industry == normalized_industry,
             ApprovedTranslation.domain == normalized_domain,
         )
@@ -117,6 +119,7 @@ def find_semantic_memory_match(
     source_text: str,
     source_language: str,
     target_language: str,
+    customer_id: str,
     industry: str | None,
     domain: str | None,
 ) -> TranslationMemoryMatch | None:
@@ -132,6 +135,7 @@ def find_semantic_memory_match(
         .filter(
             ApprovedTranslation.source_language == source_language,
             ApprovedTranslation.target_language == target_language,
+            ApprovedTranslation.customer_id == customer_id,
             ApprovedTranslation.industry == normalized_industry,
             ApprovedTranslation.domain == normalized_domain,
         )

@@ -71,6 +71,12 @@ type ReviewSegment = {
   review_status: string;
   exact_memory_used: boolean;
   semantic_memory_used: boolean;
+  semantic_memory_details: {
+    match_type: "semantic_memory";
+    suggested_translation: string;
+    similarity_score: number | null;
+    source_text?: string;
+  } | null;
   ambiguity_detected: boolean;
   ambiguity_details: AmbiguityDetails | null;
   glossary_applied: boolean;
@@ -694,6 +700,46 @@ export default function TranslationReviewPage() {
     }
   }
 
+  async function handleAcceptSemanticSuggestion() {
+    if (!selectedSegment || !semanticSuggestion?.suggested_translation) return;
+    setActionLoading(true);
+    setMessage("");
+    setError("");
+    try {
+      await saveResult(selectedSegment.id, semanticSuggestion.suggested_translation, "memory_match");
+      setIsEditing(false);
+      setMessage("Semantic memory suggestion accepted.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to accept suggestion");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function handleEditSemanticSuggestion() {
+    if (!semanticSuggestion?.suggested_translation) return;
+    setDraftTranslation(semanticSuggestion.suggested_translation);
+    setIsEditing(true);
+    setMessage("Suggestion loaded for editing.");
+    setError("");
+  }
+
+  async function handleIgnoreSemanticSuggestion() {
+    if (!selectedSegment) return;
+    setActionLoading(true);
+    setMessage("");
+    setError("");
+    try {
+      await saveResult(selectedSegment.id, draftTranslation, "edited");
+      setIsEditing(false);
+      setMessage("Semantic suggestion ignored. Current translation kept.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to ignore suggestion");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleRetryJob() {
     if (!job) return;
     setActionLoading(true);
@@ -836,6 +882,7 @@ export default function TranslationReviewPage() {
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
+  const semanticSuggestion = selectedSegment?.semantic_memory_details ?? null;
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -1242,6 +1289,49 @@ export default function TranslationReviewPage() {
                     </ul>
                   </div>
                 )}
+
+                {!isReadOnly &&
+                  semanticSuggestion &&
+                  selectedSegmentStatus !== "memory_match" &&
+                  selectedSegmentStatus !== "approved" && (
+                    <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
+                      <p className="font-medium text-sky-900">Suggested from similar previous translation</p>
+                      <p className="mt-1 whitespace-pre-wrap text-slate-700">
+                        {semanticSuggestion.suggested_translation}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {typeof semanticSuggestion.similarity_score === "number"
+                          ? `${Math.round(semanticSuggestion.similarity_score * 100)}% match`
+                          : "Similarity score unavailable"}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAcceptSemanticSuggestion}
+                          disabled={actionLoading}
+                          className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-60"
+                        >
+                          Accept suggestion
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleEditSemanticSuggestion}
+                          disabled={actionLoading}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Edit suggestion
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleIgnoreSemanticSuggestion}
+                          disabled={actionLoading}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Ignore
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                 <div className="mt-6 space-y-3">
                   {!isReadOnly && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (

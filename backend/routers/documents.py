@@ -28,6 +28,7 @@ ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf"}
 ALLOWED_SOURCE_LANGUAGES = {"en", "de", "fr", "es", "it", "nl", "pt", "zh", "ja", "ko", "ar"}
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+DEFAULT_CUSTOMER_ID = os.getenv("DEFAULT_CUSTOMER_ID", "default")
 PARSING_STAGE = "parsing"
 SEGMENT_STAGE = "segmenting"
 FAILED_STATUS = "failed"
@@ -335,6 +336,7 @@ def upload_document(
     target_language: str = Form(..., min_length=1, max_length=50),
     industry: str | None = Form(None, max_length=100),
     domain: str | None = Form(None, max_length=100),
+    customer_id: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
 ):
     """Upload a DOCX, TXT, or RTF document. Source language is auto-detected."""
@@ -342,6 +344,7 @@ def upload_document(
 
     industry_val = (industry.strip() or None) if industry else None
     domain_val = (domain.strip() or None) if domain else None
+    customer_id_val = (customer_id.strip() or DEFAULT_CUSTOMER_ID) if customer_id else DEFAULT_CUSTOMER_ID
 
     contents = file.file.read()
     if len(contents) > MAX_FILE_SIZE:
@@ -361,6 +364,7 @@ def upload_document(
         file_type=file_type,
         source_language=source_language,
         target_language=target_language.strip(),
+        customer_id=customer_id_val,
         industry=industry_val,
         domain=domain_val,
         status="uploaded",

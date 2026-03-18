@@ -61,12 +61,16 @@ def _migrate_schema():
                 )
             if "glossary_matches" not in result_columns:
                 conn.execute(text("ALTER TABLE translation_results ADD COLUMN glossary_matches JSONB"))
+            if "semantic_memory_details" not in result_columns:
+                conn.execute(text("ALTER TABLE translation_results ADD COLUMN semantic_memory_details JSONB"))
 
     if "documents" in table_names:
         document_columns = {column["name"] for column in inspector.get_columns("documents")}
-        if "error_message" not in document_columns:
-            with engine.begin() as conn:
+        with engine.begin() as conn:
+            if "error_message" not in document_columns:
                 conn.execute(text("ALTER TABLE documents ADD COLUMN error_message TEXT"))
+            if "customer_id" not in document_columns:
+                conn.execute(text("ALTER TABLE documents ADD COLUMN customer_id VARCHAR(100) NOT NULL DEFAULT 'default'"))
 
     if "translation_jobs" in table_names:
         job_columns = {column["name"] for column in inspector.get_columns("translation_jobs")}
@@ -81,6 +85,18 @@ def _migrate_schema():
                 conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN progress_completed_segments INTEGER"))
             if "progress_started_at" not in job_columns:
                 conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN progress_started_at TIMESTAMP"))
+            if "customer_id" not in job_columns:
+                conn.execute(
+                    text("ALTER TABLE translation_jobs ADD COLUMN customer_id VARCHAR(100) NOT NULL DEFAULT 'default'")
+                )
+
+    if "approved_translations" in table_names:
+        approved_columns = {column["name"] for column in inspector.get_columns("approved_translations")}
+        with engine.begin() as conn:
+            if "customer_id" not in approved_columns:
+                conn.execute(
+                    text("ALTER TABLE approved_translations ADD COLUMN customer_id VARCHAR(100) NOT NULL DEFAULT 'default'")
+                )
 
     if "processing_stage_jobs" not in table_names:
         with engine.begin() as conn:

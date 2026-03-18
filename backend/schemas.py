@@ -22,6 +22,7 @@ class DocumentResponse(BaseModel):
     file_type: str
     source_language: str | None
     target_language: str
+    customer_id: str
     industry: str | None
     domain: str | None
     status: str
@@ -84,6 +85,7 @@ class TranslationJobResponse(BaseModel):
     document_id: int
     source_language: str
     target_language: str
+    customer_id: str
     industry: str | None
     domain: str | None
     status: str
@@ -158,6 +160,7 @@ class TranslationResultResponse(BaseModel):
     review_status: str
     exact_memory_used: bool = False
     semantic_memory_used: bool = False
+    semantic_memory_details: dict | None = None
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False
@@ -182,6 +185,7 @@ class ReviewSegmentResponse(BaseModel):
     review_status: str
     exact_memory_used: bool = False
     semantic_memory_used: bool = False
+    semantic_memory_details: dict | None = None
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False
