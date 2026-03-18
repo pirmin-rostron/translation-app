@@ -138,6 +138,12 @@ def _migrate_schema():
             if "block_id" not in segment_columns:
                 conn.execute(text("ALTER TABLE document_segments ADD COLUMN block_id INTEGER"))
 
+    if "segment_annotations" in table_names:
+        annotation_columns = {column["name"] for column in inspector.get_columns("segment_annotations")}
+        with engine.begin() as conn:
+            if "translation_job_id" not in annotation_columns:
+                conn.execute(text("ALTER TABLE segment_annotations ADD COLUMN translation_job_id INTEGER"))
+
     if "document_blocks" in table_names and "document_segments" in table_names:
         _backfill_document_blocks()
 

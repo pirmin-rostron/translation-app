@@ -162,6 +162,7 @@ class SegmentAnnotation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     segment_id = Column(Integer, ForeignKey("document_segments.id"), nullable=False)
+    translation_job_id = Column(Integer, ForeignKey("translation_jobs.id"), nullable=True)
     annotation_type = Column(String(50), nullable=False)
     source_span_text = Column(Text, nullable=False)
     source_start = Column(Integer, nullable=False)

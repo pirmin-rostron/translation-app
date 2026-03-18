@@ -405,6 +405,7 @@ def _find_span(text: str, needle: str) -> tuple[int, int] | None:
 def _add_annotation(
     annotations: list[SegmentAnnotation],
     segment_id: int,
+    translation_job_id: int,
     annotation_type: str,
     source_text: str,
     source_span_text: str,
@@ -420,6 +421,7 @@ def _add_annotation(
     annotations.append(
         SegmentAnnotation(
             segment_id=segment_id,
+            translation_job_id=translation_job_id,
             annotation_type=annotation_type,
             source_span_text=source_span_text,
             source_start=source_span[0],
@@ -450,6 +452,7 @@ def _build_segment_annotations(
             _add_annotation(
                 annotations=annotations,
                 segment_id=segment.id,
+                translation_job_id=result.job_id,
                 annotation_type="glossary",
                 source_text=source_text,
                 source_span_text=source_term,
@@ -474,6 +477,7 @@ def _build_segment_annotations(
             _add_annotation(
                 annotations=annotations,
                 segment_id=segment.id,
+                translation_job_id=result.job_id,
                 annotation_type="ambiguity",
                 source_text=source_text,
                 source_span_text=source_span_text,
@@ -486,18 +490,20 @@ def _build_segment_annotations(
         _add_annotation(
             annotations=annotations,
             segment_id=segment.id,
+            translation_job_id=result.job_id,
             annotation_type="exact_memory",
             source_text=source_text,
             source_span_text=source_text,
             target_text=target_text,
             target_span_text=target_text,
-            metadata_json={"label": "Previously approved translation reused"},
+            metadata_json={"label": "Suggested from previously approved translation"},
         )
 
     if _is_semantic_memory_result(result):
         _add_annotation(
             annotations=annotations,
             segment_id=segment.id,
+            translation_job_id=result.job_id,
             annotation_type="semantic_memory",
             source_text=source_text,
             source_span_text=source_text,
@@ -513,7 +519,10 @@ def _build_segment_annotations(
 
 
 def _replace_segment_annotations(db: Session, segment: DocumentSegment, result: TranslationResult):
-    db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id == segment.id).delete()
+    db.query(SegmentAnnotation).filter(
+        SegmentAnnotation.segment_id == segment.id,
+        SegmentAnnotation.translation_job_id == result.job_id,
+    ).delete()
     annotations = _build_segment_annotations(segment, result)
     if annotations:
         db.add_all(annotations)
@@ -1091,7 +1100,8 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                         primary_translation=approved.approved_translation,
                         final_translation=approved.approved_translation,
                         confidence_score=match.similarity,
-                        review_status="memory_match",
+                        # Memory can prefill a suggestion, but review must remain job-isolated and unresolved.
+                        review_status="unreviewed",
                         exact_memory_used=True,
                         semantic_memory_used=False,
                         semantic_memory_details=None,
@@ -1340,7 +1350,10 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
     annotations = (
         db.query(SegmentAnnotation)
         .join(DocumentSegment, SegmentAnnotation.segment_id == DocumentSegment.id)
-        .filter(DocumentSegment.document_id == job.document_id)
+        .filter(
+            DocumentSegment.document_id == job.document_id,
+            SegmentAnnotation.translation_job_id == job_id,
+        )
         .order_by(SegmentAnnotation.id)
         .all()
     )
@@ -1376,7 +1389,7 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
                 block_index=block.block_index,
                 block_type=block.block_type,
                 text_original=block.text_original,
-                text_translated=_compose_block_translation(block.block_type, translated_parts) or block.text_translated,
+                text_translated=_compose_block_translation(block.block_type, translated_parts),
                 formatting_json=block.formatting_json,
                 segments=block_segments,
             )
