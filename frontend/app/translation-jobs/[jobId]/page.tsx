@@ -1095,23 +1095,72 @@ export default function TranslationReviewPage() {
     );
   }
 
+  function getSelectedDecisionTranslation() {
+    if (!selectedSegment) return "";
+    const current = selectedSegment.final_translation || "";
+    if (hasAmbiguityChoice && selectedAmbiguityTranslation.trim()) {
+      return applyAmbiguityChoiceToSegment(selectedSegment, selectedAmbiguityTranslation);
+    }
+    if (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && semanticSuggestionText.trim()) {
+      return semanticSuggestionText.trim();
+    }
+    const draft = draftTranslation.trim();
+    return draft || current;
+  }
+
+  function getSelectedDecisionStatus() {
+    if (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested") {
+      return "memory_match";
+    }
+    return "approved";
+  }
+
+  function handleAmbiguityChoiceChange(idx: number) {
+    setAmbiguityChoiceIndex(idx);
+    if (!selectedSegment) return;
+    const option = ambiguityOptions[idx];
+    if (!option) return;
+    const updatedTranslation = applyAmbiguityChoiceToSegment(selectedSegment, option.translation);
+    setDraftTranslation(updatedTranslation);
+    setBlocks((currentBlocks) =>
+      currentBlocks.map((block) => ({
+        ...block,
+        segments: block.segments.map((segment) =>
+          segment.id === selectedSegment.id ? { ...segment, final_translation: updatedTranslation } : segment
+        ),
+      }))
+    );
+  }
+
+  function handleSemanticChoiceChange(value: SemanticChoiceOption) {
+    setSemanticChoice(value);
+    if (!selectedSegment) return;
+    if (value === "suggested" && semanticSuggestionText.trim()) {
+      setDraftTranslation(semanticSuggestionText.trim());
+      return;
+    }
+    setDraftTranslation(selectedSegment.final_translation || "");
+  }
+
   async function handleSaveSegmentDraft() {
     if (!selectedSegment) return;
     const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
+    const finalTranslation = getSelectedDecisionTranslation();
+    const reviewStatus = getSelectedDecisionStatus();
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
-      const summary = await saveResult(selectedSegment.id, draftTranslation, "edited");
+      const summary = await saveResult(selectedSegment.id, finalTranslation, reviewStatus);
       setIsEditing(false);
       if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
         return;
       }
       if (reviewMode === "document") {
         moveToBlockById(nextBlockId);
-        setMessage("Edited and saved. Moved to next block.");
+        setMessage("Saved and approved. Moved to next block.");
       } else {
-        setMessage("Edited and saved.");
+        setMessage("Saved and approved.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");
@@ -1123,11 +1172,13 @@ export default function TranslationReviewPage() {
   async function handleApprove() {
     if (!selectedSegment) return;
     const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
+    const finalTranslation = getSelectedDecisionTranslation();
+    const reviewStatus = getSelectedDecisionStatus();
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
-      const summary = await saveResult(selectedSegment.id, draftTranslation, "approved");
+      const summary = await saveResult(selectedSegment.id, finalTranslation, reviewStatus);
       setIsEditing(false);
       if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
         return;
@@ -1148,6 +1199,8 @@ export default function TranslationReviewPage() {
   async function handleApproveCurrentBlock() {
     if (!selectedBlock) return;
     const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
+    const selectedDecisionTranslation = getSelectedDecisionTranslation();
+    const selectedDecisionStatus = getSelectedDecisionStatus();
     setActionLoading(true);
     setMessage("");
     setError("");
@@ -1156,7 +1209,11 @@ export default function TranslationReviewPage() {
         (segment) => !isAcceptableFinalStatus(segment.review_status) && segment.final_translation.trim().length > 0
       );
       for (const segment of toApprove) {
-        await persistResult(segment.id, segment.final_translation, "approved");
+        if (selectedSegment && segment.id === selectedSegment.id) {
+          await persistResult(segment.id, selectedDecisionTranslation, selectedDecisionStatus);
+        } else {
+          await persistResult(segment.id, segment.final_translation, "approved");
+        }
       }
       const [, summary] = await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
       if (transitionToReviewCompleteState(summary as ReviewSummary)) {
@@ -1214,66 +1271,23 @@ export default function TranslationReviewPage() {
     return currentText;
   }
 
-  async function handleUseSelectedTranslation() {
-    if (!selectedSegment) return;
-    if (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) return;
-    if (!hasAmbiguityChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) return;
-    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
-    const chosenTranslation = hasAmbiguityChoice
-      ? applyAmbiguityChoiceToSegment(selectedSegment, selectedAmbiguityTranslation)
-      : semanticChoice === "suggested"
-        ? semanticSuggestionText
-        : draftTranslation;
-    const chosenStatus = hasAmbiguityChoice ? "approved" : semanticChoice === "suggested" ? "memory_match" : "approved";
-    const nextAmbiguityIssue =
-      hasAmbiguityChoice && blockAmbiguityIssues.length > 1
-        ? blockAmbiguityIssues.find((issue) => issue.key !== selectedIssueKey)
-        : null;
-    setActionLoading(true);
-    setMessage("");
-    setError("");
-    try {
-      const summary = await saveResult(selectedSegment.id, chosenTranslation, chosenStatus);
-      setIsEditing(false);
-      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
-        return;
-      }
-      if (hasAmbiguityChoice && reviewMode === "document" && nextAmbiguityIssue) {
-        setSelectedIssueKey(nextAmbiguityIssue.key);
-        setSelectedId(nextAmbiguityIssue.segmentId);
-        setMessage("Ambiguity resolved. Continue with the next ambiguity in this block.");
-      } else if (reviewMode === "document") {
-        moveToBlockById(nextBlockId);
-        setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning and moved forward." : semanticChoice === "suggested"
-          ? "Selected semantic memory translation and moved forward."
-          : "Selected current translation and moved forward.");
-      } else {
-        setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning." : semanticChoice === "suggested"
-          ? "Selected semantic memory translation."
-          : "Selected current translation.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to apply selected translation");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   function handleEditSelectedTranslation() {
-    setDraftTranslation("");
+    if (selectedSegment) {
+      setDraftTranslation(selectedSegment.final_translation || "");
+    }
     setIsEditing(true);
     setMessage("Edit mode enabled. Update the translation and save.");
     setError("");
   }
 
   function handleToggleEdit() {
-    if (primaryActionIsGuidedChoice) {
+    if (!isEditing) {
       handleEditSelectedTranslation();
       return;
     }
     setIsEditing((current) => {
       if (!current) {
-        setDraftTranslation("");
+        setDraftTranslation(selectedSegment?.final_translation || "");
       }
       return !current;
     });
@@ -1472,23 +1486,11 @@ export default function TranslationReviewPage() {
   const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
-  const hasGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
-  const primaryActionIsGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
-  const primaryActionLabel = hasAmbiguityChoice
-    ? "Use selected translation"
-    : primaryActionIsGuidedChoice
-      ? "Use selected translation"
-      : "Approve";
-  const primaryActionDisabled =
-    actionLoading ||
-    (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) ||
-    (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) ||
-    (!primaryActionIsGuidedChoice && !draftTranslation.trim()) ||
-    currentBlockResolved;
+  const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -1691,7 +1693,7 @@ export default function TranslationReviewPage() {
             ambiguityChoiceIndex={ambiguityChoiceIndex}
             ambiguityOptions={ambiguityOptions}
             currentSuggestionIndex={currentSuggestionIndex}
-            onAmbiguityChoiceChange={setAmbiguityChoiceIndex}
+            onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
             isReadOnly={isReadOnly}
             selectedSegmentStatus={selectedSegmentStatus as "approved" | "edited" | "memory_match" | "unreviewed"}
             isEditing={isEditing}
@@ -1702,15 +1704,12 @@ export default function TranslationReviewPage() {
             hasSemanticChoice={hasSemanticChoice}
             semanticSimilarityScore={semanticSimilarityScore}
             semanticChoice={semanticChoice}
-            onSemanticChoiceChange={setSemanticChoice}
+            onSemanticChoiceChange={handleSemanticChoiceChange}
             isDocumentMode={isDocumentMode}
             currentBlockResolved={currentBlockResolved}
-            primaryActionIsGuidedChoice={primaryActionIsGuidedChoice}
-            onUseSelectedTranslation={handleUseSelectedTranslation}
             onApprove={handleApprove}
             onApproveCurrentBlock={handleApproveCurrentBlock}
             primaryActionDisabled={primaryActionDisabled}
-            primaryActionLabel={primaryActionLabel}
             onToggleEdit={handleToggleEdit}
             actionLoading={actionLoading}
             onSkipBlock={handleSkipBlock}
