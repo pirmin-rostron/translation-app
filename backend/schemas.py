@@ -161,6 +161,10 @@ class TranslationResultResponse(BaseModel):
     exact_memory_used: bool = False
     semantic_memory_used: bool = False
     semantic_memory_details: dict | None = None
+    semantic_match_found: bool = False
+    suggested_translation: str | None = None
+    similarity_score: float | None = None
+    current_translation: str
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False
@@ -186,6 +190,10 @@ class ReviewSegmentResponse(BaseModel):
     exact_memory_used: bool = False
     semantic_memory_used: bool = False
     semantic_memory_details: dict | None = None
+    semantic_match_found: bool = False
+    suggested_translation: str | None = None
+    similarity_score: float | None = None
+    current_translation: str
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False

@@ -228,8 +228,26 @@ def _is_flagged_result(result: TranslationResult) -> bool:
     return _has_review_signal(result)
 
 
+def _semantic_choice_payload(result: TranslationResult) -> tuple[bool, str | None, float | None, str]:
+    details = getattr(result, "semantic_memory_details", None)
+    suggested_translation: str | None = None
+    similarity_score: float | None = None
+    if isinstance(details, dict):
+        raw_suggestion = details.get("suggested_translation")
+        if isinstance(raw_suggestion, str) and raw_suggestion.strip():
+            suggested_translation = raw_suggestion
+        raw_similarity = details.get("similarity_score")
+        if isinstance(raw_similarity, (float, int)):
+            similarity_score = float(raw_similarity)
+
+    current_translation = result.final_translation
+    semantic_match_found = bool(_is_semantic_memory_result(result) and suggested_translation)
+    return semantic_match_found, suggested_translation, similarity_score, current_translation
+
+
 def _serialize_translation_result(result: TranslationResult, segment: DocumentSegment | None) -> TranslationResultResponse:
     seg_resp = SegmentResponse.model_validate(segment) if segment else None
+    semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
     return TranslationResultResponse(
         id=result.id,
         job_id=result.job_id,
@@ -241,6 +259,10 @@ def _serialize_translation_result(result: TranslationResult, segment: DocumentSe
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         semantic_memory_details=getattr(result, "semantic_memory_details", None),
+        semantic_match_found=semantic_match_found,
+        suggested_translation=suggested_translation,
+        similarity_score=similarity_score,
+        current_translation=current_translation,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -414,6 +436,7 @@ def _serialize_review_segment(
     result: TranslationResult,
     annotations: list[SegmentAnnotation],
 ) -> ReviewSegmentResponse:
+    semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
     return ReviewSegmentResponse(
         id=result.id,
         segment_id=segment.id,
@@ -428,6 +451,10 @@ def _serialize_review_segment(
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         semantic_memory_details=getattr(result, "semantic_memory_details", None),
+        semantic_match_found=semantic_match_found,
+        suggested_translation=suggested_translation,
+        similarity_score=similarity_score,
+        current_translation=current_translation,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -1304,6 +1331,7 @@ def update_translation_result(
             document.status = "in_review"
     db.commit()
     db.refresh(result)
+    semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
 
     if review_status in {"approved", "edited"}:
         logger.info(
@@ -1329,6 +1357,10 @@ def update_translation_result(
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         semantic_memory_details=getattr(result, "semantic_memory_details", None),
+        semantic_match_found=semantic_match_found,
+        suggested_translation=suggested_translation,
+        similarity_score=similarity_score,
+        current_translation=current_translation,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,

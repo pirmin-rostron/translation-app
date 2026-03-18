@@ -71,6 +71,10 @@ type ReviewSegment = {
   review_status: string;
   exact_memory_used: boolean;
   semantic_memory_used: boolean;
+  semantic_match_found?: boolean;
+  suggested_translation?: string | null;
+  similarity_score?: number | null;
+  current_translation?: string;
   semantic_memory_details: {
     match_type: "semantic_memory";
     suggested_translation: string;
@@ -83,6 +87,8 @@ type ReviewSegment = {
   glossary_matches: GlossaryMatches | null;
   annotations: SegmentAnnotation[];
 };
+
+type SemanticChoiceOption = "current" | "suggested";
 
 type DocumentBlock = {
   id: number;
@@ -178,6 +184,33 @@ function isSafeSegment(segment: ReviewSegment) {
 function isBlockResolved(block: DocumentBlock) {
   if (!block.segments.length) return false;
   return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
+}
+
+function hasSemanticChoiceInBlock(block: DocumentBlock) {
+  return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
+}
+
+function getSemanticChoiceDetails(segment: ReviewSegment | null) {
+  if (!segment) {
+    return {
+      semanticMatchFound: false,
+      suggestedTranslation: "",
+      similarityScore: null as number | null,
+      currentTranslation: "",
+    };
+  }
+  const suggestedFromPayload = (segment.suggested_translation || "").trim();
+  const suggestedFromDetails = (segment.semantic_memory_details?.suggested_translation || "").trim();
+  const suggestedTranslation = suggestedFromPayload || suggestedFromDetails;
+  const similarityScore =
+    typeof segment.similarity_score === "number"
+      ? segment.similarity_score
+      : typeof segment.semantic_memory_details?.similarity_score === "number"
+        ? segment.semantic_memory_details.similarity_score
+        : null;
+  const semanticMatchFound = Boolean(segment.semantic_match_found ?? (segment.semantic_memory_used && suggestedTranslation));
+  const currentTranslation = segment.current_translation || segment.final_translation || "";
+  return { semanticMatchFound, suggestedTranslation, similarityScore, currentTranslation };
 }
 
 function formatEta(seconds: number | null) {
@@ -398,6 +431,7 @@ export default function TranslationReviewPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
+  const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -523,6 +557,7 @@ export default function TranslationReviewPage() {
   useEffect(() => {
     if (!selectedSegment) return;
     setDraftTranslation(selectedSegment.final_translation);
+    setSemanticChoice("current");
     setIsEditing(false);
   }, [selectedSegment?.id, selectedSegment?.final_translation]);
 
@@ -582,7 +617,8 @@ export default function TranslationReviewPage() {
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
     if (!block || !block.segments.length) return;
-    const fallbackSegmentId = preferredSegmentId ?? block.segments[0].id;
+    const semanticChoiceSegment = block.segments.find((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
+    const fallbackSegmentId = preferredSegmentId ?? semanticChoiceSegment?.id ?? block.segments[0].id;
     if (reviewMode === "issues") {
       const firstIssue = block.segments
         .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
@@ -819,6 +855,7 @@ export default function TranslationReviewPage() {
         <ul className="list-disc space-y-3 pl-6 marker:text-slate-400">
           {node.blocks.map((block) => {
             const isActiveBlock = selectedBlock?.id === block.id;
+            const hasSemanticChoice = hasSemanticChoiceInBlock(block);
             return (
               <li
                 key={block.id}
@@ -827,9 +864,16 @@ export default function TranslationReviewPage() {
                   blockRefs.current[block.id] = el;
                 }}
               >
-                <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Block {block.block_index + 1}
-                </span>
+                <div className="mb-1 flex flex-wrap items-center gap-1">
+                  <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Block {block.block_index + 1}
+                  </span>
+                  {hasSemanticChoice && (
+                    <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
+                      Semantic choice available
+                    </span>
+                  )}
+                </div>
                 <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
                   {renderInlineSegments(block, side)}
                 </p>
@@ -843,6 +887,7 @@ export default function TranslationReviewPage() {
     const block = node.block;
     const body = renderInlineSegments(block, side);
     const isActiveBlock = selectedBlock?.id === block.id;
+    const hasSemanticChoice = hasSemanticChoiceInBlock(block);
     if (block.block_type === "heading") {
       const H = getHeadingTag(block);
       return (
@@ -852,9 +897,16 @@ export default function TranslationReviewPage() {
           }}
           className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
         >
-          <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Block {block.block_index + 1}
-          </span>
+          <div className="mb-1 flex flex-wrap items-center gap-1">
+            <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Block {block.block_index + 1}
+            </span>
+            {hasSemanticChoice && (
+              <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
+                Semantic choice available
+              </span>
+            )}
+          </div>
           <H className="text-xl font-semibold leading-8 text-slate-900">{body}</H>
         </div>
       );
@@ -866,9 +918,16 @@ export default function TranslationReviewPage() {
         }}
         className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
       >
-        <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-          Block {block.block_index + 1}
-        </span>
+        <div className="mb-1 flex flex-wrap items-center gap-1">
+          <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Block {block.block_index + 1}
+          </span>
+          {hasSemanticChoice && (
+            <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
+              Semantic choice available
+            </span>
+          )}
+        </div>
         <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>
       </div>
     );
@@ -956,44 +1015,42 @@ export default function TranslationReviewPage() {
     setError("");
   }
 
-  async function handleAcceptSemanticSuggestion() {
-    if (!selectedSegment || !semanticSuggestion?.suggested_translation) return;
-    setActionLoading(true);
-    setMessage("");
-    setError("");
-    try {
-      await saveResult(selectedSegment.id, semanticSuggestion.suggested_translation, "memory_match");
-      setIsEditing(false);
-      setMessage("Semantic memory suggestion accepted.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept suggestion");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  function handleEditSemanticSuggestion() {
-    if (!semanticSuggestion?.suggested_translation) return;
-    setDraftTranslation(semanticSuggestion.suggested_translation);
-    setIsEditing(true);
-    setMessage("Suggestion loaded for editing.");
-    setError("");
-  }
-
-  async function handleIgnoreSemanticSuggestion() {
+  async function handleUseSelectedTranslation() {
     if (!selectedSegment) return;
+    if (semanticChoice === "suggested" && !semanticSuggestionText.trim()) return;
+    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
+    const chosenTranslation = semanticChoice === "suggested" ? semanticSuggestionText : draftTranslation;
+    const chosenStatus = semanticChoice === "suggested" ? "memory_match" : "approved";
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
-      await saveResult(selectedSegment.id, draftTranslation, "edited");
+      await saveResult(selectedSegment.id, chosenTranslation, chosenStatus);
       setIsEditing(false);
-      setMessage("Semantic suggestion ignored. Current translation kept.");
+      if (reviewMode === "document") {
+        moveToBlockById(nextBlockId);
+      }
+      setMessage(
+        semanticChoice === "suggested"
+          ? "Selected semantic memory translation and moved forward."
+          : "Selected current translation and moved forward."
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to ignore suggestion");
+      setError(err instanceof Error ? err.message : "Failed to apply selected translation");
     } finally {
       setActionLoading(false);
     }
+  }
+
+  function handleEditSelectedTranslation() {
+    if (semanticChoice === "suggested" && semanticSuggestionText.trim()) {
+      setDraftTranslation(semanticSuggestionText);
+    } else {
+      setDraftTranslation(selectedSegment?.final_translation ?? draftTranslation);
+    }
+    setIsEditing(true);
+    setMessage("Selected translation loaded for editing.");
+    setError("");
   }
 
   async function handleRetryJob() {
@@ -1146,7 +1203,10 @@ export default function TranslationReviewPage() {
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
-  const semanticSuggestion = selectedSegment?.semantic_memory_details ?? null;
+  const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
+  const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
+  const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
+  const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const workflowStatusLabel =
@@ -1678,67 +1738,74 @@ export default function TranslationReviewPage() {
                   </div>
                 )}
 
-                {!isReadOnly &&
-                  semanticSuggestion &&
-                  selectedSegmentStatus !== "memory_match" &&
-                  selectedSegmentStatus !== "approved" && (
-                    <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
-                      <p className="font-medium text-sky-900">Suggested from similar previous translation</p>
-                      <p className="mt-1 whitespace-pre-wrap text-slate-700">
-                        {semanticSuggestion.suggested_translation}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {typeof semanticSuggestion.similarity_score === "number"
-                          ? `${Math.round(semanticSuggestion.similarity_score * 100)}% match`
-                          : "Similarity score unavailable"}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={handleAcceptSemanticSuggestion}
-                          disabled={actionLoading}
-                          className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-60"
-                        >
-                          Accept suggestion
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleEditSemanticSuggestion}
-                          disabled={actionLoading}
-                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          Edit suggestion
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleIgnoreSemanticSuggestion}
-                          disabled={actionLoading}
-                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          Ignore
-                        </button>
-                      </div>
+                {hasSemanticChoice && (
+                  <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
+                    <p className="font-medium text-sky-900">Semantic translation choice available</p>
+                    <p className="mt-1 text-xs text-sky-700">
+                      Suggested from similar previous translation
+                      {typeof semanticSimilarityScore === "number"
+                        ? ` (${Math.round(semanticSimilarityScore * 100)}%)`
+                        : ""}
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="semantic-choice"
+                            value="current"
+                            checked={semanticChoice === "current"}
+                            onChange={() => setSemanticChoice("current")}
+                            disabled={isReadOnly}
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current translation</p>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{semanticChoiceDetails.currentTranslation}</p>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="block cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="semantic-choice"
+                            value="suggested"
+                            checked={semanticChoice === "suggested"}
+                            onChange={() => setSemanticChoice("suggested")}
+                            disabled={isReadOnly}
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                              Previous similar approved translation
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{semanticSuggestionText}</p>
+                          </div>
+                        </div>
+                      </label>
                     </div>
-                  )}
+                  </div>
+                )}
 
                 <div className="mt-6 space-y-3">
                   {!isReadOnly && isDocumentMode && (
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        onClick={handleApproveCurrentBlock}
-                        disabled={actionLoading}
+                        onClick={hasSemanticChoice ? handleUseSelectedTranslation : handleApproveCurrentBlock}
+                        disabled={actionLoading || (hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim())}
                         className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                       >
-                        Approve
+                        {hasSemanticChoice ? "Use selected translation" : "Approve"}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsEditing(true)}
+                        onClick={hasSemanticChoice ? handleEditSelectedTranslation : () => setIsEditing(true)}
                         disabled={actionLoading || !canEditSelectedSegment}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                       >
-                        Edit
+                        {hasSemanticChoice ? "Edit selected translation" : "Edit"}
                       </button>
                       <button
                         type="button"
