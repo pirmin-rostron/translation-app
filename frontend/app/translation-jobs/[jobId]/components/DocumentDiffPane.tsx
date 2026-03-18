@@ -81,9 +81,6 @@ export function DocumentDiffPane({
             >
               Markup: {showMarkup ? "Visible" : "Hidden"}
             </button>
-            <div className="text-xs text-slate-500">
-              Default view: full side-by-side document. Use filters to narrow to issues.
-            </div>
           </div>
         </div>
 
@@ -98,16 +95,12 @@ export function DocumentDiffPane({
               </p>
             )}
           </div>
-        ) : (
-          <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500">
-            Issue navigation is available in <span className="font-medium">Issues Only</span> mode.
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div className="grid border-b border-slate-200 bg-slate-50 px-8 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="pr-6">Source document</div>
-        <div className="pl-6">Final translated document</div>
+        <div className="pr-6">Source</div>
+        <div className="pl-6">Translated</div>
       </div>
       {!displayedNodes.length ? (
         <div className="p-8 text-slate-600">

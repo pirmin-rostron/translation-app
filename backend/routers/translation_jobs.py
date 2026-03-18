@@ -54,6 +54,7 @@ TRANSLATION_STAGE = "translation"
 AMBIGUITY_STAGE = "ambiguity_detection"
 RECONSTRUCTION_STAGE = "reconstruction"
 EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "exports"))
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
 JOB_STATUS_TRANSLATION_QUEUED = "translation_queued"
 JOB_STATUS_TRANSLATING = "translating"
@@ -81,6 +82,11 @@ JOB_LIFECYCLE_STATUSES = {
 _RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
 _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
 _EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.(?P<ext>txt|rtf|docx)$")
+_RTF_METADATA_FRAGMENT_PATTERN = re.compile(
+    r"^(fonttbl|colortbl|stylesheet|info|deff\d+|ansi|ansicpg\d+|viewkind\d+|uc\d+|pard|lang\d+|f\d+|fs\d+|cf\d+|highlight\d+)$",
+    re.IGNORECASE,
+)
+_FONT_NAME_FRAGMENT_PATTERN = re.compile(r"^[A-Za-z0-9 _-]{2,80};$")
 SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
 SUPPORTED_EXPORT_FORMATS = {"txt", "rtf", "docx"}
 
@@ -319,6 +325,36 @@ def _preserve_export_translation(text: str | None) -> str:
     preserved = "\n".join(line.rstrip() for line in preserved.splitlines())
     preserved = re.sub(r"\n{3,}", "\n\n", preserved)
     return preserved.strip()
+
+
+def _clean_review_display_text(text: str | None) -> str:
+    cleaned = _clean_export_translation(text)
+    if not cleaned:
+        return ""
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    filtered_lines: list[str] = []
+    for line in lines:
+        if _RTF_METADATA_FRAGMENT_PATTERN.match(line):
+            continue
+        if _FONT_NAME_FRAGMENT_PATTERN.match(line):
+            continue
+        filtered_lines.append(line)
+    if not filtered_lines:
+        return ""
+    return "\n".join(filtered_lines).strip()
+
+
+def _load_document_raw_source_text(doc: Document) -> str | None:
+    if doc.file_type not in {"rtf", "txt"}:
+        return None
+    filepath = UPLOAD_DIR / doc.stored_filename
+    try:
+        if not filepath.exists() or not filepath.is_file():
+            return None
+        return filepath.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        logger.warning("Could not read raw source text for document_id=%d", doc.id, exc_info=True)
+        return None
 
 
 def _normalize_export_mode(export_mode: str) -> str:
@@ -1327,6 +1363,10 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    document_source_raw = _load_document_raw_source_text(doc)
 
     blocks = (
         db.query(DocumentBlock)
@@ -1383,15 +1423,15 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
             translated_parts.append(result.final_translation)
 
         translated_text_raw = _compose_block_translation(block.block_type, translated_parts)
-        translated_text_display = _clean_export_translation(translated_text_raw) if translated_text_raw else None
+        translated_text_display = _clean_review_display_text(translated_text_raw) if translated_text_raw else None
         review_blocks.append(
             ReviewBlockResponse(
                 id=block.id,
                 document_id=block.document_id,
                 block_index=block.block_index,
                 block_type=block.block_type,
-                source_text_raw=block.text_original,
-                source_text_display=_clean_export_translation(block.text_original),
+                source_text_raw=document_source_raw or block.text_original,
+                source_text_display=_clean_review_display_text(block.text_original),
                 translated_text_raw=translated_text_raw,
                 translated_text_display=translated_text_display,
                 text_original=block.text_original,
