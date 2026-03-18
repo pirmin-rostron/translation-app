@@ -1451,7 +1451,7 @@ export default function TranslationReviewPage() {
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const hasGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
-  const isSafeDecisionOnlyMode = selectedSegmentIsSafe && !selectedIssue && !hasGuidedChoice;
+  const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const workflowStatusLabel =
