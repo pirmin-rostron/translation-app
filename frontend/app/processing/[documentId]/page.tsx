@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -57,6 +57,8 @@ export default function ProcessingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [introPhase, setIntroPhase] = useState<"idle" | "upload" | "parse" | "done">("idle");
+  const introPlayedRef = useRef(false);
 
   const latestJob = jobs[0] ?? null;
   const reviewReadyStatuses = new Set(["in_review", "draft_saved", "review_complete", "ready_for_export", "exported"]);
@@ -157,6 +159,38 @@ export default function ProcessingPage() {
   const parseFailed = docStatus === "parse_failed";
   const translationFailed = latestJob?.status === "failed";
   const hasFailure = parseFailed || translationFailed;
+  const translationMeaningfulProgress = Boolean(
+    translationProgress &&
+      (translationProgress.completed_segments > 0 || translationProgress.percentage >= 12)
+  );
+  const shouldRunIntro =
+    !introPlayedRef.current &&
+    !hasFailure &&
+    !translationDone &&
+    docStatus === "parsed" &&
+    !docProgress?.is_active &&
+    !translationMeaningfulProgress;
+
+  useEffect(() => {
+    introPlayedRef.current = false;
+    setIntroPhase("idle");
+  }, [documentId]);
+
+  useEffect(() => {
+    if (shouldRunIntro) {
+      introPlayedRef.current = true;
+      setIntroPhase("upload");
+      const parseTimer = window.setTimeout(() => setIntroPhase("parse"), 1000);
+      const doneTimer = window.setTimeout(() => setIntroPhase("done"), 2000);
+      return () => {
+        window.clearTimeout(parseTimer);
+        window.clearTimeout(doneTimer);
+      };
+    }
+    if (introPlayedRef.current) {
+      setIntroPhase((prev) => (prev === "done" ? prev : "done"));
+    }
+  }, [shouldRunIntro]);
 
   const parseProgressValue = parsingDone ? 100 : docProgress?.is_active ? Math.max(0, Math.min(100, docProgress.percentage)) : 0;
   const translationProgressValue = translationDone
@@ -175,7 +209,31 @@ export default function ProcessingPage() {
   else if (translationStarted) currentStep = 2;
   else if (docProgress?.is_active || parsingDone) currentStep = 1;
 
-  const steps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
+  const introActive = introPhase === "upload" || introPhase === "parse";
+  const introSteps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
+    {
+      title: "Upload",
+      subtitle: introPhase === "upload" ? "In progress" : "Done",
+      status: introPhase === "upload" ? "current" : "complete",
+    },
+    {
+      title: "Parse",
+      subtitle: introPhase === "parse" ? "In progress" : "Waiting",
+      status: introPhase === "parse" ? "current" : "upcoming",
+    },
+    {
+      title: "Translate",
+      subtitle: "Waiting",
+      status: "upcoming",
+    },
+    {
+      title: "Review ready",
+      subtitle: "Waiting",
+      status: "upcoming",
+    },
+  ];
+
+  const realSteps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
     {
       title: "Upload",
       subtitle: "Done",
@@ -203,8 +261,13 @@ export default function ProcessingPage() {
       status: translationDone ? "complete" : currentStep === 3 ? "current" : "upcoming",
     },
   ];
+  const steps = introActive ? introSteps : realSteps;
 
-  const currentStatusHeading = hasFailure
+  const currentStatusHeading = introPhase === "upload"
+    ? "Uploading your document"
+    : introPhase === "parse"
+      ? "Parsing your document"
+      : hasFailure
     ? parseFailed
       ? "Parsing needs attention"
       : "Translation needs attention"
@@ -216,7 +279,11 @@ export default function ProcessingPage() {
           ? "Parsing your document"
           : "Uploading your document";
 
-  const currentStatusSupport = hasFailure
+  const currentStatusSupport = introPhase === "upload"
+    ? "Preparing your file for translation."
+    : introPhase === "parse"
+      ? "Extracting content so translation can begin."
+      : hasFailure
     ? "Please retry the failed step to continue."
     : translationDone
       ? "Your document is ready for review."
@@ -231,6 +298,7 @@ export default function ProcessingPage() {
               docProgress.eta_seconds == null ? "Calculating remaining time" : formatEta(docProgress.eta_seconds)
             }`
           : "This usually takes a minute or two. You can stay on this page.";
+  const displayProgress = introPhase === "upload" ? 0 : introPhase === "parse" ? 16 : overallProgress;
 
   useEffect(() => {
     if (!translationDone || !latestJob) return;
@@ -257,10 +325,10 @@ export default function ProcessingPage() {
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
               <div
                 className={`h-full rounded-full transition-all ${hasFailure ? "bg-amber-500" : "bg-indigo-600"}`}
-                style={{ width: `${Math.max(0, Math.min(100, overallProgress))}%` }}
+                style={{ width: `${Math.max(0, Math.min(100, displayProgress))}%` }}
               />
             </div>
-            <p className="mt-1 text-xs text-slate-600">{overallProgress}% complete</p>
+            <p className="mt-1 text-xs text-slate-600">{displayProgress}% complete</p>
           </div>
 
           <ol className="mt-5 space-y-3">
