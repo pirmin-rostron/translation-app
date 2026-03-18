@@ -24,6 +24,7 @@ type TranslationJob = {
   id: number;
   document_id: number;
   status: string;
+  translation_style?: "natural" | "literal" | null;
   error_message?: string | null;
   created_at: string;
 };
@@ -106,6 +107,7 @@ export default function DocumentDetailPage() {
   const [editingSourceLanguage, setEditingSourceLanguage] = useState(false);
   const [sourceLanguageEdit, setSourceLanguageEdit] = useState("");
   const [sourceLanguageSuccess, setSourceLanguageSuccess] = useState("");
+  const [translationStyle, setTranslationStyle] = useState<"natural" | "literal">("natural");
 
   const fetchDoc = () => {
     fetch(`${API_URL}/api/documents/${id}`)
@@ -229,6 +231,8 @@ export default function DocumentDetailPage() {
     try {
       const res = await fetch(`${API_URL}/api/documents/${id}/translation-jobs`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ translation_style: translationStyle }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -410,6 +414,11 @@ export default function DocumentDetailPage() {
                   {latestJob?.status ?? "no_translation_job"}
                 </span>
                 {latestJob?.error_message && <p className="mt-1 text-xs text-red-600">{latestJob.error_message}</p>}
+                {latestJob && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Style: {latestJob.translation_style === "literal" ? "Literal" : "Natural"}
+                  </p>
+                )}
               </dd>
             </div>
             <div>
@@ -449,6 +458,33 @@ export default function DocumentDetailPage() {
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-3">
+            {doc.status === "parsed" && segments.length > 0 && (
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Translation style</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="translation-style"
+                      value="natural"
+                      checked={translationStyle === "natural"}
+                      onChange={() => setTranslationStyle("natural")}
+                    />
+                    <span>Natural (recommended)</span>
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="translation-style"
+                      value="literal"
+                      checked={translationStyle === "literal"}
+                      onChange={() => setTranslationStyle("literal")}
+                    />
+                    <span>Literal / precise</span>
+                  </label>
+                </div>
+              </div>
+            )}
             {(doc.status === "uploaded" || parseFailed) && (
               <button
                 onClick={parseFailed ? handleRetryDoc : handleParse}

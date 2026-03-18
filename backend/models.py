@@ -15,6 +15,7 @@ class TranslationJob(Base):
     customer_id = Column(String(100), nullable=False, default="default")
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
+    translation_style = Column(String(20), nullable=False, default="natural")
     status = Column(String(50), nullable=False, default="queued")
     error_message = Column(Text, nullable=True)
     last_saved_at = Column(DateTime, nullable=True)

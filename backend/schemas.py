@@ -63,6 +63,10 @@ class DocumentBlockResponse(BaseModel):
         from_attributes = True
 
 
+class TranslationJobCreateRequest(BaseModel):
+    translation_style: str = Field(default="natural", min_length=1, max_length=20)
+
+
 class SegmentAnnotationResponse(BaseModel):
     id: int
     segment_id: int
@@ -88,6 +92,7 @@ class TranslationJobResponse(BaseModel):
     customer_id: str
     industry: str | None
     domain: str | None
+    translation_style: str
     status: str
     error_message: str | None
     last_saved_at: datetime | None

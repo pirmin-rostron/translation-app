@@ -28,6 +28,7 @@ from schemas import (
     ExportFileResponse,
     ProcessingStageJobResponse,
     ReviewSummaryResponse,
+    TranslationJobCreateRequest,
     TranslationProgressResponse,
     ReviewBlockResponse,
     ReviewSegmentResponse,
@@ -62,6 +63,9 @@ JOB_STATUS_REVIEW_COMPLETE = "review_complete"
 JOB_STATUS_READY_FOR_EXPORT = "ready_for_export"
 JOB_STATUS_EXPORTED = "exported"
 JOB_STATUS_FAILED = "failed"
+TRANSLATION_STYLE_NATURAL = "natural"
+TRANSLATION_STYLE_LITERAL = "literal"
+TRANSLATION_STYLES = {TRANSLATION_STYLE_NATURAL, TRANSLATION_STYLE_LITERAL}
 JOB_LIFECYCLE_STATUSES = {
     JOB_STATUS_TRANSLATION_QUEUED,
     JOB_STATUS_TRANSLATING,
@@ -79,6 +83,16 @@ _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
 _EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.(?P<ext>txt|rtf|docx)$")
 SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
 SUPPORTED_EXPORT_FORMATS = {"txt", "rtf", "docx"}
+
+
+def _normalize_translation_style(value: str | None) -> str:
+    style = (value or TRANSLATION_STYLE_NATURAL).strip().lower()
+    if style not in TRANSLATION_STYLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"translation_style must be one of: {', '.join(sorted(TRANSLATION_STYLES))}",
+        )
+    return style
 
 
 def _queue_stage_job(
@@ -947,6 +961,9 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     provider, provider_name = get_translation_provider()
     batch_size = get_batch_size()
     source_lang = doc.source_language or "unknown"
+    translation_style = (job.translation_style or TRANSLATION_STYLE_NATURAL).strip().lower()
+    if translation_style not in TRANSLATION_STYLES:
+        translation_style = TRANSLATION_STYLE_NATURAL
     glossary_candidates = _get_glossary_candidates(
         db=db,
         source_language=source_lang,
@@ -955,8 +972,9 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         domain=doc.domain,
     )
     logger.info(
-        "Translation stage start: provider=%s batch_size=%d segments=%d document_id=%d job_id=%d",
+        "Translation stage start: provider=%s style=%s batch_size=%d segments=%d document_id=%d job_id=%d",
         provider_name,
+        translation_style,
         batch_size,
         len(segments),
         doc.id,
@@ -1036,6 +1054,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                     target_language=doc.target_language,
                     industry=doc.industry,
                     domain=doc.domain,
+                    translation_style=translation_style,
                 )
             except Exception as batch_err:
                 logger.warning(
@@ -1053,6 +1072,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                         context_before=s.context_before,
                         context_after=s.context_after,
                         glossary_terms=glossary_matches_by_segment.get(s.id, []),
+                        translation_style=translation_style,
                     )
                     for s in missing_segments
                 ]
@@ -1172,6 +1192,7 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 def create_translation_job(
     document_id: int,
     background_tasks: BackgroundTasks,
+    payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),
 ):
     """Create a translation job and queue staged background processing."""
@@ -1197,6 +1218,7 @@ def create_translation_job(
         )
 
     source_lang = doc.source_language or "unknown"
+    translation_style = _normalize_translation_style(payload.translation_style if payload else None)
     job = TranslationJob(
         document_id=document_id,
         source_language=source_lang,
@@ -1204,6 +1226,7 @@ def create_translation_job(
         customer_id=doc.customer_id,
         industry=doc.industry,
         domain=doc.domain,
+        translation_style=translation_style,
         status=JOB_STATUS_TRANSLATION_QUEUED,
         translation_provider=None,
         translation_batch_size=None,

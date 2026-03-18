@@ -19,6 +19,7 @@ type TranslationJob = {
   error_message: string | null;
   last_saved_at: string | null;
   translation_provider: string | null;
+  translation_style?: "natural" | "literal" | null;
   created_at: string;
 };
 
@@ -1607,7 +1608,12 @@ export default function TranslationReviewPage() {
             {doc?.filename ?? `#${job.document_id}`} • {getLanguageDisplayName(job.source_language)} →{" "}
             {getLanguageDisplayName(job.target_language)}
           </p>
-          <p className="mt-2 text-sm text-slate-600">Follow the workflow below to save, finalize, and export.</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Follow the workflow below to save, finalize, and export.
+            <span className="ml-2 text-slate-500">
+              Style: {job.translation_style === "literal" ? "Literal" : "Natural"}
+            </span>
+          </p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
           <div className="mt-4 inline-flex rounded-lg border border-slate-300 bg-white p-1">
             <button

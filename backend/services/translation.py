@@ -65,6 +65,7 @@ class TranslationProvider:
         source_text: str,
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
         context_before: str | None = None,
@@ -79,6 +80,7 @@ class TranslationProvider:
         segments: list[SegmentContext],
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
     ) -> list[TranslationSegmentResult]:
@@ -230,6 +232,7 @@ class MockTranslationProvider(TranslationProvider):
         source_text: str,
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
         context_before: str | None = None,
@@ -243,10 +246,23 @@ class MockTranslationProvider(TranslationProvider):
         segments: list[SegmentContext],
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
     ) -> list[TranslationSegmentResult]:
         return [TranslationSegmentResult(primary_translation=f"[TRANSLATED] {s.source_text}") for s in segments]
+
+
+def _translation_style_instruction(target_language: str, translation_style: str) -> str:
+    style = (translation_style or "natural").strip().lower()
+    if style == "literal":
+        return (
+            f"Translate the following text into {target_language}, staying as close as possible to the original "
+            "wording and sentence structure, even if it sounds less natural."
+        )
+    return (
+        f"Translate the following text into fluent, natural {target_language}, preserving meaning and readability."
+    )
 
 
 class OpenAITranslationProvider(TranslationProvider):
@@ -310,6 +326,7 @@ class OpenAITranslationProvider(TranslationProvider):
         source_text: str,
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
         context_before: str | None = None,
@@ -322,6 +339,7 @@ class OpenAITranslationProvider(TranslationProvider):
                 segments=[segment],
                 source_language=source_language,
                 target_language=target_language,
+                translation_style=translation_style,
                 industry=industry,
                 domain=domain,
             )[0]
@@ -345,6 +363,7 @@ class OpenAITranslationProvider(TranslationProvider):
             segments=[segment],
             source_language=source_language,
             target_language=target_language,
+            translation_style=translation_style,
             industry=industry,
             domain=domain,
         )
@@ -363,6 +382,7 @@ class OpenAITranslationProvider(TranslationProvider):
         segments: list[SegmentContext],
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
     ) -> list[TranslationSegmentResult]:
@@ -374,11 +394,13 @@ class OpenAITranslationProvider(TranslationProvider):
             context_parts.append(f"Domain: {domain}")
         context_line = "\n".join(context_parts) if context_parts else "General text."
         src = "the detected source language" if source_language.lower() == "unknown" else source_language
+        style_instruction = _translation_style_instruction(target_language, translation_style)
 
         texts = [s.source_text for s in segments]
         if len(segments) == 1:
             glossary_block = _build_glossary_instruction_for_segment(segments[0].glossary_terms)
-            prompt = f"""Translate the single segment from {src} to {target_language} and detect material ambiguity.
+            prompt = f"""{style_instruction}
+Then detect material ambiguity for this single segment translated from {src}.
 
 Context: {context_line}
 
@@ -406,7 +428,8 @@ Return only valid JSON. Do not include markdown, code fences, explanations, head
                 }
                 for s in segments
             ]
-            prompt = f"""Translate each segment from {src} to {target_language} and detect material ambiguity.
+            prompt = f"""{style_instruction}
+Then detect material ambiguity for each segment translated from {src}.
 
 Context: {context_line}
 
@@ -489,6 +512,7 @@ Return only valid JSON. Do not include markdown, code fences, explanations, head
         segments: list[SegmentContext],
         source_language: str,
         target_language: str,
+        translation_style: str,
         industry: str | None,
         domain: str | None,
     ) -> list[str]:
@@ -500,10 +524,12 @@ Return only valid JSON. Do not include markdown, code fences, explanations, head
             context_parts.append(f"Domain: {domain}")
         context_line = "\n".join(context_parts) if context_parts else "General text."
         src = "the detected source language" if source_language.lower() == "unknown" else source_language
+        style_instruction = _translation_style_instruction(target_language, translation_style)
         if len(segments) == 1:
             segment = segments[0]
             glossary_block = _build_glossary_instruction_for_segment(segment.glossary_terms)
-            prompt = f"""Translate from {src} to {target_language}.
+            prompt = f"""{style_instruction}
+Source language: {src}
 
 Context: {context_line}
 {glossary_block}
@@ -516,7 +542,9 @@ Source text:
 Return only the translated text. Do not return JSON, markdown, code fences, explanations, or quotes around the answer."""
         else:
             texts_json = json.dumps([s.source_text for s in segments])
-            prompt = f"""Translate from {src} to {target_language}. Context: {context_line}
+            prompt = f"""{style_instruction}
+Source language: {src}
+Context: {context_line}
 
 Return only a valid JSON array of translated strings in the same order. Do not include markdown, code fences, explanations, headings, or any extra text before or after the JSON.
 
@@ -544,6 +572,7 @@ Return only a valid JSON array of translated strings in the same order. Do not i
         segments: list[SegmentContext],
         source_language: str,
         target_language: str,
+        translation_style: str = "natural",
         industry: str | None = None,
         domain: str | None = None,
     ) -> list[TranslationSegmentResult]:
@@ -556,6 +585,7 @@ Return only a valid JSON array of translated strings in the same order. Do not i
                     source_text=s.source_text,
                     source_language=source_language,
                     target_language=target_language,
+                    translation_style=translation_style,
                     industry=industry,
                     domain=domain,
                     context_before=s.context_before,
@@ -568,6 +598,7 @@ Return only a valid JSON array of translated strings in the same order. Do not i
                 segments=segments,
                 source_language=source_language,
                 target_language=target_language,
+                translation_style=translation_style,
                 industry=industry,
                 domain=domain,
             )
@@ -593,6 +624,7 @@ Return only a valid JSON array of translated strings in the same order. Do not i
                     source_text=s.source_text,
                     source_language=source_language,
                     target_language=target_language,
+                    translation_style=translation_style,
                     industry=industry,
                     domain=domain,
                     context_before=s.context_before,
@@ -606,6 +638,7 @@ Return only a valid JSON array of translated strings in the same order. Do not i
                 source_text=s.source_text,
                 source_language=source_language,
                 target_language=target_language,
+                translation_style=translation_style,
                 industry=industry,
                 domain=domain,
                 context_before=s.context_before,

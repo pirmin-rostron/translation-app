@@ -90,6 +90,16 @@ def _migrate_schema():
                 conn.execute(
                     text("ALTER TABLE translation_jobs ADD COLUMN customer_id VARCHAR(100) NOT NULL DEFAULT 'default'")
                 )
+            if "translation_style" not in job_columns:
+                conn.execute(
+                    text("ALTER TABLE translation_jobs ADD COLUMN translation_style VARCHAR(20) NOT NULL DEFAULT 'natural'")
+                )
+            conn.execute(
+                text(
+                    "UPDATE translation_jobs SET translation_style = 'natural' "
+                    "WHERE translation_style IS NULL OR TRIM(translation_style) = ''"
+                )
+            )
 
     if "approved_translations" in table_names:
         approved_columns = {column["name"] for column in inspector.get_columns("approved_translations")}
