@@ -1,0 +1,159 @@
+"use client";
+
+import type { MutableRefObject, ReactNode } from "react";
+
+type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
+type ReviewMode = "document" | "issues";
+
+type SegmentRef = { id: number };
+type DiffBlock = { segments: SegmentRef[] };
+type DocumentNode = {
+  key: string;
+  type: "block" | "bullet_list";
+  block?: DiffBlock;
+  blocks?: DiffBlock[];
+};
+
+type FilterChip = {
+  key: ReviewFilter;
+  label: string;
+  count: number;
+};
+
+type DocumentDiffPaneProps = {
+  activeFilter: ReviewFilter;
+  onFilterChange: (filter: ReviewFilter) => void;
+  reviewMode: ReviewMode;
+  filterChips: FilterChip[];
+  visibleIssuesLength: number;
+  currentIssueIndex: number;
+  onPreviousIssue: () => void;
+  onNextIssue: () => void;
+  displayedNodes: DocumentNode[];
+  allNodesCount: number;
+  getNodeSpacing: (node: DocumentNode) => string;
+  renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
+  segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
+};
+
+export function DocumentDiffPane({
+  activeFilter,
+  onFilterChange,
+  reviewMode,
+  filterChips,
+  visibleIssuesLength,
+  currentIssueIndex,
+  onPreviousIssue,
+  onNextIssue,
+  displayedNodes,
+  allNodesCount,
+  getNodeSpacing,
+  renderNode,
+  segmentRefs,
+}: DocumentDiffPaneProps) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-t-2xl border-b border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {filterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => onFilterChange(chip.key)}
+                className={`rounded-full px-3 py-1.5 text-sm ${
+                  activeFilter === chip.key
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {chip.label} ({chip.count})
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-slate-500">
+            Default view: full side-by-side document. Use filters to narrow to issues.
+          </div>
+        </div>
+
+        {reviewMode === "issues" ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issue navigation</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onPreviousIssue}
+                  disabled={!visibleIssuesLength}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Previous issue
+                </button>
+                <button
+                  type="button"
+                  onClick={onNextIssue}
+                  disabled={!visibleIssuesLength}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Next issue
+                </button>
+                <span className="text-xs text-slate-500">
+                  {visibleIssuesLength
+                    ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssuesLength}`
+                    : "No issues found — you're all good here"}
+                </span>
+              </div>
+            </div>
+            {!visibleIssuesLength && (
+              <p className="mt-2 text-xs text-slate-500">
+                Try <span className="font-medium">All Content</span> to continue full document review.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500">
+            Issue navigation is available in <span className="font-medium">Issues Only</span> mode.
+          </div>
+        )}
+      </div>
+
+      <div className="grid border-b border-slate-200 bg-slate-50 px-8 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="pr-6">Source document</div>
+        <div className="pl-6">Final translated document</div>
+      </div>
+      {!displayedNodes.length ? (
+        <div className="p-8 text-slate-600">
+          No issues found — you&apos;re all good here. Try switching back to All Content for full document context.
+        </div>
+      ) : (
+        <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
+          {displayedNodes.map((node) => {
+            const nodeSegments =
+              node.type === "bullet_list" ? node.blocks?.flatMap((b) => b.segments) ?? [] : node.block?.segments ?? [];
+            return (
+              <div
+                key={node.key}
+                className={getNodeSpacing(node)}
+                ref={(el) => {
+                  nodeSegments.forEach((s) => {
+                    segmentRefs.current[s.id] = el;
+                  });
+                }}
+              >
+                <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="min-w-0 rounded-lg bg-white/80 p-2 pr-3">{renderNode(node, "source")}</div>
+                  <div className="min-w-0 rounded-lg bg-white p-2 pl-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)]">
+                    {renderNode(node, "target")}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="border-t border-slate-200 px-6 py-3 text-sm text-slate-500">
+        Showing {displayedNodes.length} of {allNodesCount} document sections
+      </div>
+    </section>
+  );
+}

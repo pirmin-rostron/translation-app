@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { DocumentDiffPane } from "./components/DocumentDiffPane";
+import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
+import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
 import { getLanguageDisplayName } from "../../utils/language";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1247,6 +1250,19 @@ export default function TranslationReviewPage() {
     setError("");
   }
 
+  function handleToggleEdit() {
+    if (primaryActionIsGuidedChoice) {
+      handleEditSelectedTranslation();
+      return;
+    }
+    setIsEditing((current) => {
+      if (!current) {
+        setDraftTranslation("");
+      }
+      return !current;
+    });
+  }
+
   async function handleRetryJob() {
     if (!job) return;
     setActionLoading(true);
@@ -1521,6 +1537,13 @@ export default function TranslationReviewPage() {
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
   const totalBlocks = orderedBlocks.length;
   const flaggedIssuesCount = flagged.length;
+  const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
+    { key: "all", label: "All Content", count: allSegments.length },
+    { key: "issues", label: "Issues", count: flagged.length },
+    { key: "ambiguities", label: "Ambiguities", count: allSegments.filter(({ segment }) => matchesFilter(segment, "ambiguities")).length },
+    { key: "glossary", label: "Glossary", count: allSegments.filter(({ segment }) => matchesFilter(segment, "glossary")).length },
+    { key: "memory", label: "Memory", count: allSegments.filter(({ segment }) => matchesFilter(segment, "memory")).length },
+  ];
   const reviewProgressPercent =
     totalBlocks > 0 ? Math.round((completedBlocks / totalBlocks) * 100) : 0;
   const guidanceTitle =
@@ -1608,633 +1631,119 @@ export default function TranslationReviewPage() {
           </div>
         </div>
 
-        {translationProgress && !translationProgress.is_complete && (
-          <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
-            <p className="text-sm font-medium text-emerald-900">Translation status</p>
-            <p className="mt-1 text-sm text-slate-700">
-              {translationProgress.stage_label} • {translationProgress.completed_segments}/
-              {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
-            </p>
-          </section>
-        )}
-
-        <section ref={reviewGuidanceRef} className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Guidance</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
-              <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
-              <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
-              <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review progress</p>
-                  <p className="text-xs font-medium text-slate-700">
-                    {completedBlocks} of {totalBlocks} blocks completed
-                  </p>
-                </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-                  <div
-                    className="h-full rounded-full bg-indigo-600 transition-all"
-                    style={{ width: `${Math.max(0, Math.min(100, reviewProgressPercent))}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-slate-600">
-                  {reviewProgressPercent}% complete • {unresolvedBlocks} unresolved block{unresolvedBlocks === 1 ? "" : "s"} remaining
-                </p>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Blocks</p>
-                  <p className="font-semibold text-slate-900">{totalBlocks}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Segments</p>
-                  <p className="font-semibold text-slate-900">{totalSegments}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Safe</p>
-                  <p className="font-semibold text-slate-900">{safeUnresolvedSegments}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Flagged issues</p>
-                  <p className="font-semibold text-slate-900">{flaggedIssuesCount}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Unresolved</p>
-                  <p className="font-semibold text-slate-900">{unresolvedSegments}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Needs attention</p>
-                  <p className="font-semibold text-slate-900">{segmentsRequiringAttention}</p>
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-slate-600">
-                Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> • Semantic
-                memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
-              </p>
-              <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recommended next step</p>
-                <p className="mt-1 text-sm text-slate-700">{startHereActionLabel}</p>
-              </div>
-              <p className="mt-1 text-sm text-slate-600">
-                Progress: In Review → Draft Saved → Ready for Export → Exported
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Last saved:{" "}
-                <span className="font-medium text-slate-900">
-                  {reviewSummary?.last_saved_at
-                    ? new Date(reviewSummary.last_saved_at).toLocaleString()
-                    : "Not saved yet"}
-                </span>
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Last export:{" "}
-                <span className="font-medium text-slate-900">
-                  {lastExportTimestamp ? new Date(lastExportTimestamp).toLocaleString() : "No export yet"}
-                </span>
-                {" • "}
-                Format: <span className="font-medium text-slate-900">{lastExportFormat.toUpperCase()}</span>
-                {" • "}
-                Formatting mode:{" "}
-                <span className="font-medium text-slate-900">
-                  {lastExportMode === "preserve_formatting"
-                    ? "Preserve original formatting"
-                    : lastExportMode === "clean_text"
-                      ? "Clean text only"
-                      : "Not available"}
-                </span>
-              </p>
-            </div>
-            <div className="flex min-w-[220px] flex-col items-end gap-2">
-              {showSaveWorkflowDraft && (
-                <button
-                  type="button"
-                  onClick={handleSaveWorkflowDraft}
-                  disabled={actionLoading}
-                  className="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-800 disabled:opacity-60"
-                >
-                  Save draft
-                </button>
-              )}
-              <div className="flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handlePrimaryGuidanceAction}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-                >
-                  {primaryGuidanceLabel}
-                </button>
-              {isReadOnly && (
-                <button
-                  type="button"
-                  onClick={handleReopenReview}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Re-open review
-                </button>
-              )}
-              {job.status === "failed" && (
-                <p className="text-xs text-slate-500">Use retry to re-run failed workflow stages.</p>
-              )}
-              </div>
-            </div>
-          </div>
-          {exportHistory.length > 1 && (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous exports</p>
-              <ul className="mt-2 space-y-1 text-sm">
-                {exportHistory.slice(1).map((entry) => (
-                  <li key={entry.filename} className="flex items-center justify-between gap-3">
-                    <span className="text-slate-600">v{entry.version} • {new Date(entry.generated_at).toLocaleString()}</span>
-                    <span className="text-xs text-slate-500">Use Export / download again to choose options.</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {(["all", "issues", "ambiguities", "glossary", "memory"] as ReviewFilter[]).map((filter) => {
-                const count =
-                  filter === "all"
-                    ? allSegments.length
-                    : filter === "issues"
-                      ? flagged.length
-                      : allSegments.filter(({ segment }) => matchesFilter(segment, filter)).length;
-                const filterLabel =
-                  filter === "all"
-                    ? "All Content"
-                    : filter === "issues"
-                      ? "Issues"
-                      : filter === "ambiguities"
-                        ? "Ambiguities"
-                        : filter === "glossary"
-                          ? "Glossary"
-                          : "Memory";
-                return (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setActiveFilter(filter)}
-                    className={`rounded-full px-3 py-1.5 text-sm ${
-                      activeFilter === filter
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    {filterLabel} ({count})
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-xs text-slate-500">
-              Default view: full side-by-side document. Use filters to narrow to issues.
-            </div>
-          </div>
-          {reviewMode === "issues" ? (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Issue navigation
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => goToIssue(-1)}
-                    disabled={!visibleIssues.length}
-                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Previous issue
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => goToIssue(1)}
-                    disabled={!visibleIssues.length}
-                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Next issue
-                  </button>
-                  <span className="text-xs text-slate-500">
-                    {visibleIssues.length
-                      ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssues.length}`
-                      : "No issues found — you're all good here"}
-                  </span>
-                </div>
-              </div>
-              {!visibleIssues.length && (
-                <p className="mt-2 text-xs text-slate-500">
-                  Try <span className="font-medium">All Content</span> to continue full document review.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500">
-              Issue navigation is available in <span className="font-medium">Issues Only</span> mode.
-            </div>
-          )}
-        </div>
+        <ReviewGuidancePanel
+          reviewGuidanceRef={reviewGuidanceRef}
+          translationProgress={translationProgress}
+          formatEta={formatEta}
+          workflowStatusLabel={workflowStatusLabel}
+          guidanceTitle={guidanceTitle}
+          guidanceDetail={guidanceDetail}
+          completedBlocks={completedBlocks}
+          totalBlocks={totalBlocks}
+          reviewProgressPercent={reviewProgressPercent}
+          unresolvedBlocks={unresolvedBlocks}
+          totalSegments={totalSegments}
+          safeUnresolvedSegments={safeUnresolvedSegments}
+          flaggedIssuesCount={flaggedIssuesCount}
+          unresolvedSegments={unresolvedSegments}
+          segmentsRequiringAttention={segmentsRequiringAttention}
+          unresolvedAmbiguities={unresolvedAmbiguities}
+          unresolvedSemanticReviews={unresolvedSemanticReviews}
+          startHereActionLabel={startHereActionLabel}
+          lastSavedAt={reviewSummary?.last_saved_at ?? null}
+          lastExportTimestamp={lastExportTimestamp}
+          lastExportMode={lastExportMode}
+          lastExportFormat={lastExportFormat}
+          showSaveWorkflowDraft={showSaveWorkflowDraft}
+          actionLoading={actionLoading}
+          onSaveWorkflowDraft={handleSaveWorkflowDraft}
+          onPrimaryGuidanceAction={handlePrimaryGuidanceAction}
+          primaryGuidanceLabel={primaryGuidanceLabel}
+          isReadOnly={isReadOnly}
+          onReopenReview={handleReopenReview}
+          jobFailed={job.status === "failed"}
+          exportHistory={exportHistory}
+        />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="grid border-b border-slate-200 bg-slate-50 px-8 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <div className="pr-6">Source document</div>
-              <div className="pl-6">Final translated document</div>
-            </div>
-            {!displayedNodes.length ? (
-              <div className="p-8 text-slate-600">
-                No issues found — you're all good here. Try switching back to All Content for full document context.
-              </div>
-            ) : (
-              <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
-                {displayedNodes.map((node) => {
-                  const nodeSegments =
-                    node.type === "bullet_list" ? node.blocks.flatMap((b) => b.segments) : node.block.segments;
-                  return (
-                    <div
-                      key={node.key}
-                      className={getNodeSpacing(node)}
-                      ref={(el) => {
-                        nodeSegments.forEach((s) => {
-                          segmentRefs.current[s.id] = el;
-                        });
-                      }}
-                    >
-                      <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                        <div className="min-w-0 rounded-lg bg-white/80 p-2 pr-3">{renderNode(node, "source")}</div>
-                        <div className="min-w-0 rounded-lg bg-white p-2 pl-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)]">
-                          {renderNode(node, "target")}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="border-t border-slate-200 px-6 py-3 text-sm text-slate-500">
-              Showing {displayedNodes.length} of {allNodes.length} document sections
-            </div>
-          </section>
+          <DocumentDiffPane
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            reviewMode={reviewMode}
+            filterChips={filterChips}
+            visibleIssuesLength={visibleIssues.length}
+            currentIssueIndex={currentIssueIndex}
+            onPreviousIssue={() => goToIssue(-1)}
+            onNextIssue={() => goToIssue(1)}
+            displayedNodes={displayedNodes}
+            allNodesCount={allNodes.length}
+            getNodeSpacing={getNodeSpacing}
+            renderNode={(node, side) => renderNode(node as DocumentNode, side)}
+            segmentRefs={segmentRefs}
+          />
 
-          <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            {!selectedSegment || !selectedBlock ? (
-              reviewComplete ? (
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium text-slate-900">Review complete.</p>
-                  <p className="text-slate-600">Use Review Guidance to continue with export.</p>
-                  <button
-                    type="button"
-                    onClick={focusReviewGuidance}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Go to Review Guidance
-                  </button>
-                </div>
-              ) : (
-                <div className="text-sm text-slate-600">Select highlighted text to review details.</div>
-              )
-            ) : (
-              <>
-                <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
-                {reviewMode === "document" ? (
-                  <>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocks.length}
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-slate-600">
-                      Review progress: {completedBlocks} of {orderedBlocks.length} completed
-                    </p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handlePreviousBlock}
-                        disabled={selectedBlockPosition <= 0}
-                        className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                      >
-                        Previous block
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleNextBlock}
-                        disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
-                        className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                      >
-                        Next block
-                      </button>
-                    </div>
-                    {isLastBlock && (
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                        {unresolvedBlocks === 0 ? (
-                          <span>Review complete. You can mark this document ready for export.</span>
-                        ) : (
-                          <span>{unresolvedBlocks} items still unresolved. Review skipped blocks or unresolved segments.</span>
-                        )}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">
-                    {visibleIssues.length
-                      ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssues.length}${
-                          selectedIssue ? ` (${issueTypeLabel(selectedIssue.type)} • Block ${selectedBlock.block_index + 1})` : ""
-                        }`
-                      : "No issue selected"}
-                  </p>
-                )}
-                {selectedSegmentIsSafe && (
-                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-                    <span className="inline-flex rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-medium text-emerald-800">
-                      Safe segment
-                    </span>
-                    <p className="mt-2 text-sm text-slate-700">No ambiguity or conflicts detected.</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Safe queue position: {selectedSafeIndex + 1} / {safeSegments.length}
-                    </p>
-                  </div>
-                )}
-                {selectedIssue && !isSafeDecisionOnlyMode && (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${issueBadgeClass(selectedIssue.type)}`}
-                      >
-                        {issueTypeLabel(selectedIssue.type)}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {visibleIssues.length ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}` : "Issue"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">{cleanPanelText(selectedIssue.title)}</p>
-                  </div>
-                )}
-                {hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
-                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
-                    <p className="font-medium text-amber-900">Ambiguity detected</p>
-                    {ambiguityChoiceDetails.explanation && (
-                      <p className="mt-2 text-xs text-slate-700">{cleanPanelText(ambiguityChoiceDetails.explanation)}</p>
-                    )}
-                    {blockAmbiguityIssues.length > 1 && (
-                      <p className="mt-2 text-xs font-medium text-amber-800">
-                        Block {selectedBlock.block_index + 1} - Ambiguity {activeBlockAmbiguityPosition} of {blockAmbiguityIssues.length}
-                      </p>
-                    )}
-                    {ambiguityChoiceIndex == null && (
-                      <p className="mt-2 text-xs text-amber-800">Choose one meaning to continue.</p>
-                    )}
-                    <div className="mt-3 space-y-2">
-                      {ambiguityOptions.map((option, idx) => (
-                        <label
-                          key={`${option.meaning}-${idx}`}
-                          className="block cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-2"
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="radio"
-                              name="ambiguity-choice"
-                              value={`option-${idx}`}
-                              checked={ambiguityChoiceIndex === idx}
-                              onChange={() => setAmbiguityChoiceIndex(idx)}
-                              disabled={isReadOnly}
-                              className="mt-0.5"
-                            />
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                                {cleanPanelText(option.meaning)}
-                                {idx === currentSuggestionIndex
-                                  ? " - Current suggestion"
-                                  : ""}
-                              </p>
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!isSafeDecisionOnlyMode && (
-                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-slate-900">Decision status</p>
-                    {selectedSegmentStatus === "approved" && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        Approved
-                      </span>
-                    )}
-                    {selectedSegmentStatus === "edited" && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                        Edited and saved
-                      </span>
-                    )}
-                    {selectedSegmentStatus === "memory_match" && (
-                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-                        Accepted from memory
-                      </span>
-                    )}
-                    {selectedSegmentStatus === "unreviewed" && (
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                        Needs review
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs text-slate-600">
-                    Full source and translated context stays in the side-by-side document view.
-                  </p>
-                </div>
-                )}
-
-                {isEditing && canEditSelectedSegment && !isSafeDecisionOnlyMode && (
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit selected translation</p>
-                    <textarea
-                      value={draftTranslation}
-                      onChange={(e) => setDraftTranslation(e.target.value)}
-                      rows={6}
-                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-                    />
-                  </div>
-                )}
-
-                {glossaryMatches.length > 0 && !isSafeDecisionOnlyMode && (
-                  <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm">
-                    <p className="font-medium text-violet-900">Glossary matches</p>
-                    <ul className="mt-2 space-y-1 text-slate-700">
-                      {glossaryMatches.map((m, i) => (
-                        <li key={`${m.source_term}-${m.target_term}-${i}`}>
-                          {m.source_term} → {m.target_term}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {hasSemanticChoice && !hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
-                  <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
-                    <p className="font-medium text-sky-900">Semantic translation choice available</p>
-                    <p className="mt-1 text-xs text-sky-700">
-                      Suggested from similar previous translation
-                      {typeof semanticSimilarityScore === "number"
-                        ? ` (${Math.round(semanticSimilarityScore * 100)}%)`
-                        : ""}
-                    </p>
-                    <div className="mt-3 space-y-2">
-                      <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="radio"
-                            name="semantic-choice"
-                            value="current"
-                            checked={semanticChoice === "current"}
-                            onChange={() => setSemanticChoice("current")}
-                            disabled={isReadOnly}
-                            className="mt-0.5"
-                          />
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Use current translation decision</p>
-                          </div>
-                        </div>
-                      </label>
-                      <label className="block cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2">
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="radio"
-                            name="semantic-choice"
-                            value="suggested"
-                            checked={semanticChoice === "suggested"}
-                            onChange={() => setSemanticChoice("suggested")}
-                            disabled={isReadOnly}
-                            className="mt-0.5"
-                          />
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                              Use previous similar approved translation
-                            </p>
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-6 space-y-3">
-                  {!isReadOnly && isDocumentMode && !currentBlockResolved && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={
-                          primaryActionIsGuidedChoice
-                            ? handleUseSelectedTranslation
-                            : selectedSegmentIsSafe
-                              ? handleApprove
-                              : handleApproveCurrentBlock
-                        }
-                        disabled={primaryActionDisabled}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
-                      >
-                        {primaryActionLabel}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={
-                          primaryActionIsGuidedChoice
-                            ? handleEditSelectedTranslation
-                            : () =>
-                                setIsEditing((current) => {
-                                  if (!current) {
-                                    setDraftTranslation("");
-                                  }
-                                  return !current;
-                                })
-                        }
-                        disabled={actionLoading || !canEditSelectedSegment}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-                      >
-                        {isEditing ? "Cancel edit" : "Edit"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSkipBlock}
-                        disabled={actionLoading}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                  )}
-                  {!isReadOnly && isDocumentMode && currentBlockResolved && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                      Approved. Continue to the next unresolved block or edit again if needed.
-                    </div>
-                  )}
-                  {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (
-                    <button
-                      type="button"
-                      onClick={handleApprove}
-                      disabled={actionLoading || !draftTranslation.trim()}
-                      className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
-                    >
-                      Approve
-                    </button>
-                  )}
-                  {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || (isEditing && hasDraftChanges)) && (
-                    <button
-                      type="button"
-                      onClick={handleSaveSegmentDraft}
-                      disabled={actionLoading || !draftTranslation.trim()}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      Save segment edit
-                    </button>
-                  )}
-                  {!isReadOnly && isDocumentMode && isEditing && hasDraftChanges && (
-                    <button
-                      type="button"
-                      onClick={handleSaveSegmentDraft}
-                      disabled={actionLoading || !draftTranslation.trim()}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      Save edit and next block
-                    </button>
-                  )}
-                  {!isReadOnly && selectedSegmentIsSafe && safeSegments.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={handleNextSafeSegment}
-                      disabled={actionLoading}
-                      className="w-full rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                    >
-                      Next safe segment
-                    </button>
-                  )}
-                  {isReadOnly && (
-                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                      This document is exported and read-only. Re-open review from the workflow banner to edit.
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-500">
-                    {isDocumentMode
-                      ? isLastBlock
-                        ? unresolvedBlocks === 0
-                          ? "End of document reached. Ready to finalize workflow."
-                          : `${unresolvedBlocks} blocks still unresolved.`
-                        : `Block ${selectedBlock.block_index + 1} of ${orderedBlocks.length}`
-                      : visibleIssues.length
-                        ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssues.length}`
-                        : selectedFlaggedIndex === -1
-                          ? "No open issues in current filter."
-                          : `Flagged queue position: ${selectedFlaggedIndex + 1} / ${flagged.length}`}
-                  </p>
-                </div>
-              </>
-            )}
-          </aside>
+          <ReviewDetailsPane
+            selectedSegment={selectedSegment}
+            selectedBlock={selectedBlock}
+            reviewComplete={reviewComplete}
+            onFocusReviewGuidance={focusReviewGuidance}
+            reviewMode={reviewMode}
+            orderedBlocksLength={orderedBlocks.length}
+            completedBlocks={completedBlocks}
+            selectedBlockPosition={selectedBlockPosition}
+            onPreviousBlock={handlePreviousBlock}
+            onNextBlock={handleNextBlock}
+            isLastBlock={isLastBlock}
+            unresolvedBlocks={unresolvedBlocks}
+            visibleIssuesLength={visibleIssues.length}
+            currentIssueIndex={currentIssueIndex}
+            selectedIssue={selectedIssue}
+            issueTypeLabel={issueTypeLabel}
+            selectedSegmentIsSafe={selectedSegmentIsSafe}
+            selectedSafeIndex={selectedSafeIndex}
+            safeSegmentsLength={safeSegments.length}
+            isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
+            issueBadgeClass={issueBadgeClass}
+            cleanPanelText={cleanPanelText}
+            hasAmbiguityChoice={hasAmbiguityChoice}
+            ambiguityExplanation={ambiguityChoiceDetails.explanation}
+            blockAmbiguityIssuesLength={blockAmbiguityIssues.length}
+            activeBlockAmbiguityPosition={activeBlockAmbiguityPosition}
+            ambiguityChoiceIndex={ambiguityChoiceIndex}
+            ambiguityOptions={ambiguityOptions}
+            currentSuggestionIndex={currentSuggestionIndex}
+            onAmbiguityChoiceChange={setAmbiguityChoiceIndex}
+            isReadOnly={isReadOnly}
+            selectedSegmentStatus={selectedSegmentStatus as "approved" | "edited" | "memory_match" | "unreviewed"}
+            isEditing={isEditing}
+            canEditSelectedSegment={canEditSelectedSegment}
+            draftTranslation={draftTranslation}
+            onDraftTranslationChange={setDraftTranslation}
+            glossaryMatches={glossaryMatches}
+            hasSemanticChoice={hasSemanticChoice}
+            semanticSimilarityScore={semanticSimilarityScore}
+            semanticChoice={semanticChoice}
+            onSemanticChoiceChange={setSemanticChoice}
+            isDocumentMode={isDocumentMode}
+            currentBlockResolved={currentBlockResolved}
+            primaryActionIsGuidedChoice={primaryActionIsGuidedChoice}
+            onUseSelectedTranslation={handleUseSelectedTranslation}
+            onApprove={handleApprove}
+            onApproveCurrentBlock={handleApproveCurrentBlock}
+            primaryActionDisabled={primaryActionDisabled}
+            primaryActionLabel={primaryActionLabel}
+            onToggleEdit={handleToggleEdit}
+            actionLoading={actionLoading}
+            onSkipBlock={handleSkipBlock}
+            hasDraftChanges={hasDraftChanges}
+            onSaveSegmentDraft={handleSaveSegmentDraft}
+            onNextSafeSegment={handleNextSafeSegment}
+            selectedFlaggedIndex={selectedFlaggedIndex}
+            flaggedLength={flagged.length}
+          />
         </div>
         {showExportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
