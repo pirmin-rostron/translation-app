@@ -128,7 +128,7 @@ def _run_document_pipeline(document_id: int):
         db.close()
 
 
-def _run_default_upload_to_review_pipeline(document_id: int):
+def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural"):
     """Happy-path orchestration: parse document, then create and execute translation job."""
     db = SessionLocal()
     try:
@@ -172,8 +172,15 @@ def _run_default_upload_to_review_pipeline(document_id: int):
         if doc.status == PARSED_STATUS:
             # Import lazily to avoid circular import at module load time.
             from routers.translation_jobs import create_translation_job
+            from schemas import TranslationJobCreateRequest
 
-            create_translation_job(document_id=document_id, background_tasks=immediate_tasks, db=db)
+            style_value = (translation_style or "natural").strip().lower()
+            create_translation_job(
+                document_id=document_id,
+                background_tasks=immediate_tasks,
+                payload=TranslationJobCreateRequest(translation_style=style_value),
+                db=db,
+            )
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
     finally:
@@ -447,10 +454,14 @@ def upload_and_translate_document(
     target_language: str = Form(..., min_length=1, max_length=50),
     industry: str | None = Form(None, max_length=100),
     domain: str | None = Form(None, max_length=100),
+    translation_style: str = Form("natural", min_length=1, max_length=20),
     customer_id: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
 ):
     """Upload document and automatically run parse + translation for the default flow."""
+    style_value = translation_style.strip().lower()
+    if style_value not in {"natural", "literal"}:
+        raise HTTPException(status_code=400, detail="translation_style must be one of: literal, natural")
     doc = upload_document(
         file=file,
         target_language=target_language,
@@ -459,7 +470,7 @@ def upload_and_translate_document(
         customer_id=customer_id,
         db=db,
     )
-    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id)
+    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value)
     return doc
 
 

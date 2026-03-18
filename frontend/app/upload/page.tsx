@@ -29,6 +29,7 @@ export default function UploadPage() {
   const [targetLanguage, setTargetLanguage] = useState("");
   const [industry, setIndustry] = useState("");
   const [domain, setDomain] = useState("");
+  const [translationStyle, setTranslationStyle] = useState<"natural" | "literal">("natural");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -74,6 +75,7 @@ export default function UploadPage() {
       formData.append("target_language", trimmed);
       if (industry.trim()) formData.append("industry", industry.trim());
       if (domain.trim()) formData.append("domain", domain.trim());
+      formData.append("translation_style", translationStyle);
 
       const res = await fetch(`${API_URL}/api/documents/upload-and-translate`, {
         method: "POST",
@@ -181,6 +183,31 @@ export default function UploadPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <p className="block text-sm font-medium text-slate-700 mb-1">Translation style</p>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="translation-style"
+                  value="natural"
+                  checked={translationStyle === "natural"}
+                  onChange={() => setTranslationStyle("natural")}
+                />
+                <span>Natural (recommended)</span>
+              </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="translation-style"
+                  value="literal"
+                  checked={translationStyle === "literal"}
+                  onChange={() => setTranslationStyle("literal")}
+                />
+                <span>Literal / precise</span>
+              </label>
+            </div>
           </div>
           {error && (
             <p className="text-red-600 text-sm">{error}</p>
