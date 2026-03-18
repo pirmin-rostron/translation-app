@@ -1454,6 +1454,17 @@ export default function TranslationReviewPage() {
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
+  const primaryActionIsGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
+  const primaryActionLabel = hasAmbiguityChoice
+    ? "Use selected translation"
+    : primaryActionIsGuidedChoice
+      ? "Use selected translation"
+      : "Approve";
+  const primaryActionDisabled =
+    actionLoading ||
+    (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) ||
+    (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) ||
+    (!primaryActionIsGuidedChoice && !draftTranslation.trim());
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -1899,7 +1910,7 @@ export default function TranslationReviewPage() {
                         type="button"
                         onClick={handlePreviousBlock}
                         disabled={selectedBlockPosition <= 0}
-                        className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
                       >
                         Previous block
                       </button>
@@ -1907,7 +1918,7 @@ export default function TranslationReviewPage() {
                         type="button"
                         onClick={handleNextBlock}
                         disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
-                        className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
                       >
                         Next block
                       </button>
@@ -2127,20 +2138,22 @@ export default function TranslationReviewPage() {
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        onClick={hasGuidedChoice ? handleUseSelectedTranslation : handleApproveCurrentBlock}
-                        disabled={
-                          actionLoading ||
-                          (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) ||
-                          (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim())
+                        onClick={
+                          primaryActionIsGuidedChoice
+                            ? handleUseSelectedTranslation
+                            : selectedSegmentIsSafe
+                              ? handleApprove
+                              : handleApproveCurrentBlock
                         }
+                        disabled={primaryActionDisabled}
                         className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                       >
-                        {hasAmbiguityChoice ? "Use selected meaning" : hasGuidedChoice ? "Use selected translation" : "Approve"}
+                        {primaryActionLabel}
                       </button>
                       <button
                         type="button"
                         onClick={
-                          hasGuidedChoice
+                          primaryActionIsGuidedChoice
                             ? handleEditSelectedTranslation
                             : () => {
                                 setDraftTranslation("");
@@ -2148,15 +2161,15 @@ export default function TranslationReviewPage() {
                               }
                         }
                         disabled={actionLoading || !canEditSelectedSegment}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                       >
-                        {hasAmbiguityChoice ? "Edit" : hasGuidedChoice ? "Edit selected translation" : "Edit"}
+                        Edit
                       </button>
                       <button
                         type="button"
                         onClick={handleSkipBlock}
                         disabled={actionLoading}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                       >
                         Skip
                       </button>
@@ -2213,7 +2226,7 @@ export default function TranslationReviewPage() {
                         ? unresolvedBlocks === 0
                           ? "End of document reached. Ready to finalize workflow."
                           : `${unresolvedBlocks} blocks still unresolved.`
-                        : "Complete this block or skip to continue sequential review."
+                        : `Block ${selectedBlock.block_index + 1} of ${orderedBlocks.length}`
                       : visibleIssues.length
                         ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssues.length}`
                         : selectedFlaggedIndex === -1
