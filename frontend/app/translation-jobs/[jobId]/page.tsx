@@ -203,7 +203,7 @@ function isAcceptableFinalStatus(status: string) {
 function isSafeSegment(segment: ReviewSegment) {
   return (
     !isAcceptableFinalStatus(segment.review_status) &&
-    !segment.ambiguity_detected &&
+    !hasValidAmbiguityChoice(segment) &&
     !segment.semantic_memory_used &&
     Boolean((segment.final_translation || "").trim())
   );
@@ -277,8 +277,12 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
     (segment.ambiguity_source_phrase || "").trim() || (segment.ambiguity_details?.source_span || "").trim();
   const explanation = (segment.ambiguity_details?.explanation || "").trim();
   const currentTranslation = cleanChoiceTranslationText(segment.current_translation || segment.final_translation || "");
-  const ambiguityChoiceFound = Boolean(segment.ambiguity_choice_found ?? (segment.ambiguity_detected && options.length > 0));
+  const ambiguityChoiceFound = Boolean(segment.ambiguity_choice_found ?? (segment.ambiguity_detected && options.length > 1));
   return { ambiguityChoiceFound, sourcePhrase, explanation, options, currentTranslation };
+}
+
+function hasValidAmbiguityChoice(segment: ReviewSegment) {
+  return getAmbiguityChoiceDetails(segment).ambiguityChoiceFound;
 }
 
 function hasAmbiguityChoiceInBlock(block: DocumentBlock) {
@@ -321,7 +325,7 @@ function hasMemory(segment: ReviewSegment) {
 }
 
 function hasReviewSignal(segment: ReviewSegment) {
-  return segment.ambiguity_detected || segment.glossary_applied || hasMemory(segment);
+  return hasValidAmbiguityChoice(segment) || segment.glossary_applied || hasMemory(segment);
 }
 
 function isFlagged(segment: ReviewSegment) {
@@ -331,7 +335,7 @@ function isFlagged(segment: ReviewSegment) {
 function matchesFilter(segment: ReviewSegment, filter: ReviewFilter) {
   if (filter === "all") return true;
   if (filter === "issues") return isFlagged(segment);
-  if (filter === "ambiguities") return segment.ambiguity_detected;
+  if (filter === "ambiguities") return hasValidAmbiguityChoice(segment);
   if (filter === "glossary") return segment.glossary_applied;
   return hasMemory(segment);
 }

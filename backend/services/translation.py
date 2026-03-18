@@ -100,6 +100,9 @@ def _safe_ambiguity_details(obj: object) -> dict | None:
     if not source_span or not isinstance(alternatives, list):
         return None
     valid_alts = []
+    seen_pairs: set[tuple[str, str]] = set()
+    distinct_translations: set[str] = set()
+    distinct_meanings: set[str] = set()
     for idx, a in enumerate(alternatives):
         if not isinstance(a, dict):
             continue
@@ -107,8 +110,15 @@ def _safe_ambiguity_details(obj: object) -> dict | None:
         if not translation:
             continue
         meaning = str(a.get("meaning", "")).strip() or f"Possible meaning {idx + 1}"
+        pair = (translation, meaning)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
         valid_alts.append({"translation": translation, "meaning": meaning})
-    if not valid_alts:
+        distinct_translations.add(translation.casefold())
+        distinct_meanings.add(meaning.casefold())
+    # Ambiguity must provide at least two distinct choices.
+    if len(valid_alts) < 2 or len(distinct_translations) < 2 or len(distinct_meanings) < 2:
         return None
     explanation_text = str(explanation).strip() if explanation is not None else ""
     if not explanation_text:
@@ -411,6 +421,7 @@ Language rule for ambiguity metadata:
 - "ambiguity_details.explanation" MUST be written in English.
 - Each alternative "meaning" MUST be written in English.
 - Keep "primary_translation" and each alternative "translation" in the target language ({target_language}).
+- If "ambiguity_detected" is true, provide at least 2 DISTINCT alternatives with different meanings and different target-language translations.
 
 Important: There is exactly one input segment. Even if it contains multiple sentences, bullet points, or lines, keep everything inside one translated segment. Do not split it into multiple output items.
 
@@ -442,6 +453,7 @@ Language rule for ambiguity metadata:
 - "ambiguity_details.explanation" MUST be written in English.
 - Each alternative "meaning" MUST be written in English.
 - Keep "primary_translation" and each alternative "translation" in the target language ({target_language}).
+- If "ambiguity_detected" is true, provide at least 2 DISTINCT alternatives with different meanings and different target-language translations.
 
 Glossary rule: If a segment includes matching glossary terms, use the provided target terms when applicable.
 
