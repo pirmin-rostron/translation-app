@@ -814,6 +814,7 @@ export default function TranslationReviewPage() {
 
   async function handleApproveAllSafeSegments() {
     if (!job) return;
+    const safeCountToApprove = safeUnresolvedSegments;
     setActionLoading(true);
     setError("");
     setMessage("");
@@ -823,8 +824,12 @@ export default function TranslationReviewPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to approve safe segments");
+      if (payload && typeof payload === "object") {
+        setReviewSummary(payload as ReviewSummary);
+      }
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
-      setMessage("Approved all safe unresolved segments.");
+      const label = safeCountToApprove === 1 ? "segment" : "segments";
+      setMessage(`✓ ${safeCountToApprove} ${label} approved`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve safe segments");
     } finally {
@@ -878,12 +883,14 @@ export default function TranslationReviewPage() {
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
+  const totalSegments = reviewSummary?.total_segments ?? allSegments.length;
   const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? allSegments.length;
   const unresolvedAmbiguities =
     reviewSummary?.unresolved_ambiguities ?? reviewSummary?.ambiguity_count ?? 0;
   const unresolvedSemanticReviews =
     reviewSummary?.unresolved_semantic_reviews ?? reviewSummary?.semantic_memory_review_count ?? 0;
   const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
+  const segmentsRequiringAttention = Math.max(unresolvedSegments - safeUnresolvedSegments, 0);
   const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
   const isReadOnly = workflowStatus === "exported";
@@ -917,8 +924,8 @@ export default function TranslationReviewPage() {
         ? "Ready for export"
         : showMarkReadyForExport
           ? "All segments reviewed"
-          : unresolvedAmbiguities > 0
-            ? `${unresolvedAmbiguities} ambiguities require review`
+          : segmentsRequiringAttention > 0
+            ? `${segmentsRequiringAttention} items still require review`
             : `Review in progress — ${unresolvedSegments} segments remaining`;
   const guidanceDetail =
     workflowStatus === "exported"
@@ -927,8 +934,8 @@ export default function TranslationReviewPage() {
         ? "Export the finalized document."
         : showMarkReadyForExport
           ? "All required review items are resolved."
-          : unresolvedAmbiguities > 0
-            ? "Review ambiguity highlights first, then continue with remaining segments."
+          : segmentsRequiringAttention > 0
+            ? "Review flagged items next to finish the document review."
             : "Approve safe segments first, then review any remaining flagged items.";
 
   return (
@@ -976,19 +983,17 @@ export default function TranslationReviewPage() {
               <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
               <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
               <p className="mt-1 text-sm text-slate-600">
-                Approved: <span className="font-semibold text-slate-900">{reviewSummary?.approved_segments ?? 0}</span>{" "}
-                • Edited: <span className="font-semibold text-slate-900">{reviewSummary?.edited_segments ?? 0}</span> •
-                Unresolved: <span className="font-semibold text-slate-900">{unresolvedSegments}</span>
+                <span className="font-semibold text-slate-900">{totalSegments}</span> total segments
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Safe unresolved: <span className="font-semibold text-slate-900">{safeUnresolvedSegments}</span>
+                <span className="font-semibold text-slate-900">{safeUnresolvedSegments}</span> safe to approve
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> •
-                Semantic memory reviews:{" "}
-                <span className="font-semibold text-slate-900">
-                  {unresolvedSemanticReviews}
-                </span>
+                <span className="font-semibold text-slate-900">{segmentsRequiringAttention}</span> require attention
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> • Semantic
+                memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 Progress: In Review → Draft Saved → Ready for Export → Exported
@@ -1024,14 +1029,17 @@ export default function TranslationReviewPage() {
                 </button>
               )}
               {showApproveAllSafeSegments && (
-                <button
-                  type="button"
-                  onClick={handleApproveAllSafeSegments}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
-                >
-                  Approve all safe segments
-                </button>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={handleApproveAllSafeSegments}
+                    disabled={actionLoading}
+                    className="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                  >
+                    Approve {safeUnresolvedSegments} safe {safeUnresolvedSegments === 1 ? "segment" : "segments"}
+                  </button>
+                  <p className="text-xs text-slate-500">Safe segments have no ambiguity or conflicts.</p>
+                </div>
               )}
               {showMarkReadyForExport && (
                 <button
@@ -1084,8 +1092,8 @@ export default function TranslationReviewPage() {
                   ? "Export document"
                   : showMarkReadyForExport
                     ? "Mark ready for export"
-                    : unresolvedAmbiguities > 0
-                      ? "Review ambiguity"
+                    : segmentsRequiringAttention > 0
+                      ? "Review issues"
                       : showApproveAllSafeSegments
                         ? "Approve all safe segments"
                         : "Save draft and continue review"}
