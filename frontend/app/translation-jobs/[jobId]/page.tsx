@@ -208,6 +208,14 @@ function normalizeChoiceText(value: string) {
   return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
+function ambiguityOptionSnippet(value: string) {
+  const cleaned = cleanChoiceTranslationText(value);
+  if (!cleaned || cleaned.length < 8) return null;
+  const firstSentence = cleaned.split(/[.!?]/)[0]?.trim() ?? cleaned;
+  const snippet = firstSentence.length > 90 ? `${firstSentence.slice(0, 90).trimEnd()}…` : firstSentence;
+  return snippet.length >= 8 ? snippet : null;
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -1802,6 +1810,9 @@ export default function TranslationReviewPage() {
                                   ? " - Current suggestion"
                                   : ""}
                               </p>
+                              {ambiguityOptionSnippet(option.translation) && (
+                                <p className="mt-1 text-xs text-slate-600">{ambiguityOptionSnippet(option.translation)}</p>
+                              )}
                             </div>
                           </div>
                         </label>

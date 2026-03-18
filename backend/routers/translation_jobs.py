@@ -285,20 +285,6 @@ def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | No
                 seen_translations.add(normalized_translation)
                 options.append({"meaning": meaning, "translation": translation})
 
-    # Fallback: keep ambiguity actionable even when upstream options are sparse.
-    current_translation = _clean_choice_translation(result.final_translation)
-    primary_translation = _clean_choice_translation(result.primary_translation)
-    if current_translation:
-        normalized_current = current_translation.casefold()
-        if normalized_current not in seen_translations:
-            seen_translations.add(normalized_current)
-            options.append({"meaning": "Current model translation", "translation": current_translation})
-    if primary_translation and primary_translation != current_translation:
-        normalized_primary = primary_translation.casefold()
-        if normalized_primary not in seen_translations:
-            seen_translations.add(normalized_primary)
-            options.append({"meaning": "Alternative model phrasing", "translation": primary_translation})
-
     ambiguity_choice_found = bool(getattr(result, "ambiguity_detected", False) and options)
     return ambiguity_choice_found, source_phrase, options
 
