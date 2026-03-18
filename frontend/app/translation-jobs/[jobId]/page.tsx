@@ -157,6 +157,16 @@ type ExportResult = {
   export_format: string;
   filename: string;
   download_url: string;
+  generated_at: string;
+  version: number;
+};
+
+type ExportFile = {
+  filename: string;
+  download_url: string;
+  generated_at: string;
+  version: number;
+  latest: boolean;
 };
 
 type TranslationProgress = {
@@ -490,6 +500,7 @@ export default function TranslationReviewPage() {
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
+  const [exportHistory, setExportHistory] = useState<ExportFile[]>([]);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -832,6 +843,15 @@ export default function TranslationReviewPage() {
     return payload as TranslationProgress;
   }
 
+  async function loadExportHistory() {
+    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/exports`).then(async (res) => {
+      if (!res.ok) throw new Error("Failed to load export history");
+      return res.json();
+    });
+    setExportHistory(payload as ExportFile[]);
+    return payload as ExportFile[];
+  }
+
   useEffect(() => {
     if (Number.isNaN(jobId)) {
       setError("Invalid job ID");
@@ -839,7 +859,7 @@ export default function TranslationReviewPage() {
       return;
     }
 
-    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary(), loadTranslationProgress()])
+    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()])
       .then(async ([loadedJob]) => {
         const docRes = await fetch(`${API_URL}/api/documents/${loadedJob.document_id}`);
         if (!docRes.ok) return null;
@@ -858,6 +878,7 @@ export default function TranslationReviewPage() {
       void loadReviewBlocks();
       void loadReviewSummary();
       void loadTranslationProgress();
+      void loadExportHistory();
     }, 2500);
     return () => window.clearInterval(timer);
   }, [job?.status]);
@@ -1192,26 +1213,6 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleMarkReadyForExport() {
-    if (!job) return;
-    setActionLoading(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/mark-ready`, {
-        method: "POST",
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to mark ready for export");
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
-      setMessage("Marked as ready for export.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mark ready for export");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   async function handleApproveAllSafeSegments() {
     if (!job) return;
     const safeCountToApprove = safeUnresolvedSegments;
@@ -1249,8 +1250,43 @@ export default function TranslationReviewPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to export document");
       setExportResult(payload as ExportResult);
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage("Export completed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export document");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleExportDocumentWorkflow() {
+    if (!job) return;
+    if (workflowStatus === "ready_for_export") {
+      await handleExportFinalDocument();
+      return;
+    }
+    if (!reviewComplete) {
+      setError("Resolve all review items before export.");
+      return;
+    }
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const markReady = await fetch(`${API_URL}/api/translation-jobs/${job.id}/mark-ready`, {
+        method: "POST",
+      });
+      const readyPayload = await markReady.json().catch(() => ({}));
+      if (!markReady.ok) throw new Error(readyPayload.detail || "Failed to mark ready for export");
+
+      const exportRes = await fetch(`${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt`, {
+        method: "POST",
+      });
+      const exportPayload = await exportRes.json().catch(() => ({}));
+      if (!exportRes.ok) throw new Error(exportPayload.detail || "Failed to export document");
+      setExportResult(exportPayload as ExportResult);
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
+      setMessage("Document finalized and exported.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
     } finally {
@@ -1329,24 +1365,22 @@ export default function TranslationReviewPage() {
           ? "Draft Saved"
           : "In Review";
   const showSaveWorkflowDraft = !reviewComplete && !["ready_for_export", "exported"].includes(workflowStatus);
-  const showMarkReadyForExport =
-    reviewComplete &&
-    !["ready_for_export", "exported"].includes(workflowStatus);
-  const showExportAction = workflowStatus === "ready_for_export";
+  const showExportAction = reviewComplete && workflowStatus !== "exported";
   const showApproveAllSafeSegments =
     unresolvedSegments > 0 &&
     safeUnresolvedSegments > 0 &&
     !["ready_for_export", "exported"].includes(workflowStatus);
   const showReviewSafeSegments =
     safeUnresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
-  const showDownloadLink = workflowStatus === "exported" && exportResult?.download_url;
+  const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
+  const showDownloadLink = workflowStatus === "exported" && Boolean((latestExport ?? exportResult)?.download_url);
   const guidanceTitle =
     workflowStatus === "exported"
       ? "Document exported"
       : showExportAction
-        ? "Ready for export"
-        : showMarkReadyForExport
-          ? "All segments reviewed"
+        ? "Review complete"
+        : reviewComplete
+          ? "This document is ready for export"
           : segmentsRequiringAttention > 0
             ? `${segmentsRequiringAttention} items still require review`
             : `Review in progress — ${unresolvedSegments} segments remaining`;
@@ -1354,9 +1388,9 @@ export default function TranslationReviewPage() {
     workflowStatus === "exported"
       ? "Download the final file or re-open review if you need changes."
       : showExportAction
-        ? "Export the finalized document."
-        : showMarkReadyForExport
-          ? "All required review items are resolved."
+        ? "This document is ready for export."
+        : reviewComplete
+          ? "Export to generate the final deliverable."
           : segmentsRequiringAttention > 0
             ? "Review flagged items next to finish the document review."
             : "Approve safe segments first, then review any remaining flagged items.";
@@ -1498,24 +1532,14 @@ export default function TranslationReviewPage() {
                   <p className="text-xs text-slate-500">Safe segments have no ambiguity or conflicts.</p>
                 </div>
               )}
-              {showMarkReadyForExport && (
-                <button
-                  type="button"
-                  onClick={handleMarkReadyForExport}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
-                >
-                  Mark ready for export
-                </button>
-              )}
               {showExportAction && (
                 <button
                   type="button"
-                  onClick={handleExportFinalDocument}
+                  onClick={handleExportDocumentWorkflow}
                   disabled={actionLoading}
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
                 >
-                  Export final document
+                  Export document
                 </button>
               )}
               {isReadOnly && (
@@ -1547,9 +1571,7 @@ export default function TranslationReviewPage() {
                 ? "Download file or re-open review"
                 : showExportAction
                   ? "Export document"
-                  : showMarkReadyForExport
-                    ? "Mark ready for export"
-                    : segmentsRequiringAttention > 0
+                  : segmentsRequiringAttention > 0
                       ? "Review issues"
                       : showApproveAllSafeSegments
                         ? "Approve all safe segments"
@@ -1558,13 +1580,35 @@ export default function TranslationReviewPage() {
           </p>
           {showDownloadLink && (
             <a
-              href={`${API_URL}${exportResult?.download_url ?? ""}`}
+              href={`${API_URL}${(latestExport?.download_url ?? exportResult?.download_url) || ""}`}
               className="mt-2 inline-block text-sm font-medium text-indigo-700 underline"
               target="_blank"
               rel="noreferrer"
             >
               Download latest export
             </a>
+          )}
+          {exportHistory.length > 1 && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous exports</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {exportHistory.slice(1).map((entry) => (
+                  <li key={entry.filename} className="flex items-center justify-between gap-3">
+                    <span className="text-slate-600">
+                      v{entry.version} • {new Date(entry.generated_at).toLocaleString()}
+                    </span>
+                    <a
+                      href={`${API_URL}${entry.download_url}`}
+                      className="font-medium text-indigo-700 underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
 

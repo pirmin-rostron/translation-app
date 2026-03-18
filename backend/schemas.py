@@ -264,6 +264,16 @@ class ExportResponse(BaseModel):
     export_format: str
     filename: str
     download_url: str
+    generated_at: datetime
+    version: int
+
+
+class ExportFileResponse(BaseModel):
+    filename: str
+    download_url: str
+    generated_at: datetime
+    version: int
+    latest: bool = False
 
 
 class DocumentProgressResponse(BaseModel):

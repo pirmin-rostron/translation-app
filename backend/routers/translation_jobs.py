@@ -23,6 +23,7 @@ from models import (
 )
 from schemas import (
     ExportResponse,
+    ExportFileResponse,
     ProcessingStageJobResponse,
     ReviewSummaryResponse,
     TranslationProgressResponse,
@@ -55,6 +56,7 @@ SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
 
 _RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
 _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
+_EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.txt$")
 
 
 def _queue_stage_job(
@@ -604,11 +606,18 @@ def _build_export_text(db: Session, job: TranslationJob) -> str:
     for block in blocks:
         block_segments = segments_by_block_id.get(block.id, [])
         translated_parts: list[str] = []
+        last_part = ""
         for segment in block_segments:
             result = result_by_segment_id.get(segment.id)
             if not result:
                 continue
-            translated_parts.append((result.final_translation or "").strip())
+            cleaned_part = _clean_choice_translation(result.final_translation)
+            if not cleaned_part:
+                continue
+            if cleaned_part == last_part:
+                continue
+            translated_parts.append(cleaned_part)
+            last_part = cleaned_part
         translated_text = _compose_block_translation(block.block_type, translated_parts) or ""
         translated_text = translated_text.strip()
         if not translated_text:
@@ -619,6 +628,45 @@ def _build_export_text(db: Session, job: TranslationJob) -> str:
             output_lines.append(translated_text)
         output_lines.append("")
     return "\n".join(output_lines).strip() + "\n"
+
+
+def _export_filename_prefix(doc: Document, job: TranslationJob) -> str:
+    safe_stem = Path(doc.filename).stem or f"document-{doc.id}"
+    return f"{safe_stem}-job-{job.id}"
+
+
+def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileResponse]:
+    prefix = _export_filename_prefix(doc, job)
+    files = sorted(EXPORT_DIR.glob(f"{prefix}-v*.txt"))
+    parsed: list[ExportFileResponse] = []
+    for path in files:
+        match = _EXPORT_FILENAME_PATTERN.match(path.name)
+        if not match:
+            continue
+        if match.group("prefix") != prefix:
+            continue
+        version = int(match.group("version"))
+        generated_at = datetime.utcfromtimestamp(path.stat().st_mtime)
+        parsed.append(
+            ExportFileResponse(
+                filename=path.name,
+                download_url=f"/api/translation-jobs/{job.id}/exports/{path.name}",
+                generated_at=generated_at,
+                version=version,
+            )
+        )
+
+    parsed.sort(key=lambda item: item.version, reverse=True)
+    if parsed:
+        parsed[0].latest = True
+    return parsed
+
+
+def _next_export_version(job: TranslationJob, doc: Document) -> int:
+    existing = _list_export_files(job, doc)
+    if not existing:
+        return 1
+    return max(item.version for item in existing) + 1
 
 
 def _estimate_translation_eta_seconds(job: TranslationJob, total_segments: int, completed_segments: int) -> int | None:
@@ -1289,13 +1337,15 @@ def export_translation_job(
         raise HTTPException(status_code=404, detail="Document not found")
 
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-    safe_stem = Path(doc.filename).stem or f"document-{doc.id}"
-    filename = f"{safe_stem}-job-{job.id}.txt"
+    version = _next_export_version(job, doc)
+    prefix = _export_filename_prefix(doc, job)
+    filename = f"{prefix}-v{version}.txt"
     filepath = EXPORT_DIR / filename
     filepath.write_text(_build_export_text(db, job), encoding="utf-8")
 
+    exported_at = datetime.utcnow()
     job.status = "exported"
-    job.last_saved_at = datetime.utcnow()
+    job.last_saved_at = exported_at
     doc.status = "exported"
     db.commit()
     return ExportResponse(
@@ -1304,7 +1354,21 @@ def export_translation_job(
         export_format="txt",
         filename=filename,
         download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
+        generated_at=exported_at,
+        version=version,
     )
+
+
+@router.get("/translation-jobs/{job_id}/exports", response_model=list[ExportFileResponse])
+def list_exports(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    return _list_export_files(job, doc)
 
 
 @router.get("/translation-jobs/{job_id}/exports/{filename}")
