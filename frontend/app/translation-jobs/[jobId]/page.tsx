@@ -226,6 +226,12 @@ function ambiguityOptionSnippet(value: string) {
   return snippet.length >= 8 ? snippet : null;
 }
 
+function replaceFirstOccurrence(haystack: string, needle: string, replacement: string) {
+  const idx = haystack.indexOf(needle);
+  if (idx === -1) return haystack;
+  return `${haystack.slice(0, idx)}${replacement}${haystack.slice(idx + needle.length)}`;
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -1127,29 +1133,58 @@ export default function TranslationReviewPage() {
     setError("");
   }
 
+  function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string) {
+    const selectedChoice = cleanChoiceTranslationText(choiceTranslation);
+    if (!selectedChoice) return selectedChoice;
+    const currentText = segment.final_translation || "";
+    const ambiguityAnnotation = segment.annotations.find((annotation) => annotation.annotation_type === "ambiguity");
+    const rawAmbiguousTarget = (ambiguityAnnotation?.target_span_text || "").trim();
+    const currentAmbiguousTarget = cleanChoiceTranslationText(ambiguityAnnotation?.target_span_text || "");
+    if (rawAmbiguousTarget && currentText.includes(rawAmbiguousTarget)) {
+      return replaceFirstOccurrence(currentText, rawAmbiguousTarget, selectedChoice);
+    }
+    if (currentAmbiguousTarget && currentText.includes(currentAmbiguousTarget)) {
+      return replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice);
+    }
+    // Fallback to full replacement when no reliable span replacement exists.
+    return selectedChoice;
+  }
+
   async function handleUseSelectedTranslation() {
     if (!selectedSegment) return;
     if (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) return;
     if (!hasAmbiguityChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) return;
     const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
     const chosenTranslation = hasAmbiguityChoice
-      ? selectedAmbiguityTranslation
+      ? applyAmbiguityChoiceToSegment(selectedSegment, selectedAmbiguityTranslation)
       : semanticChoice === "suggested"
         ? semanticSuggestionText
         : draftTranslation;
     const chosenStatus = hasAmbiguityChoice ? "approved" : semanticChoice === "suggested" ? "memory_match" : "approved";
+    const nextAmbiguityIssue =
+      hasAmbiguityChoice && blockAmbiguityIssues.length > 1
+        ? blockAmbiguityIssues.find((issue) => issue.key !== selectedIssueKey)
+        : null;
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
       await saveResult(selectedSegment.id, chosenTranslation, chosenStatus);
       setIsEditing(false);
-      if (reviewMode === "document") {
+      if (hasAmbiguityChoice && reviewMode === "document" && nextAmbiguityIssue) {
+        setSelectedIssueKey(nextAmbiguityIssue.key);
+        setSelectedId(nextAmbiguityIssue.segmentId);
+        setMessage("Ambiguity resolved. Continue with the next ambiguity in this block.");
+      } else if (reviewMode === "document") {
         moveToBlockById(nextBlockId);
+        setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning and moved forward." : semanticChoice === "suggested"
+          ? "Selected semantic memory translation and moved forward."
+          : "Selected current translation and moved forward.");
+      } else {
+        setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning." : semanticChoice === "suggested"
+          ? "Selected semantic memory translation."
+          : "Selected current translation.");
       }
-      setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning and moved forward." : semanticChoice === "suggested"
-        ? "Selected semantic memory translation and moved forward."
-        : "Selected current translation and moved forward.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply selected translation");
     } finally {
@@ -1349,6 +1384,16 @@ export default function TranslationReviewPage() {
   const currentSuggestionIndex = currentSuggestionMatches.length === 1 ? currentSuggestionMatches[0] : null;
   const selectedAmbiguityOption = ambiguityChoiceIndex == null ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
   const selectedAmbiguityTranslation = selectedAmbiguityOption?.translation ?? "";
+  const blockAmbiguityIssues = !selectedBlock
+    ? ([] as ReviewIssue[])
+    : selectedBlock.segments
+        .filter((segment) => !isAcceptableFinalStatus(segment.review_status))
+        .flatMap((segment) =>
+          (issuesBySegmentId.get(segment.id) ?? []).filter((issue) => issue.type === "ambiguity")
+        )
+        .sort((a, b) => (a.segmentIndex === b.segmentIndex ? a.key.localeCompare(b.key) : a.segmentIndex - b.segmentIndex));
+  const activeBlockAmbiguityIndex = blockAmbiguityIssues.findIndex((issue) => issue.key === selectedIssueKey);
+  const activeBlockAmbiguityPosition = activeBlockAmbiguityIndex === -1 ? 1 : activeBlockAmbiguityIndex + 1;
   const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
   const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
@@ -1827,6 +1872,11 @@ export default function TranslationReviewPage() {
                     </p>
                     {ambiguityChoiceDetails.explanation && (
                       <p className="mt-2 text-xs text-slate-700">{ambiguityChoiceDetails.explanation}</p>
+                    )}
+                    {blockAmbiguityIssues.length > 1 && (
+                      <p className="mt-2 text-xs font-medium text-amber-800">
+                        Block {selectedBlock.block_index + 1} - Ambiguity {activeBlockAmbiguityPosition} of {blockAmbiguityIssues.length}
+                      </p>
                     )}
                     {ambiguityChoiceIndex == null && (
                       <p className="mt-2 text-xs text-amber-800">Choose one meaning to continue.</p>
