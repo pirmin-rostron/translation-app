@@ -48,6 +48,7 @@ TRANSLATION_STAGE = "translation"
 AMBIGUITY_STAGE = "ambiguity_detection"
 RECONSTRUCTION_STAGE = "reconstruction"
 EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "exports"))
+SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
 
 
 def _queue_stage_job(
@@ -235,7 +236,7 @@ def _serialize_translation_result(result: TranslationResult, segment: DocumentSe
         primary_translation=result.primary_translation,
         final_translation=result.final_translation,
         confidence_score=result.confidence_score,
-        review_status=result.review_status,
+        review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
@@ -421,7 +422,7 @@ def _serialize_review_segment(
         primary_translation=result.primary_translation,
         final_translation=result.final_translation,
         confidence_score=result.confidence_score,
-        review_status=result.review_status,
+        review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
@@ -433,15 +434,23 @@ def _serialize_review_segment(
 
 
 def _is_acceptable_final_status(review_status: str) -> bool:
-    # "reviewed" is kept as a backward-compatible alias for older saved data.
-    return review_status in {"approved", "edited", "memory_match", "reviewed"}
+    return _normalize_review_status(review_status) in {"approved", "edited", "memory_match"}
+
+
+def _normalize_review_status(review_status: str) -> str:
+    # Backward compatibility for historical saved values.
+    if review_status == "reviewed":
+        return "edited"
+    if review_status == "semantic_memory_match":
+        return "memory_match"
+    return review_status
 
 
 def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummaryResponse:
     results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
     total_segments = len(results)
-    approved_segments = sum(1 for result in results if result.review_status == "approved")
-    edited_segments = sum(1 for result in results if result.review_status == "edited")
+    approved_segments = sum(1 for result in results if _normalize_review_status(result.review_status) == "approved")
+    edited_segments = sum(1 for result in results if _normalize_review_status(result.review_status) == "edited")
     unresolved_count = sum(1 for result in results if not _is_acceptable_final_status(result.review_status))
     unresolved_ambiguities = sum(
         1
@@ -680,7 +689,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                 primary_translation=approved.approved_translation,
                 final_translation=approved.approved_translation,
                 confidence_score=similarity,
-                review_status="memory_match" if memory_type == "exact" else "semantic_memory_match",
+                review_status="memory_match",
                 exact_memory_used=memory_type == "exact",
                 semantic_memory_used=memory_type == "semantic",
                 ambiguity_detected=False,
@@ -1033,6 +1042,25 @@ def mark_ready_for_export_alias(job_id: int, db: Session = Depends(get_db)):
     return mark_ready_for_export(job_id=job_id, db=db)
 
 
+@router.post("/translation-jobs/{job_id}/reopen-review", response_model=ReviewSummaryResponse)
+def reopen_review(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status not in {"ready_for_export", "exported"}:
+        raise HTTPException(status_code=400, detail="Only ready_for_export or exported jobs can be reopened")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    job.status = "in_review"
+    doc.status = "in_review"
+    db.commit()
+    db.refresh(job)
+    return _calculate_review_summary(db, job)
+
+
 @router.post("/translation-jobs/{job_id}/export", response_model=ExportResponse)
 def export_translation_job(
     job_id: int,
@@ -1058,6 +1086,7 @@ def export_translation_job(
     filepath.write_text(_build_export_text(db, job), encoding="utf-8")
 
     job.status = "exported"
+    job.last_saved_at = datetime.utcnow()
     doc.status = "exported"
     db.commit()
     return ExportResponse(
@@ -1099,17 +1128,24 @@ def update_translation_result(
     job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == "exported":
+        raise HTTPException(status_code=400, detail="Job is exported. Re-open review to edit.")
 
     segment = db.query(DocumentSegment).filter(DocumentSegment.id == result.segment_id).first()
     if not segment:
         raise HTTPException(status_code=404, detail="Document segment not found")
 
     final_translation = body.final_translation.strip()
-    review_status = body.review_status.strip()
+    review_status = _normalize_review_status(body.review_status.strip())
     if not final_translation:
         raise HTTPException(status_code=400, detail="final_translation is required")
     if not review_status:
         raise HTTPException(status_code=400, detail="review_status is required")
+    if review_status not in SEGMENT_REVIEW_STATES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"review_status must be one of: {', '.join(sorted(SEGMENT_REVIEW_STATES))}",
+        )
 
     result.final_translation = final_translation
     result.review_status = review_status
@@ -1158,7 +1194,7 @@ def update_translation_result(
         primary_translation=result.primary_translation,
         final_translation=result.final_translation,
         confidence_score=result.confidence_score,
-        review_status=result.review_status,
+        review_status=_normalize_review_status(result.review_status),
         exact_memory_used=_is_exact_memory_result(result),
         semantic_memory_used=_is_semantic_memory_result(result),
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,

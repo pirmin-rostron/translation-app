@@ -127,6 +127,12 @@ type ExportResult = {
   download_url: string;
 };
 
+function normalizeSegmentStatus(status: string) {
+  if (status === "reviewed") return "edited";
+  if (status === "semantic_memory_match") return "memory_match";
+  return status;
+}
+
 function hasMemory(segment: ReviewSegment) {
   return segment.exact_memory_used || segment.semantic_memory_used;
 }
@@ -459,7 +465,8 @@ export default function TranslationReviewPage() {
     setError("");
     try {
       await saveResult(selectedSegment.id, draftTranslation, "edited");
-      setMessage("Draft saved.");
+      setIsEditing(false);
+      setMessage("Edited and saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");
     } finally {
@@ -474,6 +481,7 @@ export default function TranslationReviewPage() {
     setError("");
     try {
       await saveResult(selectedSegment.id, draftTranslation, "approved");
+      setIsEditing(false);
       setMessage("Item approved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve");
@@ -586,6 +594,26 @@ export default function TranslationReviewPage() {
     }
   }
 
+  async function handleReopenReview() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/reopen-review`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.detail || "Failed to re-open review");
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks()]);
+      setMessage("Review re-opened. You can edit segments again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to re-open review");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
   if (error && !job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
@@ -599,6 +627,11 @@ export default function TranslationReviewPage() {
   const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
   const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
+  const isReadOnly = workflowStatus === "exported";
+  const selectedSegmentStatus = normalizeSegmentStatus(selectedSegment?.review_status ?? "unreviewed");
+  const canEditSelectedSegment = !isReadOnly;
+  const hasDraftChanges =
+    (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -711,6 +744,16 @@ export default function TranslationReviewPage() {
                   Export final document
                 </button>
               )}
+              {isReadOnly && (
+                <button
+                  type="button"
+                  onClick={handleReopenReview}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Re-open review
+                </button>
+              )}
               {job.status === "failed" && (
                 <button
                   type="button"
@@ -731,7 +774,7 @@ export default function TranslationReviewPage() {
                 : showExportAction
                   ? "This job is finalized and ready to export."
                   : workflowStatus === "exported"
-                    ? "Export completed successfully."
+                    ? `Export completed successfully${reviewSummary?.last_saved_at ? ` at ${new Date(reviewSummary.last_saved_at).toLocaleString()}` : ""}.`
                     : "Continue reviewing translated segments."}
           </p>
           {showDownloadLink && (
@@ -829,17 +872,35 @@ export default function TranslationReviewPage() {
 
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium text-slate-900">Final translation</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900">Final translation</p>
+                      {selectedSegmentStatus === "approved" && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          Approved
+                        </span>
+                      )}
+                      {selectedSegmentStatus === "edited" && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          Edited and saved
+                        </span>
+                      )}
+                      {selectedSegmentStatus === "memory_match" && (
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          Accepted from memory
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
+                      disabled={!canEditSelectedSegment}
                       onClick={() => setIsEditing((v) => !v)}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                      className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {isEditing ? "Cancel edit" : "Edit"}
+                      {isReadOnly ? "Read only" : isEditing ? "Cancel edit" : "Edit again"}
                     </button>
                   </div>
 
-                  {isEditing ? (
+                  {isEditing && canEditSelectedSegment ? (
                     <textarea
                       value={draftTranslation}
                       onChange={(e) => setDraftTranslation(e.target.value)}
@@ -872,22 +933,31 @@ export default function TranslationReviewPage() {
                 )}
 
                 <div className="mt-6 space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleApprove}
-                    disabled={actionLoading || !draftTranslation.trim()}
-                    className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveSegmentDraft}
-                    disabled={actionLoading || !draftTranslation.trim()}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                  >
-                    Save segment edit
-                  </button>
+                  {!isReadOnly && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (
+                    <button
+                      type="button"
+                      onClick={handleApprove}
+                      disabled={actionLoading || !draftTranslation.trim()}
+                      className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  {!isReadOnly && (selectedSegmentStatus === "unreviewed" || (isEditing && hasDraftChanges)) && (
+                    <button
+                      type="button"
+                      onClick={handleSaveSegmentDraft}
+                      disabled={actionLoading || !draftTranslation.trim()}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      Save segment edit
+                    </button>
+                  )}
+                  {isReadOnly && (
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                      This document is exported and read-only. Re-open review from the workflow banner to edit.
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500">
                     Flagged queue position:{" "}
                     {selectedFlaggedIndex === -1
