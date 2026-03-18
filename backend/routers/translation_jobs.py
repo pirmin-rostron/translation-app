@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -50,6 +51,10 @@ AMBIGUITY_STAGE = "ambiguity_detection"
 RECONSTRUCTION_STAGE = "reconstruction"
 EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "exports"))
 SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
+
+
+_RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
+_RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
 
 
 def _queue_stage_job(
@@ -245,6 +250,16 @@ def _semantic_choice_payload(result: TranslationResult) -> tuple[bool, str | Non
     return semantic_match_found, suggested_translation, similarity_score, current_translation
 
 
+def _clean_choice_translation(text: str | None) -> str:
+    if not text:
+        return ""
+    cleaned = text.replace("\\n", " ")
+    cleaned = _RTF_HEX_ESCAPE_PATTERN.sub(" ", cleaned)
+    cleaned = _RTF_CONTROL_PATTERN.sub(" ", cleaned)
+    cleaned = cleaned.replace("{", " ").replace("}", " ")
+    return " ".join(cleaned.split()).strip()
+
+
 def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | None, list[dict[str, str]]]:
     details = getattr(result, "ambiguity_details", None)
     source_phrase: str | None = None
@@ -260,7 +275,7 @@ def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | No
             for idx, option in enumerate(raw_alternatives):
                 if not isinstance(option, dict):
                     continue
-                translation = str(option.get("translation", "")).strip()
+                translation = _clean_choice_translation(str(option.get("translation", "")))
                 if not translation:
                     continue
                 meaning = str(option.get("meaning", "")).strip() or f"Possible meaning {idx + 1}"
@@ -271,8 +286,8 @@ def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | No
                 options.append({"meaning": meaning, "translation": translation})
 
     # Fallback: keep ambiguity actionable even when upstream options are sparse.
-    current_translation = (result.final_translation or "").strip()
-    primary_translation = (result.primary_translation or "").strip()
+    current_translation = _clean_choice_translation(result.final_translation)
+    primary_translation = _clean_choice_translation(result.primary_translation)
     if current_translation:
         normalized_current = current_translation.casefold()
         if normalized_current not in seen_translations:

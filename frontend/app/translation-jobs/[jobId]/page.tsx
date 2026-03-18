@@ -194,8 +194,18 @@ function isBlockResolved(block: DocumentBlock) {
   return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
 }
 
+function cleanChoiceTranslationText(value: string) {
+  return value
+    .replace(/\\n/g, " ")
+    .replace(/\\'[0-9a-fA-F]{2}/g, " ")
+    .replace(/\\[a-z]+-?\d*\s?/gi, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeChoiceText(value: string) {
-  return value.trim().toLocaleLowerCase();
+  return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
@@ -216,7 +226,7 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
   const rawOptions = Array.isArray(segment.ambiguity_options) ? segment.ambiguity_options : [];
   const seen = new Set<string>();
   const options = rawOptions.reduce<AmbiguityChoiceOption[]>((acc, option, idx) => {
-    const translation = (option?.translation || "").trim();
+    const translation = cleanChoiceTranslationText(option?.translation || "");
     if (!translation) return acc;
     const normalized = normalizeChoiceText(translation);
     if (seen.has(normalized)) return acc;
@@ -228,7 +238,7 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
   const sourcePhrase =
     (segment.ambiguity_source_phrase || "").trim() || (segment.ambiguity_details?.source_span || "").trim();
   const explanation = (segment.ambiguity_details?.explanation || "").trim();
-  const currentTranslation = segment.current_translation || segment.final_translation || "";
+  const currentTranslation = cleanChoiceTranslationText(segment.current_translation || segment.final_translation || "");
   const ambiguityChoiceFound = Boolean(segment.ambiguity_choice_found ?? (segment.ambiguity_detected && options.length > 0));
   return { ambiguityChoiceFound, sourcePhrase, explanation, options, currentTranslation };
 }
