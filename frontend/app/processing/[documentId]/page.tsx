@@ -253,6 +253,12 @@ export default function ProcessingPage() {
               />
             </div>
             <p className="mt-1 text-xs text-slate-600">{overallProgress}% complete</p>
+            {!hasFailure && translationProgress && !translationDone && (
+              <p className="mt-1 text-xs text-slate-600">
+                {translationProgress.stage_label} • {translationProgress.completed_segments}/
+                {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
+              </p>
+            )}
           </div>
 
           <ol className="mt-5 space-y-3">
@@ -280,18 +286,6 @@ export default function ProcessingPage() {
               </li>
             ))}
           </ol>
-
-          {!hasFailure && translationProgress && !translationDone && (
-            <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Translation progress</p>
-              <p className="mt-1 text-sm text-slate-700">
-                Translating {translationProgress.completed_segments} of {translationProgress.total_segments} segments
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {translationProgress.percentage.toFixed(0)}% • {formatEta(translationProgress.eta_seconds)}
-              </p>
-            </div>
-          )}
 
           {translationDone && latestJob && (
             <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
