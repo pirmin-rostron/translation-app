@@ -202,10 +202,10 @@ export default function UploadPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/documents")}
+              onClick={() => router.push("/")}
               className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50"
             >
-              View Documents
+              Back to All Translations
             </button>
           </div>
         </form>

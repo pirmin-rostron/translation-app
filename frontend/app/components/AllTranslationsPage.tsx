@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getLanguageDisplayName } from "../utils/language";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -27,10 +28,12 @@ const IN_PROGRESS_STATUSES = new Set(["parsing", "parsed", "segmented", "transla
 const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "ready_for_export", "exported"]);
 
 export default function AllTranslationsPage() {
+  const router = useRouter();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [parsingId, setParsingId] = useState<number | null>(null);
+  const [openingDocId, setOpeningDocId] = useState<number | null>(null);
 
   const fetchDocs = () => {
     fetch(`${API_URL}/api/documents`)
@@ -61,6 +64,31 @@ export default function AllTranslationsPage() {
     }
   };
 
+  const handleOpenWorkflow = async (doc: Document) => {
+    setError("");
+    setOpeningDocId(doc.id);
+    try {
+      if (REVIEW_STATUSES.has(doc.status)) {
+        const res = await fetch(`${API_URL}/api/documents/${doc.id}/translation-jobs`);
+        if (!res.ok) throw new Error(`Failed to load translation jobs (${res.status})`);
+        const jobs = (await res.json()) as Array<{ id: number }>;
+        if (jobs.length > 0) {
+          router.push(`/translation-jobs/${jobs[0].id}`);
+          return;
+        }
+      }
+      if (IN_PROGRESS_STATUSES.has(doc.status)) {
+        router.push(`/processing/${doc.id}`);
+        return;
+      }
+      router.push(`/documents/${doc.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open workflow");
+    } finally {
+      setOpeningDocId(null);
+    }
+  };
+
   useEffect(() => {
     fetch(`${API_URL}/api/documents`)
       .then((res) => {
@@ -86,7 +114,7 @@ export default function AllTranslationsPage() {
             href="/upload"
             className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
-            Import document
+            New translation
           </Link>
         </div>
 
@@ -156,20 +184,20 @@ export default function AllTranslationsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatDate(doc.created_at)}</td>
                     <td className="px-6 py-4 flex gap-2">
-                      <Link
-                        href={
-                          IN_PROGRESS_STATUSES.has(doc.status)
-                            ? `/processing/${doc.id}`
-                            : `/documents/${doc.id}`
-                        }
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenWorkflow(doc)}
+                        disabled={openingDocId === doc.id}
                         className="text-sm text-slate-600 hover:text-slate-900"
                       >
-                        {IN_PROGRESS_STATUSES.has(doc.status)
+                        {openingDocId === doc.id
+                          ? "Opening…"
+                          : IN_PROGRESS_STATUSES.has(doc.status)
                           ? "View progress"
                           : REVIEW_STATUSES.has(doc.status)
                             ? "Open review/export"
                             : "Open details"}
-                      </Link>
+                      </button>
                       {(doc.status === "uploaded" || doc.status === "failed") && (
                         <button
                           onClick={() => handleParse(doc.id)}

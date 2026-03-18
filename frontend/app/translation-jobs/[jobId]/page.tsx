@@ -1315,12 +1315,16 @@ export default function TranslationReviewPage() {
     }
   }
 
-  function handleStartHereAction() {
-    if (workflowStatus === "exported") {
+  function handlePrimaryGuidanceAction() {
+    if (job?.status === "failed") {
+      void handleRetryJob();
+      return;
+    }
+    if (workflowStatus === "exported" || showExportAction) {
       handleOpenExportModal();
       return;
     }
-    // "Start/Continue review" should always begin the sequential full-document flow.
+    // Start/continue review always uses sequential full-document flow.
     switchToDocumentMode();
   }
 
@@ -1548,7 +1552,15 @@ export default function TranslationReviewPage() {
             ? `Approve ${safeUnresolvedSegments} safe ${safeUnresolvedSegments === 1 ? "segment" : "segments"}`
             : "Review Block 1";
   const primaryGuidanceLabel =
-    completedBlocks > 0 || workflowStatus === "draft_saved" ? "Continue review" : "Start review";
+    job.status === "failed"
+      ? "Retry failed stages"
+      : workflowStatus === "exported"
+        ? "Export / download again"
+        : showExportAction
+          ? "Export document"
+          : completedBlocks > 0 || workflowStatus === "draft_saved"
+            ? "Continue review"
+            : "Start review";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1703,47 +1715,14 @@ export default function TranslationReviewPage() {
                 </button>
               )}
               <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleStartHereAction}
-                disabled={actionLoading}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-              >
-                {primaryGuidanceLabel}
-              </button>
-              {showApproveAllSafeSegments && (
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={handleApproveAllSafeSegments}
-                    disabled={actionLoading}
-                    className="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
-                  >
-                    Approve {safeUnresolvedSegments} safe {safeUnresolvedSegments === 1 ? "segment" : "segments"}
-                  </button>
-                  <p className="text-xs text-slate-500">Safe segments have no ambiguity or conflicts.</p>
-                </div>
-              )}
-              {showExportAction && (
                 <button
                   type="button"
-                  onClick={handleOpenExportModal}
+                  onClick={handlePrimaryGuidanceAction}
                   disabled={actionLoading}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
                 >
-                  Export document
+                  {primaryGuidanceLabel}
                 </button>
-              )}
-              {workflowStatus === "exported" && (
-                <button
-                  type="button"
-                  onClick={handleOpenExportModal}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
-                >
-                  Export / download again
-                </button>
-              )}
               {isReadOnly && (
                 <button
                   type="button"
@@ -1755,24 +1734,11 @@ export default function TranslationReviewPage() {
                 </button>
               )}
               {job.status === "failed" && (
-                <button
-                  type="button"
-                  onClick={handleRetryJob}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Retry failed stages
-                </button>
+                <p className="text-xs text-slate-500">Use retry to re-run failed workflow stages.</p>
               )}
               </div>
             </div>
           </div>
-          <p className="mt-3 text-sm text-slate-600">
-            Next best action:{" "}
-            <span className="font-medium text-slate-800">
-              {startHereActionLabel}
-            </span>
-          </p>
           {exportHistory.length > 1 && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous exports</p>
@@ -2053,44 +2019,28 @@ export default function TranslationReviewPage() {
 
                 {!isSafeDecisionOnlyMode && (
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-slate-900">Decision status</p>
-                      {selectedSegmentStatus === "approved" && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Approved
-                        </span>
-                      )}
-                      {selectedSegmentStatus === "edited" && (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          Edited and saved
-                        </span>
-                      )}
-                      {selectedSegmentStatus === "memory_match" && (
-                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-                          Accepted from memory
-                        </span>
-                      )}
-                      {selectedSegmentStatus === "unreviewed" && (
-                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                          Needs review
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!canEditSelectedSegment}
-                      onClick={() =>
-                        setIsEditing((v) => {
-                          const next = !v;
-                          if (next) setDraftTranslation("");
-                          return next;
-                        })
-                      }
-                      className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isReadOnly ? "Read only" : isEditing ? "Cancel edit" : "Edit translation"}
-                    </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-slate-900">Decision status</p>
+                    {selectedSegmentStatus === "approved" && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        Approved
+                      </span>
+                    )}
+                    {selectedSegmentStatus === "edited" && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        Edited and saved
+                      </span>
+                    )}
+                    {selectedSegmentStatus === "memory_match" && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        Accepted from memory
+                      </span>
+                    )}
+                    {selectedSegmentStatus === "unreviewed" && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        Needs review
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-xs text-slate-600">
                     Full source and translated context stays in the side-by-side document view.
@@ -2193,15 +2143,18 @@ export default function TranslationReviewPage() {
                         onClick={
                           primaryActionIsGuidedChoice
                             ? handleEditSelectedTranslation
-                            : () => {
-                                setDraftTranslation("");
-                                setIsEditing(true);
-                              }
+                            : () =>
+                                setIsEditing((current) => {
+                                  if (!current) {
+                                    setDraftTranslation("");
+                                  }
+                                  return !current;
+                                })
                         }
                         disabled={actionLoading || !canEditSelectedSegment}
                         className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                       >
-                        Edit
+                        {isEditing ? "Cancel edit" : "Edit"}
                       </button>
                       <button
                         type="button"
