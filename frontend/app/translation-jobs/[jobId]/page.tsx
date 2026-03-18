@@ -175,6 +175,11 @@ function isSafeSegment(segment: ReviewSegment) {
   );
 }
 
+function isBlockResolved(block: DocumentBlock) {
+  if (!block.segments.length) return false;
+  return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
+}
+
 function formatEta(seconds: number | null) {
   if (seconds == null) return "Calculating…";
   if (seconds <= 0) return "Almost done";
@@ -499,6 +504,8 @@ export default function TranslationReviewPage() {
     () => new Map(orderedBlocks.map((block, idx) => [block.id, idx])),
     [orderedBlocks]
   );
+  const completedBlocks = useMemo(() => orderedBlocks.filter((block) => isBlockResolved(block)).length, [orderedBlocks]);
+  const unresolvedBlocks = Math.max(orderedBlocks.length - completedBlocks, 0);
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedSafeIndex = safeSegments.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
@@ -523,6 +530,16 @@ export default function TranslationReviewPage() {
     if (!selectedId) return;
     segmentRefs.current[selectedId]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [selectedId]);
+
+  useEffect(() => {
+    if (reviewMode !== "document") return;
+    if (!orderedBlocks.length) return;
+    if (selectedBlockPosition !== -1) return;
+    const firstBlock = orderedBlocks[0];
+    setSelectedIssueKey(null);
+    setSelectedId(firstBlock.segments[0]?.id ?? null);
+    blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [reviewMode, orderedBlocks, selectedBlockPosition]);
 
   useEffect(() => {
     if (!visibleIssues.length) {
@@ -589,6 +606,18 @@ export default function TranslationReviewPage() {
     blockRefs.current[nextBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
+  function getNextBlockIdFromCurrent() {
+    if (selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1) return null;
+    return orderedBlocks[selectedBlockPosition + 1].id;
+  }
+
+  function moveToBlockById(blockId: number | null) {
+    if (blockId == null) return;
+    setActiveFilter("all");
+    selectBlockById(blockId);
+    blockRefs.current[blockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
   function handleReviewAmbiguities() {
     setReviewMode("issues");
     setActiveFilter("ambiguities");
@@ -620,8 +649,12 @@ export default function TranslationReviewPage() {
 
   function switchToDocumentMode() {
     setReviewMode("document");
-    if (activeFilter === "issues") {
-      setActiveFilter("all");
+    setActiveFilter("all");
+    if (orderedBlocks.length > 0) {
+      const firstBlock = orderedBlocks[0];
+      setSelectedIssueKey(null);
+      setSelectedId(firstBlock.segments[0]?.id ?? null);
+      blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }
 
@@ -700,7 +733,7 @@ export default function TranslationReviewPage() {
     return () => window.clearInterval(timer);
   }, [job?.status]);
 
-  async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
+  async function persistResult(resultId: number, finalTranslation: string, reviewStatus: string) {
     const res = await fetch(`${API_URL}/api/translation-results/${resultId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -708,6 +741,10 @@ export default function TranslationReviewPage() {
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.detail || "Failed to save translation result");
+  }
+
+  async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
+    await persistResult(resultId, finalTranslation, reviewStatus);
     await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
   }
 
@@ -820,13 +857,19 @@ export default function TranslationReviewPage() {
 
   async function handleSaveSegmentDraft() {
     if (!selectedSegment) return;
+    const nextBlockId = reviewMode === "document" ? getNextBlockIdFromCurrent() : null;
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
       await saveResult(selectedSegment.id, draftTranslation, "edited");
       setIsEditing(false);
-      setMessage("Edited and saved.");
+      if (reviewMode === "document") {
+        moveToBlockById(nextBlockId);
+        setMessage("Edited and saved. Moved to next block.");
+      } else {
+        setMessage("Edited and saved.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");
     } finally {
@@ -836,18 +879,62 @@ export default function TranslationReviewPage() {
 
   async function handleApprove() {
     if (!selectedSegment) return;
+    const nextBlockId = reviewMode === "document" ? getNextBlockIdFromCurrent() : null;
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
       await saveResult(selectedSegment.id, draftTranslation, "approved");
       setIsEditing(false);
-      setMessage("Item approved.");
+      if (reviewMode === "document") {
+        moveToBlockById(nextBlockId);
+        setMessage("Block approved. Moved to next block.");
+      } else {
+        setMessage("Item approved.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve");
     } finally {
       setActionLoading(false);
     }
+  }
+
+  async function handleApproveCurrentBlock() {
+    if (!selectedBlock) return;
+    const nextBlockId = getNextBlockIdFromCurrent();
+    setActionLoading(true);
+    setMessage("");
+    setError("");
+    try {
+      const toApprove = selectedBlock.segments.filter(
+        (segment) => !isAcceptableFinalStatus(segment.review_status) && segment.final_translation.trim().length > 0
+      );
+      for (const segment of toApprove) {
+        await persistResult(segment.id, segment.final_translation, "approved");
+      }
+      await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+      moveToBlockById(nextBlockId);
+      setMessage(
+        toApprove.length > 0
+          ? `Approved ${toApprove.length} segment${toApprove.length === 1 ? "" : "s"} in Block ${selectedBlock.block_index + 1}.`
+          : "Block already reviewed. Moved to next block."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve block");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function handleSkipBlock() {
+    const nextBlockId = getNextBlockIdFromCurrent();
+    if (nextBlockId == null) {
+      setMessage("Reached the end of the document.");
+      return;
+    }
+    moveToBlockById(nextBlockId);
+    setMessage("Skipped block. Moved to next block.");
+    setError("");
   }
 
   async function handleAcceptSemanticSuggestion() {
@@ -1041,6 +1128,8 @@ export default function TranslationReviewPage() {
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
   const semanticSuggestion = selectedSegment?.semantic_memory_details ?? null;
+  const isDocumentMode = reviewMode === "document";
+  const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -1427,6 +1516,9 @@ export default function TranslationReviewPage() {
                     <p className="mt-1 text-sm text-slate-500">
                       Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocks.length}
                     </p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">
+                      Review progress: {completedBlocks} of {orderedBlocks.length} completed
+                    </p>
                     <div className="mt-3 flex items-center gap-2">
                       <button
                         type="button"
@@ -1445,6 +1537,15 @@ export default function TranslationReviewPage() {
                         Next block
                       </button>
                     </div>
+                    {isLastBlock && (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        {unresolvedBlocks === 0 ? (
+                          <span>Review complete. You can mark this document ready for export.</span>
+                        ) : (
+                          <span>{unresolvedBlocks} items still unresolved. Review skipped blocks or unresolved segments.</span>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p className="mt-1 text-sm text-slate-500">
@@ -1602,7 +1703,35 @@ export default function TranslationReviewPage() {
                   )}
 
                 <div className="mt-6 space-y-3">
-                  {!isReadOnly && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (
+                  {!isReadOnly && isDocumentMode && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleApproveCurrentBlock}
+                        disabled={actionLoading}
+                        className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(true)}
+                        disabled={actionLoading || !canEditSelectedSegment}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSkipBlock}
+                        disabled={actionLoading}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  )}
+                  {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (
                     <button
                       type="button"
                       onClick={handleApprove}
@@ -1612,7 +1741,7 @@ export default function TranslationReviewPage() {
                       Approve
                     </button>
                   )}
-                  {!isReadOnly && (selectedSegmentStatus === "unreviewed" || (isEditing && hasDraftChanges)) && (
+                  {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || (isEditing && hasDraftChanges)) && (
                     <button
                       type="button"
                       onClick={handleSaveSegmentDraft}
@@ -1620,6 +1749,16 @@ export default function TranslationReviewPage() {
                       className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                     >
                       Save segment edit
+                    </button>
+                  )}
+                  {!isReadOnly && isDocumentMode && isEditing && hasDraftChanges && (
+                    <button
+                      type="button"
+                      onClick={handleSaveSegmentDraft}
+                      disabled={actionLoading || !draftTranslation.trim()}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      Save edit and next block
                     </button>
                   )}
                   {!isReadOnly && selectedSegmentIsSafe && safeSegments.length > 1 && (
@@ -1638,11 +1777,17 @@ export default function TranslationReviewPage() {
                     </p>
                   )}
                   <p className="text-xs text-slate-500">
-                    {visibleIssues.length
-                      ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssues.length}`
-                      : selectedFlaggedIndex === -1
-                        ? "No open issues in current filter."
-                        : `Flagged queue position: ${selectedFlaggedIndex + 1} / ${flagged.length}`}
+                    {isDocumentMode
+                      ? isLastBlock
+                        ? unresolvedBlocks === 0
+                          ? "End of document reached. Ready to finalize workflow."
+                          : `${unresolvedBlocks} blocks still unresolved.`
+                        : "Complete this block or skip to continue sequential review."
+                      : visibleIssues.length
+                        ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssues.length}`
+                        : selectedFlaggedIndex === -1
+                          ? "No open issues in current filter."
+                          : `Flagged queue position: ${selectedFlaggedIndex + 1} / ${flagged.length}`}
                   </p>
                 </div>
               </>
