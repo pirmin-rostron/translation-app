@@ -368,7 +368,7 @@ export default function TranslationReviewPage() {
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
-  const [activeFilter, setActiveFilter] = useState<ReviewFilter>("flagged");
+  const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
   const [activeIssueFilter, setActiveIssueFilter] = useState<IssueFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
@@ -1020,6 +1020,16 @@ export default function TranslationReviewPage() {
                     : filter === "flagged"
                       ? flagged.length
                       : allSegments.filter(({ segment }) => matchesFilter(segment, filter)).length;
+                const filterLabel =
+                  filter === "all"
+                    ? "All Content"
+                    : filter === "flagged"
+                      ? "Flagged only"
+                      : filter === "ambiguities"
+                        ? "Ambiguities"
+                        : filter === "glossary"
+                          ? "Glossary"
+                          : "Memory";
                 return (
                   <button
                     key={filter}
@@ -1031,12 +1041,14 @@ export default function TranslationReviewPage() {
                         : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    {filter} ({count})
+                    {filterLabel} ({count})
                   </button>
                 );
               })}
             </div>
-            <div className="text-xs text-slate-500">Continuous side-by-side document review</div>
+            <div className="text-xs text-slate-500">
+              Default view: full side-by-side document. Use filters to narrow to issues.
+            </div>
           </div>
           <div className="mt-4 border-t border-slate-200 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
