@@ -274,6 +274,8 @@ class ExportFileResponse(BaseModel):
     download_url: str
     generated_at: datetime
     version: int
+    export_format: str | None = None
+    export_mode: str | None = None
     latest: bool = False
 
 

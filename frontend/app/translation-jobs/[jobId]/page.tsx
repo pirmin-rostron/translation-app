@@ -170,6 +170,8 @@ type ExportFile = {
   download_url: string;
   generated_at: string;
   version: number;
+  export_format?: string | null;
+  export_mode?: "clean_text" | "preserve_formatting" | null;
   latest: boolean;
 };
 
@@ -1331,7 +1333,7 @@ export default function TranslationReviewPage() {
     const selectedMode = exportMode;
     const selectedFormat = exportFormat;
     setShowExportModal(false);
-    if (workflowStatus === "ready_for_export") {
+    if (workflowStatus === "ready_for_export" || workflowStatus === "exported") {
       await handleExportFinalDocument(selectedMode, selectedFormat);
       return;
     }
@@ -1459,7 +1461,8 @@ export default function TranslationReviewPage() {
     safeUnresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
   const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
-  const lastExportMode = exportResult?.export_mode ?? null;
+  const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
+  const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
   const guidanceTitle =
     workflowStatus === "exported"
       ? "Document exported"
@@ -1579,7 +1582,7 @@ export default function TranslationReviewPage() {
                   {lastExportTimestamp ? new Date(lastExportTimestamp).toLocaleString() : "No export yet"}
                 </span>
                 {" • "}
-                Format: <span className="font-medium text-slate-900">TXT</span>
+                Format: <span className="font-medium text-slate-900">{lastExportFormat.toUpperCase()}</span>
                 {" • "}
                 Formatting mode:{" "}
                 <span className="font-medium text-slate-900">
@@ -2254,7 +2257,8 @@ export default function TranslationReviewPage() {
                 </label>
                 {lastExportTimestamp && (
                   <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    Last export: {new Date(lastExportTimestamp).toLocaleString()} • Format: TXT • Last mode:{" "}
+                    Last export: {new Date(lastExportTimestamp).toLocaleString()} • Format:{" "}
+                    {lastExportFormat.toUpperCase()} • Last mode:{" "}
                     {lastExportMode === "preserve_formatting"
                       ? "Preserve original formatting"
                       : lastExportMode === "clean_text"

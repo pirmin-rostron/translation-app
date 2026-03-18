@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -58,6 +59,7 @@ _RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
 _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
 _EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.txt$")
 SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
+SUPPORTED_EXPORT_FORMATS = {"txt"}
 
 
 def _queue_stage_job(
@@ -678,6 +680,37 @@ def _export_filename_prefix(doc: Document, job: TranslationJob) -> str:
     return f"{safe_stem}-job-{job.id}"
 
 
+def _export_metadata_path(filename: str) -> Path:
+    return EXPORT_DIR / f"{filename}.meta.json"
+
+
+def _write_export_metadata(filename: str, generated_at: datetime, export_format: str, export_mode: str) -> None:
+    metadata = {
+        "generated_at": generated_at.isoformat(),
+        "export_format": export_format,
+        "export_mode": export_mode,
+    }
+    _export_metadata_path(filename).write_text(json.dumps(metadata), encoding="utf-8")
+
+
+def _read_export_metadata(filename: str) -> dict[str, str] | None:
+    path = _export_metadata_path(filename)
+    if not path.exists() or not path.is_file():
+        return None
+    try:
+        raw = path.read_text(encoding="utf-8")
+        loaded = json.loads(raw)
+        if isinstance(loaded, dict):
+            return {
+                "generated_at": str(loaded.get("generated_at", "")).strip(),
+                "export_format": str(loaded.get("export_format", "")).strip(),
+                "export_mode": str(loaded.get("export_mode", "")).strip(),
+            }
+    except Exception:
+        logger.warning("Failed to read export metadata for %s", filename, exc_info=True)
+    return None
+
+
 def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileResponse]:
     prefix = _export_filename_prefix(doc, job)
     files = sorted(EXPORT_DIR.glob(f"{prefix}-v*.txt"))
@@ -689,13 +722,31 @@ def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileRes
         if match.group("prefix") != prefix:
             continue
         version = int(match.group("version"))
+        metadata = _read_export_metadata(path.name)
         generated_at = datetime.utcfromtimestamp(path.stat().st_mtime)
+        export_format: str | None = "txt"
+        export_mode: str | None = None
+        if metadata:
+            generated_at_raw = metadata.get("generated_at")
+            if generated_at_raw:
+                try:
+                    generated_at = datetime.fromisoformat(generated_at_raw)
+                except ValueError:
+                    pass
+            export_format_raw = metadata.get("export_format")
+            export_mode_raw = metadata.get("export_mode")
+            if export_format_raw:
+                export_format = export_format_raw
+            if export_mode_raw:
+                export_mode = export_mode_raw
         parsed.append(
             ExportFileResponse(
                 filename=path.name,
                 download_url=f"/api/translation-jobs/{job.id}/exports/{path.name}",
                 generated_at=generated_at,
                 version=version,
+                export_format=export_format,
+                export_mode=export_mode,
             )
         )
 
@@ -1372,10 +1423,11 @@ def export_translation_job(
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     normalized_export_mode = _normalize_export_mode(export_mode)
-    if export_format.lower() != "txt":
+    normalized_export_format = (export_format or "").strip().lower()
+    if normalized_export_format not in SUPPORTED_EXPORT_FORMATS:
         raise HTTPException(status_code=400, detail="Only txt export is supported currently")
-    if job.status != "ready_for_export":
-        raise HTTPException(status_code=400, detail="Job must be ready_for_export before export")
+    if job.status not in {"ready_for_export", "exported"}:
+        raise HTTPException(status_code=400, detail="Job must be ready_for_export or exported before export")
 
     doc = db.query(Document).filter(Document.id == job.document_id).first()
     if not doc:
@@ -1384,11 +1436,17 @@ def export_translation_job(
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
     version = _next_export_version(job, doc)
     prefix = _export_filename_prefix(doc, job)
-    filename = f"{prefix}-v{version}.txt"
+    filename = f"{prefix}-v{version}.{normalized_export_format}"
     filepath = EXPORT_DIR / filename
     filepath.write_text(_build_export_text(db, job, normalized_export_mode), encoding="utf-8")
 
     exported_at = datetime.utcnow()
+    _write_export_metadata(
+        filename=filename,
+        generated_at=exported_at,
+        export_format=normalized_export_format,
+        export_mode=normalized_export_mode,
+    )
     job.status = "exported"
     job.last_saved_at = exported_at
     doc.status = "exported"
@@ -1396,7 +1454,7 @@ def export_translation_job(
     return ExportResponse(
         job_id=job.id,
         status=job.status,
-        export_format="txt",
+        export_format=normalized_export_format,
         export_mode=normalized_export_mode,
         filename=filename,
         download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
