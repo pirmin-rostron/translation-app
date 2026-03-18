@@ -208,14 +208,6 @@ function normalizeChoiceText(value: string) {
   return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
-function ambiguityHint(translation: string) {
-  const cleaned = cleanChoiceTranslationText(translation).replace(/[.,;:!?()[\]{}"']/g, " ").trim();
-  if (!cleaned) return null;
-  const firstToken = cleaned.split(/\s+/)[0];
-  if (!firstToken) return null;
-  return `Uses "${firstToken}"`;
-}
-
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -626,10 +618,11 @@ export default function TranslationReviewPage() {
     setSemanticChoice("current");
     const ambiguityDetails = getAmbiguityChoiceDetails(selectedSegment);
     const currentTranslationNormalized = normalizeChoiceText(ambiguityDetails.currentTranslation);
-    const currentChoiceIndex = ambiguityDetails.options.findIndex(
-      (option) => normalizeChoiceText(option.translation) === currentTranslationNormalized
-    );
-    setAmbiguityChoiceIndex(currentChoiceIndex >= 0 ? currentChoiceIndex : null);
+    const matchingIndices = ambiguityDetails.options
+      .map((option, idx) => ({ idx, normalized: normalizeChoiceText(option.translation) }))
+      .filter((entry) => entry.normalized.length > 0 && entry.normalized === currentTranslationNormalized)
+      .map((entry) => entry.idx);
+    setAmbiguityChoiceIndex(matchingIndices.length === 1 ? matchingIndices[0] : null);
     setIsEditing(false);
   }, [selectedSegment?.id, selectedSegment?.final_translation]);
 
@@ -1301,6 +1294,15 @@ export default function TranslationReviewPage() {
   const ambiguityChoiceDetails = getAmbiguityChoiceDetails(selectedSegment);
   const hasAmbiguityChoice = ambiguityChoiceDetails.ambiguityChoiceFound;
   const ambiguityOptions = ambiguityChoiceDetails.options;
+  const currentSuggestionMatches = ambiguityOptions
+    .map((option, idx) => ({ idx, normalized: normalizeChoiceText(option.translation) }))
+    .filter(
+      (entry) =>
+        entry.normalized.length > 0 &&
+        entry.normalized === normalizeChoiceText(ambiguityChoiceDetails.currentTranslation)
+    )
+    .map((entry) => entry.idx);
+  const currentSuggestionIndex = currentSuggestionMatches.length === 1 ? currentSuggestionMatches[0] : null;
   const selectedAmbiguityOption = ambiguityChoiceIndex == null ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
   const selectedAmbiguityTranslation = selectedAmbiguityOption?.translation ?? "";
   const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
@@ -1796,14 +1798,10 @@ export default function TranslationReviewPage() {
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                                 {option.meaning}
-                                {normalizeChoiceText(option.translation) ===
-                                normalizeChoiceText(ambiguityChoiceDetails.currentTranslation)
+                                {idx === currentSuggestionIndex
                                   ? " - Current suggestion"
                                   : ""}
                               </p>
-                              {ambiguityHint(option.translation) && (
-                                <p className="mt-1 text-xs text-slate-500">{ambiguityHint(option.translation)}</p>
-                              )}
                             </div>
                           </div>
                         </label>
