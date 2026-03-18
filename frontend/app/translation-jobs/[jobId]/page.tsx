@@ -397,6 +397,7 @@ export default function TranslationReviewPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const blockRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const allSegments = useMemo(
     () =>
@@ -485,8 +486,20 @@ export default function TranslationReviewPage() {
   );
   const selectedSegment = selectedEntry?.segment ?? null;
   const selectedBlock = selectedEntry?.block ?? null;
+  const orderedBlocks = useMemo(
+    () =>
+      [...blocks]
+        .filter((block) => block.segments.length > 0)
+        .sort((a, b) => a.block_index - b.block_index),
+    [blocks]
+  );
+  const blockIndexById = useMemo(
+    () => new Map(orderedBlocks.map((block, idx) => [block.id, idx])),
+    [orderedBlocks]
+  );
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedSafeIndex = safeSegments.findIndex(({ segment }) => segment.id === selectedSegment?.id);
+  const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
 
   useEffect(() => {
     if (!filteredSegments.length) {
@@ -542,6 +555,35 @@ export default function TranslationReviewPage() {
     const start = currentIssueIndex === -1 ? 0 : currentIssueIndex;
     const nextIndex = (start + step + visibleIssues.length) % visibleIssues.length;
     selectIssue(visibleIssues[nextIndex].key);
+  }
+
+  function selectBlockById(blockId: number, preferredSegmentId?: number) {
+    const block = orderedBlocks.find((candidate) => candidate.id === blockId);
+    if (!block || !block.segments.length) return;
+    const fallbackSegmentId = preferredSegmentId ?? block.segments[0].id;
+    const firstIssue = block.segments
+      .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
+      .sort((a, b) => a.segmentIndex - b.segmentIndex)[0];
+    setSelectedIssueKey(firstIssue?.key ?? null);
+    setSelectedId(fallbackSegmentId);
+    setMessage("");
+    setError("");
+  }
+
+  function handlePreviousBlock() {
+    if (selectedBlockPosition <= 0) return;
+    const previousBlock = orderedBlocks[selectedBlockPosition - 1];
+    setActiveFilter("all");
+    selectBlockById(previousBlock.id);
+    blockRefs.current[previousBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  function handleNextBlock() {
+    if (selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1) return;
+    const nextBlock = orderedBlocks[selectedBlockPosition + 1];
+    setActiveFilter("all");
+    selectBlockById(nextBlock.id);
+    blockRefs.current[nextBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
   function handleReviewAmbiguities() {
@@ -674,11 +716,7 @@ export default function TranslationReviewPage() {
         <span
           key={segment.id}
           onClick={() => {
-            setSelectedId(segment.id);
-            const firstIssue = issuesBySegmentId.get(segment.id)?.[0];
-            setSelectedIssueKey(firstIssue?.key ?? null);
-            setMessage("");
-            setError("");
+            selectBlockById(block.id, segment.id);
           }}
           className={`rounded-md transition-colors cursor-pointer ${
             segmentHasSelectedIssue
@@ -700,25 +738,62 @@ export default function TranslationReviewPage() {
   function renderNode(node: DocumentNode, side: "source" | "target") {
     if (node.type === "bullet_list") {
       return (
-        <ul className="list-disc space-y-2 pl-6 marker:text-slate-400">
-          {node.blocks.map((block) => (
-            <li key={block.id} className="pl-1">
-              <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
-                {renderInlineSegments(block, side)}
-              </p>
-            </li>
-          ))}
+        <ul className="list-disc space-y-3 pl-6 marker:text-slate-400">
+          {node.blocks.map((block) => {
+            const isActiveBlock = selectedBlock?.id === block.id;
+            return (
+              <li
+                key={block.id}
+                className={`rounded-md pl-1 transition-colors ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+                ref={(el) => {
+                  blockRefs.current[block.id] = el;
+                }}
+              >
+                <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Block {block.block_index + 1}
+                </span>
+                <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
+                  {renderInlineSegments(block, side)}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       );
     }
 
     const block = node.block;
     const body = renderInlineSegments(block, side);
+    const isActiveBlock = selectedBlock?.id === block.id;
     if (block.block_type === "heading") {
       const H = getHeadingTag(block);
-      return <H className="text-xl font-semibold leading-8 text-slate-900">{body}</H>;
+      return (
+        <div
+          ref={(el) => {
+            blockRefs.current[block.id] = el;
+          }}
+          className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+        >
+          <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Block {block.block_index + 1}
+          </span>
+          <H className="text-xl font-semibold leading-8 text-slate-900">{body}</H>
+        </div>
+      );
     }
-    return <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>;
+    return (
+      <div
+        ref={(el) => {
+          blockRefs.current[block.id] = el;
+        }}
+        className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+      >
+        <span className="mb-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          Block {block.block_index + 1}
+        </span>
+        <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>
+      </div>
+    );
   }
 
   async function handleSaveSegmentDraft() {
@@ -1295,7 +1370,27 @@ export default function TranslationReviewPage() {
             ) : (
               <>
                 <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
-                <p className="mt-1 text-sm text-slate-500">Block {selectedBlock.block_index + 1}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocks.length}
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePreviousBlock}
+                    disabled={selectedBlockPosition <= 0}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Previous block
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextBlock}
+                    disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Next block
+                  </button>
+                </div>
                 {selectedSegmentIsSafe && (
                   <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
                     <span className="inline-flex rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-medium text-emerald-800">
