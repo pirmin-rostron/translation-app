@@ -1316,7 +1316,7 @@ export default function TranslationReviewPage() {
   }
 
   function handleStartHereAction() {
-    if (workflowStatus === "exported" || showExportAction) {
+    if (workflowStatus === "exported") {
       handleOpenExportModal();
       return;
     }
@@ -1480,6 +1480,7 @@ export default function TranslationReviewPage() {
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const hasGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
+  const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionIsGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
@@ -1492,7 +1493,8 @@ export default function TranslationReviewPage() {
     actionLoading ||
     (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) ||
     (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) ||
-    (!primaryActionIsGuidedChoice && !draftTranslation.trim());
+    (!primaryActionIsGuidedChoice && !draftTranslation.trim()) ||
+    currentBlockResolved;
   const workflowStatusLabel =
     workflowStatus === "exported"
       ? "Exported"
@@ -2158,7 +2160,7 @@ export default function TranslationReviewPage() {
                 )}
 
                 <div className="mt-6 space-y-3">
-                  {!isReadOnly && isDocumentMode && (
+                  {!isReadOnly && isDocumentMode && !currentBlockResolved && (
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
@@ -2197,6 +2199,11 @@ export default function TranslationReviewPage() {
                       >
                         Skip
                       </button>
+                    </div>
+                  )}
+                  {!isReadOnly && isDocumentMode && currentBlockResolved && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                      Approved. Continue to the next unresolved block or edit again if needed.
                     </div>
                   )}
                   {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || selectedSegmentStatus === "edited") && (
