@@ -1368,11 +1368,7 @@ export default function TranslationReviewPage() {
       setExportResult(exportPayload);
       triggerExportDownload(exportPayload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
-      setMessage(
-        selectedMode === "preserve_formatting"
-          ? "Export completed with preserved formatting. Your file is downloading."
-          : "Export completed as clean text. Your file is downloading."
-      );
+      setMessage("Export successful. Your file is downloading.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
     } finally {
@@ -1417,11 +1413,7 @@ export default function TranslationReviewPage() {
       setExportResult(payload);
       triggerExportDownload(payload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
-      setMessage(
-        selectedMode === "preserve_formatting"
-          ? "Document finalized and exported with preserved formatting. Your file is downloading."
-          : "Document finalized and exported as clean text. Your file is downloading."
-      );
+      setMessage("Export successful. Your file is downloading.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
     } finally {
@@ -1460,6 +1452,12 @@ export default function TranslationReviewPage() {
     reviewSummary?.unresolved_ambiguities ?? reviewSummary?.ambiguity_count ?? 0;
   const unresolvedSemanticReviews =
     reviewSummary?.unresolved_semantic_reviews ?? reviewSummary?.semantic_memory_review_count ?? 0;
+  const unresolvedGlossaryReviews = allSegments.filter(
+    ({ segment }) => !isAcceptableFinalStatus(segment.review_status) && segment.glossary_applied
+  ).length;
+  const unresolvedMemoryReviews = allSegments.filter(
+    ({ segment }) => !isAcceptableFinalStatus(segment.review_status) && (segment.exact_memory_used || segment.semantic_memory_used)
+  ).length;
   const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
   const segmentsRequiringAttention = Math.max(unresolvedSegments - safeUnresolvedSegments, 0);
   const reviewComplete = Boolean(reviewSummary?.review_complete);
@@ -1535,6 +1533,12 @@ export default function TranslationReviewPage() {
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
+  const latestExportHref = latestExport?.download_url
+    ? `${API_URL}${latestExport.download_url}`
+    : exportResult?.download_url
+      ? `${API_URL}${exportResult.download_url}`
+      : null;
+  const resolvedItemsCount = Math.max(totalSegments - unresolvedSegments, 0);
   const totalBlocks = orderedBlocks.length;
   const flaggedIssuesCount = flagged.length;
   const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
@@ -1648,7 +1652,11 @@ export default function TranslationReviewPage() {
           unresolvedSegments={unresolvedSegments}
           segmentsRequiringAttention={segmentsRequiringAttention}
           unresolvedAmbiguities={unresolvedAmbiguities}
+          unresolvedGlossaryReviews={unresolvedGlossaryReviews}
+          unresolvedMemoryReviews={unresolvedMemoryReviews}
           unresolvedSemanticReviews={unresolvedSemanticReviews}
+          reviewComplete={reviewComplete}
+          resolvedItemsCount={resolvedItemsCount}
           startHereActionLabel={startHereActionLabel}
           lastSavedAt={reviewSummary?.last_saved_at ?? null}
           lastExportTimestamp={lastExportTimestamp}
@@ -1660,9 +1668,11 @@ export default function TranslationReviewPage() {
           onPrimaryGuidanceAction={handlePrimaryGuidanceAction}
           primaryGuidanceLabel={primaryGuidanceLabel}
           isReadOnly={isReadOnly}
+          showExportPrimary={showExportAction || workflowStatus === "exported"}
           onReopenReview={handleReopenReview}
           jobFailed={job.status === "failed"}
           exportHistory={exportHistory}
+          latestExportHref={latestExportHref}
         />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}

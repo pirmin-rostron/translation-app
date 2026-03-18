@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { RefObject } from "react";
 
 type ExportMode = "clean_text" | "preserve_formatting";
@@ -35,7 +36,11 @@ type ReviewGuidancePanelProps = {
   unresolvedSegments: number;
   segmentsRequiringAttention: number;
   unresolvedAmbiguities: number;
+  unresolvedGlossaryReviews: number;
+  unresolvedMemoryReviews: number;
   unresolvedSemanticReviews: number;
+  reviewComplete: boolean;
+  resolvedItemsCount: number;
   startHereActionLabel: string;
   lastSavedAt: string | null;
   lastExportTimestamp: string | null;
@@ -47,9 +52,11 @@ type ReviewGuidancePanelProps = {
   onPrimaryGuidanceAction: () => void;
   primaryGuidanceLabel: string;
   isReadOnly: boolean;
+  showExportPrimary: boolean;
   onReopenReview: () => void;
   jobFailed: boolean;
   exportHistory: ExportHistoryItem[];
+  latestExportHref: string | null;
 };
 
 export function ReviewGuidancePanel({
@@ -69,7 +76,11 @@ export function ReviewGuidancePanel({
   unresolvedSegments,
   segmentsRequiringAttention,
   unresolvedAmbiguities,
+  unresolvedGlossaryReviews,
+  unresolvedMemoryReviews,
   unresolvedSemanticReviews,
+  reviewComplete,
+  resolvedItemsCount,
   startHereActionLabel,
   lastSavedAt,
   lastExportTimestamp,
@@ -81,9 +92,11 @@ export function ReviewGuidancePanel({
   onPrimaryGuidanceAction,
   primaryGuidanceLabel,
   isReadOnly,
+  showExportPrimary,
   onReopenReview,
   jobFailed,
   exportHistory,
+  latestExportHref,
 }: ReviewGuidancePanelProps) {
   return (
     <>
@@ -104,6 +117,32 @@ export function ReviewGuidancePanel({
             <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
             <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
             <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
+            {reviewComplete && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                <p className="text-sm font-semibold text-emerald-900">Review complete</p>
+                <p className="mt-1 text-xs text-slate-700">
+                  {completedBlocks} of {totalBlocks} blocks reviewed • {resolvedItemsCount} review items resolved
+                </p>
+              </div>
+            )}
+            {isReadOnly && lastExportTimestamp && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                <p className="text-sm font-semibold text-emerald-900">Export successful</p>
+                <p className="mt-1 text-xs text-slate-700">
+                  Export completed at {new Date(lastExportTimestamp).toLocaleString()}.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                  {latestExportHref && (
+                    <a href={latestExportHref} target="_blank" rel="noreferrer" className="font-medium text-emerald-800 underline">
+                      Download again
+                    </a>
+                  )}
+                  <Link href="/" className="font-medium text-slate-700 underline">
+                    Back to all translations
+                  </Link>
+                </div>
+              </div>
+            )}
             <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review progress</p>
@@ -144,6 +183,10 @@ export function ReviewGuidancePanel({
                 <p className="font-semibold text-slate-900">{unresolvedSegments}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Remaining blocks</p>
+                <p className="font-semibold text-slate-900">{unresolvedBlocks}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Needs attention</p>
                 <p className="font-semibold text-slate-900">{segmentsRequiringAttention}</p>
               </div>
@@ -151,6 +194,10 @@ export function ReviewGuidancePanel({
             <p className="mt-2 text-sm text-slate-600">
               Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> • Semantic
               memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Glossary issues remaining: <span className="font-semibold text-slate-900">{unresolvedGlossaryReviews}</span> •
+              Memory issues remaining: <span className="font-semibold text-slate-900">{unresolvedMemoryReviews}</span>
             </p>
             <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recommended next step</p>
@@ -203,7 +250,7 @@ export function ReviewGuidancePanel({
               >
                 {primaryGuidanceLabel}
               </button>
-              {isReadOnly && (
+              {isReadOnly && !showExportPrimary && (
                 <button
                   type="button"
                   onClick={onReopenReview}

@@ -144,24 +144,35 @@ export function ReviewDetailsPane({
   selectedFlaggedIndex,
   flaggedLength,
 }: ReviewDetailsPaneProps) {
+  if (reviewComplete) {
+    return (
+      <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+          <p className="text-sm font-semibold text-emerald-900">Review complete</p>
+          <p className="mt-1 text-sm text-slate-700">
+            {completedBlocks} of {orderedBlocksLength} blocks reviewed. Block-level decisions are now locked.
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            Remaining unresolved blocks: {unresolvedBlocks}
+          </p>
+        </div>
+        <p className="mt-4 text-sm text-slate-600">Continue in Review Guidance to export your final document.</p>
+        <button
+          type="button"
+          onClick={onFocusReviewGuidance}
+          className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Go to Review Guidance
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       {!selectedSegment || !selectedBlock ? (
-        reviewComplete ? (
-          <div className="space-y-2 text-sm">
-            <p className="font-medium text-slate-900">Review complete.</p>
-            <p className="text-slate-600">Use Review Guidance to continue with export.</p>
-            <button
-              type="button"
-              onClick={onFocusReviewGuidance}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Go to Review Guidance
-            </button>
-          </div>
-        ) : (
-          <div className="text-sm text-slate-600">Select highlighted text to review details.</div>
-        )
+        <div className="text-sm text-slate-600">Select highlighted text to review details.</div>
       ) : (
         <>
           <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
