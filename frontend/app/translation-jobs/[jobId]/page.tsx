@@ -285,6 +285,30 @@ function preferFullBlockTranslationWhenCollapsed(
   return fallback;
 }
 
+function preferFullSegmentTranslationWhenCollapsed(
+  segment: ReviewSegment,
+  side: "source" | "target",
+  text: string,
+  isSelected: boolean,
+  isEditing: boolean
+) {
+  if (side !== "target") return text;
+  if (isSelected && isEditing) return text;
+  if (!hasMultiSentenceOrLine(segment.source_text || "")) return text;
+  const current = (text || "").trim();
+  if (!current || !isVeryShortSnippet(current)) return text;
+
+  const candidates = [segment.primary_translation, segment.final_translation]
+    .map((value) => (value || "").trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  const longest = candidates[0] ?? "";
+  if (!longest) return text;
+  if (longest.length <= current.length + 20) return text;
+  return longest;
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -1004,7 +1028,8 @@ export default function TranslationReviewPage() {
           : isSelected && isEditing
             ? draftTranslation
             : segment.final_translation;
-      const displayText = preferFullBlockTranslationWhenCollapsed(block, side, text, isSelected, isEditing);
+      const segmentSafeText = preferFullSegmentTranslationWhenCollapsed(segment, side, text, isSelected, isEditing);
+      const displayText = preferFullBlockTranslationWhenCollapsed(block, side, segmentSafeText, isSelected, isEditing);
       const ranges = buildHighlightRanges(segment, side, selectedIssueKey);
       const wrapperProps =
         side === "target"
