@@ -7,6 +7,7 @@ from striprtf.striprtf import rtf_to_text
 
 BULLET_PREFIX_RE = re.compile(r"^\s*([*\-•])\s+(.*)$")
 HEADING_STYLE_RE = re.compile(r"^heading\s*(\d+)?$", re.IGNORECASE)
+RTF_CONTROL_RE = re.compile(r"\\[a-zA-Z]+-?\d*\s?")
 
 
 @dataclass
@@ -111,9 +112,38 @@ def parse_rtf(filepath: Path) -> list[ParsedDocumentBlock]:
 
 
 def split_block_into_segments(block: ParsedDocumentBlock) -> list[str]:
-    """Return translation segments for a block. MVP keeps one segment per block."""
-    text = block.text_original.strip()
-    return [text] if text else []
+    """Return translation segments for a block.
+
+    Paragraph blocks with multiple lines/sentences are split to preserve full
+    reconstructed output and avoid single-snippet collapse in downstream review.
+    """
+    text = (block.text_original or "").strip()
+    if not text:
+        return []
+
+    if block.block_type in {"heading", "bullet_item"}:
+        return [text]
+
+    normalized = text.replace("\\par", "\n")
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    if not lines:
+        return [text]
+
+    segments: list[str] = []
+    for line in lines:
+        cleaned_line = RTF_CONTROL_RE.sub(" ", line).replace("{", " ").replace("}", " ")
+        cleaned_line = re.sub(r"\s+", " ", cleaned_line).strip()
+        if not cleaned_line:
+            continue
+
+        # Preserve sentence-level context in long lines while keeping short labels intact.
+        sentence_parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", cleaned_line) if part.strip()]
+        if len(sentence_parts) > 1:
+            segments.extend(sentence_parts)
+        else:
+            segments.append(cleaned_line)
+
+    return segments if segments else [text]
 
 
 def parse_document(filepath: Path, file_type: str) -> list[ParsedDocumentBlock]:

@@ -232,6 +232,28 @@ def _recover_plain_translations(raw_text: str, expected_count: int) -> list[str]
     return None
 
 
+def _source_units_for_coverage(source_text: str) -> list[str]:
+    normalized = (source_text or "").replace("\\par", "\n")
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    units: list[str] = []
+    for line in lines:
+        cleaned = re.sub(r"\\[a-zA-Z]+-?\d*\s?", " ", line).replace("{", " ").replace("}", " ")
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            continue
+        parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", cleaned) if part.strip()]
+        units.extend(parts if parts else [cleaned])
+    return units
+
+
+def _translation_looks_collapsed(source_text: str, translation_text: str) -> bool:
+    units = _source_units_for_coverage(source_text)
+    if len(units) < 2:
+        return False
+    translated_words = len((translation_text or "").strip().split())
+    return translated_words > 0 and translated_words <= 6
+
+
 class MockTranslationProvider(TranslationProvider):
     """Fallback provider. Returns mock output when no API key is configured."""
 
@@ -345,7 +367,7 @@ class OpenAITranslationProvider(TranslationProvider):
     ) -> TranslationSegmentResult:
         segment = SegmentContext(0, source_text, context_before, context_after, glossary_terms)
         try:
-            return self._translate_with_ambiguity(
+            result = self._translate_with_ambiguity(
                 segments=[segment],
                 source_language=source_language,
                 target_language=target_language,
@@ -353,6 +375,30 @@ class OpenAITranslationProvider(TranslationProvider):
                 industry=industry,
                 domain=domain,
             )[0]
+            if _translation_looks_collapsed(source_text, result.primary_translation):
+                units = _source_units_for_coverage(source_text)
+                if len(units) >= 2:
+                    logger.warning(
+                        "Translation provider=%s detected collapsed single-segment output; applying line/sentence fallback",
+                        self.name,
+                    )
+                    fallback_segments = [SegmentContext(idx, unit, None, None, glossary_terms) for idx, unit in enumerate(units)]
+                    fallback_parts = self._fallback_translate_only(
+                        segments=fallback_segments,
+                        source_language=source_language,
+                        target_language=target_language,
+                        translation_style=translation_style,
+                        industry=industry,
+                        domain=domain,
+                    )
+                    joined = " ".join(part.strip() for part in fallback_parts if part and part.strip()).strip()
+                    if joined:
+                        return TranslationSegmentResult(
+                            primary_translation=joined,
+                            ambiguity_detected=False,
+                            ambiguity_details=None,
+                        )
+            return result
         except StructuredResponseParseError as exc:
             logger.warning(
                 "Translation provider=%s structured parse failed for single segment; raw response=%r; "
@@ -500,6 +546,41 @@ Return only valid JSON. Do not include markdown, code fences, explanations, head
                     f"Item {i} missing primary_translation",
                     raw_response=raw_text,
                 )
+
+            source_text = segments[i].source_text
+            if _translation_looks_collapsed(source_text, primary_translation):
+                units = _source_units_for_coverage(source_text)
+                if len(units) >= 2:
+                    logger.warning(
+                        "Translation provider=%s detected collapsed batch output for segment=%d; applying line/sentence fallback",
+                        self.name,
+                        segments[i].segment_id,
+                    )
+                    fallback_segments = [
+                        SegmentContext(idx, unit, None, None, segments[i].glossary_terms) for idx, unit in enumerate(units)
+                    ]
+                    try:
+                        fallback_parts = self._fallback_translate_only(
+                            segments=fallback_segments,
+                            source_language=source_language,
+                            target_language=target_language,
+                            translation_style=translation_style,
+                            industry=industry,
+                            domain=domain,
+                        )
+                        joined = " ".join(part.strip() for part in fallback_parts if part and part.strip()).strip()
+                        if joined:
+                            primary_translation = joined
+                            # Fallback translation is plain-text only; ambiguity metadata is not reliable here.
+                            item["ambiguity_detected"] = False
+                            item["ambiguity_details"] = None
+                    except Exception as fallback_exc:
+                        logger.warning(
+                            "Translation provider=%s collapsed-output fallback failed for segment=%d: %s",
+                            self.name,
+                            segments[i].segment_id,
+                            fallback_exc,
+                        )
 
             ambiguity_detected = item.get("ambiguity_detected") is True
             ambiguity_details = _safe_ambiguity_details(item.get("ambiguity_details")) if ambiguity_detected else None
