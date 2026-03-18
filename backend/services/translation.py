@@ -407,13 +407,17 @@ Context: {context_line}
 {glossary_block}
 
 Rules for ambiguity: Only flag when a word/phrase could MATERIALLY change meaning (e.g. "table" as verb: present for discussion vs postpone). Do NOT flag stylistic differences or minor synonyms. Use industry/domain context. Keep false positives low.
+Language rule for ambiguity metadata:
+- "ambiguity_details.explanation" MUST be written in English.
+- Each alternative "meaning" MUST be written in English.
+- Keep "primary_translation" and each alternative "translation" in the target language ({target_language}).
 
 Important: There is exactly one input segment. Even if it contains multiple sentences, bullet points, or lines, keep everything inside one translated segment. Do not split it into multiple output items.
 
 Return exactly one JSON object with these fields:
 - "primary_translation": the full translation of the entire segment
 - "ambiguity_detected": true only if material ambiguity exists
-- "ambiguity_details": null, or {{"source_span": "the ambiguous phrase", "explanation": "brief explanation", "alternatives": [{{"translation": "...", "meaning": "..."}}, ...]}}
+- "ambiguity_details": null, or {{"source_span": "the ambiguous phrase", "explanation": "brief explanation in English", "alternatives": [{{"translation": "... (target language)", "meaning": "... (English description)"}}, ...]}}
 
 Segment:
 {json.dumps(texts[0])}
@@ -434,6 +438,10 @@ Then detect material ambiguity for each segment translated from {src}.
 Context: {context_line}
 
 Rules for ambiguity: Only flag when a word/phrase could MATERIALLY change meaning (e.g. "table" as verb: present for discussion vs postpone). Do NOT flag stylistic differences or minor synonyms. Use industry/domain context. Keep false positives low.
+Language rule for ambiguity metadata:
+- "ambiguity_details.explanation" MUST be written in English.
+- Each alternative "meaning" MUST be written in English.
+- Keep "primary_translation" and each alternative "translation" in the target language ({target_language}).
 
 Glossary rule: If a segment includes matching glossary terms, use the provided target terms when applicable.
 
@@ -443,7 +451,7 @@ Glossary by segment:
 Return a JSON array with one object per segment. Each object:
 - "primary_translation": the translation
 - "ambiguity_detected": true only if material ambiguity exists
-- "ambiguity_details": null, or {{"source_span": "the ambiguous phrase", "explanation": "brief explanation", "alternatives": [{{"translation": "...", "meaning": "..."}}, ...]}}
+- "ambiguity_details": null, or {{"source_span": "the ambiguous phrase", "explanation": "brief explanation in English", "alternatives": [{{"translation": "... (target language)", "meaning": "... (English description)"}}, ...]}}
 
 Segments:
 {json.dumps(texts)}
