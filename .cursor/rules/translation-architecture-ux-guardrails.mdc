@@ -1,0 +1,52 @@
+---
+description: Architecture, state ownership, review UX, and integrity guardrails for Translation_app
+alwaysApply: true
+---
+
+# Translation App Guardrails (Strict)
+
+## 1) Architecture Separation (Review Page)
+- `ReviewGuidancePanel` = direction/status/next-step only.
+- `DocumentDiffPane` = document content only.
+- `ReviewDetailsPane` = decision controls only.
+- Never duplicate responsibilities across these sections.
+
+## 2) State Ownership
+- `TranslationJob.status` owns translation/review/export lifecycle.
+- `Document.status` owns ingest/parse only.
+- Do not merge or cross-drive these status domains.
+
+## 3) Rendering Rules
+- Translated diff must render full reconstructed block content from ordered segment translations.
+- Never use ambiguity/semantic snippet text as the whole block value.
+- Exception: if the original block truly contains only one sentence/snippet, single-segment output is valid.
+- Review Details must not render full document content.
+
+## 4) Ambiguity Rules
+- Ambiguity is valid only when there are 2+ distinct options.
+- If fewer than 2 valid options, treat as non-ambiguity.
+- Explanations/meanings must be English (UI language).
+- Translation option text remains in target language.
+
+## 5) UX Rules
+- One primary CTA per screen/state; secondary actions must be visually de-emphasized.
+- No duplicate progress indicators.
+- On review completion: hide block controls and guide to export.
+
+## 6) Component + Change Discipline
+- Modify existing components first; avoid creating parallel render paths.
+- Reuse existing utilities/handlers before adding new ones.
+- In responses, always state which files were edited and why.
+
+## 7) Data Integrity
+- Review state is job-scoped (`translation_job_id`) only.
+- Never reuse approvals/decisions across jobs (memory may suggest, never auto-approve).
+- Export must use final reviewed data for the active job.
+
+## 8) Delivery Discipline
+- Explain what changed, why, and how to test.
+- Call out assumptions and edge cases explicitly.
+- Fail safely on malformed/incomplete data.
+
+## 9) Golden Rule
+- If uncertain, prioritize architecture + UX guardrails over shortcuts.

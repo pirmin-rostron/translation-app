@@ -246,6 +246,45 @@ function replaceFirstOccurrence(haystack: string, needle: string, replacement: s
   return `${haystack.slice(0, idx)}${replacement}${haystack.slice(idx + needle.length)}`;
 }
 
+function replaceByRange(text: string, start: number, end: number, replacement: string) {
+  if (start < 0 || end <= start || end > text.length) return text;
+  return `${text.slice(0, start)}${replacement}${text.slice(end)}`;
+}
+
+function hasMultiSentenceOrLine(text: string) {
+  const normalized = (text || "").trim();
+  if (!normalized) return false;
+  if (normalized.includes("\n")) return true;
+  const sentenceMarkers = normalized.match(/[.!?。！？]/g)?.length ?? 0;
+  return sentenceMarkers >= 2;
+}
+
+function isVeryShortSnippet(text: string) {
+  const normalized = (text || "").trim();
+  if (!normalized) return false;
+  const words = normalized.split(/\s+/).filter(Boolean).length;
+  return normalized.length <= 24 || words <= 3;
+}
+
+function preferFullBlockTranslationWhenCollapsed(
+  block: DocumentBlock,
+  side: "source" | "target",
+  text: string,
+  isSelected: boolean,
+  isEditing: boolean
+) {
+  if (side !== "target") return text;
+  if (isSelected && isEditing) return text;
+  if (block.segments.length !== 1) return text;
+  if (!hasMultiSentenceOrLine(block.text_original || "")) return text;
+  const fallback = (block.text_translated || "").trim();
+  const current = (text || "").trim();
+  if (!fallback || !current) return text;
+  if (!isVeryShortSnippet(current)) return text;
+  if (fallback.length <= current.length + 20) return text;
+  return fallback;
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -965,6 +1004,7 @@ export default function TranslationReviewPage() {
           : isSelected && isEditing
             ? draftTranslation
             : segment.final_translation;
+      const displayText = preferFullBlockTranslationWhenCollapsed(block, side, text, isSelected, isEditing);
       const ranges = buildHighlightRanges(segment, side, selectedIssueKey);
       const wrapperProps =
         side === "target"
@@ -987,7 +1027,7 @@ export default function TranslationReviewPage() {
                 : "hover:bg-slate-100/70"
           }`}
         >
-          {renderHighlightedText(text, ranges, wrapperProps.className, wrapperProps.title, selectIssue)}
+          {renderHighlightedText(displayText, ranges, wrapperProps.className, wrapperProps.title, selectIssue)}
           {idx < block.segments.length - 1 ? " " : ""}
         </span>
       );
@@ -1249,6 +1289,18 @@ export default function TranslationReviewPage() {
     const currentText = segment.final_translation || "";
     if (!currentText.trim()) return selectedChoice;
     const ambiguityAnnotation = segment.annotations.find((annotation) => annotation.annotation_type === "ambiguity");
+    const hasTargetRange =
+      ambiguityAnnotation?.target_start != null &&
+      ambiguityAnnotation?.target_end != null &&
+      ambiguityAnnotation.target_end > ambiguityAnnotation.target_start;
+    if (hasTargetRange) {
+      return replaceByRange(
+        currentText,
+        ambiguityAnnotation.target_start as number,
+        ambiguityAnnotation.target_end as number,
+        selectedChoice
+      );
+    }
     const rawAmbiguousTarget = (ambiguityAnnotation?.target_span_text || "").trim();
     const currentAmbiguousTarget = cleanChoiceTranslationText(ambiguityAnnotation?.target_span_text || "");
     if (rawAmbiguousTarget && currentText.includes(rawAmbiguousTarget)) {
@@ -1256,16 +1308,6 @@ export default function TranslationReviewPage() {
     }
     if (currentAmbiguousTarget && currentText.includes(currentAmbiguousTarget)) {
       return replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice);
-    }
-    const alternativeCandidates = (segment.ambiguity_details?.alternatives || [])
-      .flatMap((alternative) => [String(alternative?.translation || "").trim(), cleanChoiceTranslationText(alternative?.translation || "")])
-      .filter((value) => value.length > 0);
-    const candidates = [...new Set(alternativeCandidates)];
-    for (const candidate of candidates) {
-      if (candidate === selectedChoice) continue;
-      if (currentText.includes(candidate)) {
-        return replaceFirstOccurrence(currentText, candidate, selectedChoice);
-      }
     }
     // No reliable in-context span match: keep full segment text to avoid collapsing content.
     return currentText;
