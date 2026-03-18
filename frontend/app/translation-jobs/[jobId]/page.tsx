@@ -163,7 +163,7 @@ type ExportResult = {
 };
 
 type ExportMode = "clean_text" | "preserve_formatting";
-type ExportFormat = "txt";
+type ExportFormat = "docx" | "rtf" | "txt";
 
 type ExportFile = {
   filename: string;
@@ -514,8 +514,8 @@ export default function TranslationReviewPage() {
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [exportHistory, setExportHistory] = useState<ExportFile[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportMode, setExportMode] = useState<ExportMode>("clean_text");
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
+  const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -1295,7 +1295,7 @@ export default function TranslationReviewPage() {
     setMessage("");
     try {
       const res = await fetch(
-        `${API_URL}/api/translation-jobs/${job.id}/export?export_format=${selectedFormat}&export_mode=${selectedMode}`,
+        `${API_URL}/api/translation-jobs/${job.id}/export?file_type=${selectedFormat}&formatting_mode=${selectedMode}`,
         {
           method: "POST",
         }
@@ -1319,12 +1319,8 @@ export default function TranslationReviewPage() {
   }
 
   function handleOpenExportModal() {
-    const hasFormattingSignals = blocks.some(
-      (block) =>
-        block.block_type !== "paragraph" || (block.formatting_json && Object.keys(block.formatting_json).length > 0)
-    );
-    setExportFormat("txt");
-    setExportMode(hasFormattingSignals ? "preserve_formatting" : "clean_text");
+    setExportFormat("docx");
+    setExportMode("preserve_formatting");
     setShowExportModal(true);
   }
 
@@ -1351,7 +1347,7 @@ export default function TranslationReviewPage() {
       const readyPayload = await markReady.json().catch(() => ({}));
       if (!markReady.ok) throw new Error(readyPayload.detail || "Failed to mark ready for export");
 
-      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?export_format=${selectedFormat}&export_mode=${selectedMode}`;
+      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?file_type=${selectedFormat}&formatting_mode=${selectedMode}`;
       const exportRes2 = await fetch(exportUrl, { method: "POST" });
       const exportPayload = await exportRes2.json().catch(() => ({}));
       if (!exportRes2.ok) throw new Error(exportPayload.detail || "Failed to export document");
@@ -2204,20 +2200,52 @@ export default function TranslationReviewPage() {
                       <input
                         type="radio"
                         name="export-format"
+                        value="docx"
+                        checked={exportFormat === "docx"}
+                        onChange={() => setExportFormat("docx")}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">DOCX</p>
+                        <p className="mt-1 text-xs text-slate-600">Best for sharing editable documents.</p>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="export-format"
+                        value="rtf"
+                        checked={exportFormat === "rtf"}
+                        onChange={() => setExportFormat("rtf")}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">RTF</p>
+                        <p className="mt-1 text-xs text-slate-600">Rich text output compatible with many editors.</p>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="export-format"
                         value="txt"
                         checked={exportFormat === "txt"}
                         onChange={() => setExportFormat("txt")}
                         className="mt-0.5"
                       />
                       <div>
-                        <p className="text-sm font-medium text-slate-900">TXT (plain text)</p>
-                        <p className="mt-1 text-xs text-slate-600">Simple text export for reviewed content.</p>
+                        <p className="text-sm font-medium text-slate-900">TXT</p>
+                        <p className="mt-1 text-xs text-slate-600">Plain text export for simple delivery.</p>
                       </div>
                     </div>
                   </label>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formatting mode</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formatting</p>
                 </div>
                 <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
                   <div className="flex items-start gap-2">
@@ -2232,7 +2260,7 @@ export default function TranslationReviewPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-900">Preserve original formatting</p>
                       <p className="mt-1 text-xs text-slate-600">
-                        Keeps headings, spacing, and structure where possible.
+                        Preserve original formatting: keeps headings, spacing, and structure where possible.
                       </p>
                     </div>
                   </div>
@@ -2250,7 +2278,7 @@ export default function TranslationReviewPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-900">Clean text only</p>
                       <p className="mt-1 text-xs text-slate-600">
-                        Removes formatting markers and exports plain reviewed text.
+                        Clean text only: removes formatting and exports plain reviewed text.
                       </p>
                     </div>
                   </div>

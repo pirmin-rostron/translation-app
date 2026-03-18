@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
+from docx import Document as DocxDocument
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -57,9 +58,9 @@ SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
 
 _RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
 _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
-_EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.txt$")
+_EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.(?P<ext>txt|rtf|docx)$")
 SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
-SUPPORTED_EXPORT_FORMATS = {"txt"}
+SUPPORTED_EXPORT_FORMATS = {"txt", "rtf", "docx"}
 
 
 def _queue_stage_job(
@@ -625,7 +626,7 @@ def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummary
     )
 
 
-def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> str:
+def _collect_export_blocks(db: Session, job: TranslationJob, export_mode: str) -> list[tuple[str, str]]:
     blocks = (
         db.query(DocumentBlock)
         .filter(DocumentBlock.document_id == job.document_id)
@@ -644,7 +645,7 @@ def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> st
     for segment in segments:
         segments_by_block_id[segment.block_id].append(segment)
 
-    output_lines: list[str] = []
+    output_blocks: list[tuple[str, str]] = []
     for block in blocks:
         block_segments = sorted(
             segments_by_block_id.get(block.id, []),
@@ -667,12 +668,64 @@ def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> st
         translated_text = translated_text.strip()
         if not translated_text:
             continue
-        if block.block_type == "bullet_item":
-            output_lines.append(f"- {translated_text}")
-        else:
-            output_lines.append(translated_text)
+        output_blocks.append((block.block_type or "paragraph", translated_text))
+    return output_blocks
+
+
+def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> str:
+    output_blocks = _collect_export_blocks(db, job, export_mode)
+    output_lines: list[str] = []
+    for block_type, translated_text in output_blocks:
+        output_lines.append(f"- {translated_text}" if block_type == "bullet_item" else translated_text)
         output_lines.append("")
     return "\n".join(output_lines).strip() + "\n"
+
+
+def _build_export_rtf(db: Session, job: TranslationJob, export_mode: str) -> str:
+    def _rtf_escape(value: str) -> str:
+        escaped = (
+            value.replace("\\", "\\\\")
+            .replace("{", "\\{")
+            .replace("}", "\\}")
+            .replace("\n", "\\line ")
+        )
+        return escaped
+
+    output_blocks = _collect_export_blocks(db, job, export_mode)
+    rtf_parts = ["{\\rtf1\\ansi\\deff0", "\\viewkind4\\uc1\\pard"]
+    for block_type, translated_text in output_blocks:
+        escaped = _rtf_escape(translated_text)
+        if export_mode == "preserve_formatting":
+            if block_type == "heading":
+                rtf_parts.append(f"\\b {escaped}\\b0\\par")
+            elif block_type == "bullet_item":
+                rtf_parts.append(f"\\tab \\bullet\\tab {escaped}\\par")
+            else:
+                rtf_parts.append(f"{escaped}\\par")
+        else:
+            plain = _rtf_escape(_clean_export_translation(translated_text))
+            rtf_parts.append(f"{plain}\\par")
+    rtf_parts.append("}")
+    return "\n".join(rtf_parts) + "\n"
+
+
+def _build_export_docx(db: Session, job: TranslationJob, export_mode: str, output_path: Path) -> None:
+    output_blocks = _collect_export_blocks(db, job, export_mode)
+    doc = DocxDocument()
+    for block_type, translated_text in output_blocks:
+        text_value = translated_text if export_mode == "preserve_formatting" else _clean_export_translation(translated_text)
+        if not text_value:
+            continue
+        if export_mode == "preserve_formatting":
+            if block_type == "heading":
+                doc.add_heading(text_value, level=2)
+            elif block_type == "bullet_item":
+                doc.add_paragraph(text_value, style="List Bullet")
+            else:
+                doc.add_paragraph(text_value)
+        else:
+            doc.add_paragraph(text_value)
+    doc.save(str(output_path))
 
 
 def _export_filename_prefix(doc: Document, job: TranslationJob) -> str:
@@ -713,7 +766,7 @@ def _read_export_metadata(filename: str) -> dict[str, str] | None:
 
 def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileResponse]:
     prefix = _export_filename_prefix(doc, job)
-    files = sorted(EXPORT_DIR.glob(f"{prefix}-v*.txt"))
+    files = sorted(EXPORT_DIR.glob(f"{prefix}-v*.*"))
     parsed: list[ExportFileResponse] = []
     for path in files:
         match = _EXPORT_FILENAME_PATTERN.match(path.name)
@@ -724,7 +777,7 @@ def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileRes
         version = int(match.group("version"))
         metadata = _read_export_metadata(path.name)
         generated_at = datetime.utcfromtimestamp(path.stat().st_mtime)
-        export_format: str | None = "txt"
+        export_format: str | None = match.group("ext")
         export_mode: str | None = None
         if metadata:
             generated_at_raw = metadata.get("generated_at")
@@ -1415,17 +1468,21 @@ def reopen_review(job_id: int, db: Session = Depends(get_db)):
 @router.post("/translation-jobs/{job_id}/export", response_model=ExportResponse)
 def export_translation_job(
     job_id: int,
-    export_format: str = Query(default="txt"),
-    export_mode: str = Query(default="clean_text"),
+    file_type: str | None = Query(default=None),
+    formatting_mode: str | None = Query(default=None),
+    export_format: str | None = Query(default=None),
+    export_mode: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
-    normalized_export_mode = _normalize_export_mode(export_mode)
-    normalized_export_format = (export_format or "").strip().lower()
+    raw_mode = formatting_mode if formatting_mode is not None else export_mode
+    raw_format = file_type if file_type is not None else export_format
+    normalized_export_mode = _normalize_export_mode(raw_mode or "preserve_formatting")
+    normalized_export_format = (raw_format or "docx").strip().lower()
     if normalized_export_format not in SUPPORTED_EXPORT_FORMATS:
-        raise HTTPException(status_code=400, detail="Only txt export is supported currently")
+        raise HTTPException(status_code=400, detail="file_type must be one of: docx, rtf, txt")
     if job.status not in {"ready_for_export", "exported"}:
         raise HTTPException(status_code=400, detail="Job must be ready_for_export or exported before export")
 
@@ -1438,14 +1495,20 @@ def export_translation_job(
     prefix = _export_filename_prefix(doc, job)
     filename = f"{prefix}-v{version}.{normalized_export_format}"
     filepath = EXPORT_DIR / filename
-    filepath.write_text(_build_export_text(db, job, normalized_export_mode), encoding="utf-8")
+    effective_export_mode = normalized_export_mode if normalized_export_format != "txt" else "clean_text"
+    if normalized_export_format == "docx":
+        _build_export_docx(db, job, effective_export_mode, filepath)
+    elif normalized_export_format == "rtf":
+        filepath.write_text(_build_export_rtf(db, job, effective_export_mode), encoding="utf-8")
+    else:
+        filepath.write_text(_build_export_text(db, job, effective_export_mode), encoding="utf-8")
 
     exported_at = datetime.utcnow()
     _write_export_metadata(
         filename=filename,
         generated_at=exported_at,
         export_format=normalized_export_format,
-        export_mode=normalized_export_mode,
+        export_mode=effective_export_mode,
     )
     job.status = "exported"
     job.last_saved_at = exported_at
@@ -1455,7 +1518,7 @@ def export_translation_job(
         job_id=job.id,
         status=job.status,
         export_format=normalized_export_format,
-        export_mode=normalized_export_mode,
+        export_mode=effective_export_mode,
         filename=filename,
         download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
         generated_at=exported_at,
@@ -1488,7 +1551,15 @@ def download_export(job_id: int, filename: str, db: Session = Depends(get_db)):
     if not filepath.exists() or not filepath.is_file():
         raise HTTPException(status_code=404, detail="Export file not found")
 
-    return FileResponse(path=str(filepath), filename=filename, media_type="text/plain")
+    suffix = filepath.suffix.lower()
+    media_type = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        if suffix == ".docx"
+        else "application/rtf"
+        if suffix == ".rtf"
+        else "text/plain"
+    )
+    return FileResponse(path=str(filepath), filename=filename, media_type=media_type)
 
 
 @router.patch("/translation-results/{result_id}", response_model=TranslationResultResponse)
