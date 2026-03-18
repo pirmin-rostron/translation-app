@@ -93,11 +93,23 @@ type DocumentNode =
   | { key: string; type: "bullet_list"; blocks: DocumentBlock[] };
 
 type ReviewFilter = "all" | "flagged" | "ambiguities" | "glossary" | "memory";
+type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
+type IssueFilter = "all" | IssueType;
 
 type HighlightRange = {
   start: number;
   end: number;
   className: string;
+  title: string;
+  issueKey: string;
+};
+
+type ReviewIssue = {
+  key: string;
+  type: IssueType;
+  segmentId: number;
+  segmentIndex: number;
+  blockId: number | null;
   title: string;
 };
 
@@ -197,24 +209,68 @@ function getHeadingTag(block: DocumentBlock): "h1" | "h2" | "h3" {
 
 function getNodeSpacing(node: DocumentNode) {
   if (node.type === "bullet_list") return "mt-4 first:mt-0";
-  if (node.block.block_type === "heading") return "mt-8 first:mt-0";
-  return "mt-5 first:mt-0";
+  if (node.block.block_type === "heading") return "mt-10 first:mt-0";
+  return "mt-7 first:mt-0";
 }
 
-function buildHighlightRanges(segment: ReviewSegment, side: "source" | "target") {
+function buildHighlightRanges(
+  segment: ReviewSegment,
+  side: "source" | "target",
+  selectedIssueKey?: string | null
+) {
   return segment.annotations.flatMap((annotation) => {
     const start = side === "source" ? annotation.source_start : annotation.target_start;
     const end = side === "source" ? annotation.source_end : annotation.target_end;
     if (start == null || end == null || end <= start) return [];
+    const issueKey = `issue-${annotation.id}`;
+    const selectedClass = selectedIssueKey === issueKey ? " ring-2 ring-offset-1 ring-slate-500" : "";
 
     if (annotation.annotation_type === "glossary") {
       const sourceTerm = String(annotation.metadata_json?.source_term ?? annotation.source_span_text);
       const targetTerm = String(annotation.metadata_json?.target_term ?? annotation.target_span_text ?? "");
-      return [{ start, end, className: "bg-violet-100/80 text-slate-900", title: `Glossary term applied: ${sourceTerm} -> ${targetTerm}` }] as HighlightRange[];
+      return [
+        {
+          start,
+          end,
+          issueKey,
+          className: `bg-teal-100/90 text-teal-900${selectedClass}`,
+          title: `Glossary term applied: ${sourceTerm} -> ${targetTerm}`,
+        },
+      ] as HighlightRange[];
     }
 
     if (annotation.annotation_type === "ambiguity") {
-      return [{ start, end, className: "bg-amber-100/80 text-slate-900", title: `Ambiguity to review: ${annotation.source_span_text}` }] as HighlightRange[];
+      return [
+        {
+          start,
+          end,
+          issueKey,
+          className: `bg-amber-100/90 text-amber-900${selectedClass}`,
+          title: `Ambiguity to review: ${annotation.source_span_text}`,
+        },
+      ] as HighlightRange[];
+    }
+    if (annotation.annotation_type === "exact_memory") {
+      return [
+        {
+          start,
+          end,
+          issueKey,
+          className: `bg-emerald-100/80 text-emerald-900${selectedClass}`,
+          title: "Trusted reuse from exact translation memory",
+        },
+      ] as HighlightRange[];
+    }
+    if (annotation.annotation_type === "semantic_memory") {
+      return [
+        {
+          start,
+          end,
+          issueKey,
+          className: `bg-sky-100/80 text-sky-900${selectedClass}`,
+          title: "Intelligent reuse from semantic translation memory",
+        },
+      ] as HighlightRange[];
     }
     return [];
   });
@@ -224,7 +280,8 @@ function renderHighlightedText(
   text: string,
   ranges: HighlightRange[],
   wrapperClassName?: string,
-  wrapperTitle?: string
+  wrapperTitle?: string,
+  onIssueSelect?: (issueKey: string) => void
 ) {
   const rendered = (() => {
     if (!text || !ranges.length) return text;
@@ -238,7 +295,15 @@ function renderHighlightedText(
       if (range.start < cursor) continue;
       if (range.start > cursor) out.push(<span key={`plain-${key++}`}>{text.slice(cursor, range.start)}</span>);
       out.push(
-        <span key={`mark-${key++}`} className={`rounded px-1 py-0.5 ${range.className}`} title={range.title}>
+        <span
+          key={`mark-${key++}`}
+          className={`rounded px-1 py-0.5 ${range.className} ${onIssueSelect ? "cursor-pointer" : ""}`}
+          title={range.title}
+          onClick={(event) => {
+            event.stopPropagation();
+            onIssueSelect?.(range.issueKey);
+          }}
+        >
           {text.slice(range.start, range.end)}
         </span>
       );
@@ -280,6 +345,20 @@ function getTranslationWrapperProps(segment: ReviewSegment) {
   return { className: undefined, title: undefined };
 }
 
+function issueTypeLabel(issueType: IssueType) {
+  if (issueType === "ambiguity") return "Ambiguity";
+  if (issueType === "glossary") return "Glossary";
+  if (issueType === "exact_memory") return "Exact memory";
+  return "Semantic memory";
+}
+
+function issueBadgeClass(issueType: IssueType) {
+  if (issueType === "ambiguity") return "bg-amber-100 text-amber-900 border-amber-200";
+  if (issueType === "glossary") return "bg-teal-100 text-teal-900 border-teal-200";
+  if (issueType === "exact_memory") return "bg-emerald-100 text-emerald-900 border-emerald-200";
+  return "bg-sky-100 text-sky-900 border-sky-200";
+}
+
 export default function TranslationReviewPage() {
   const params = useParams();
   const jobId = Number(params.jobId);
@@ -290,7 +369,9 @@ export default function TranslationReviewPage() {
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("flagged");
+  const [activeIssueFilter, setActiveIssueFilter] = useState<IssueFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -320,6 +401,56 @@ export default function TranslationReviewPage() {
   const allNodes = useMemo(() => buildDocumentNodes(blocks), [blocks]);
   const displayedNodes = useMemo(() => buildDocumentNodes(filteredBlocks), [filteredBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
+  const issues = useMemo(() => {
+    const collected: ReviewIssue[] = [];
+    for (const { segment } of allSegments) {
+      for (const annotation of segment.annotations) {
+        const annotationType = annotation.annotation_type;
+        if (
+          annotationType !== "ambiguity" &&
+          annotationType !== "glossary" &&
+          annotationType !== "exact_memory" &&
+          annotationType !== "semantic_memory"
+        ) {
+          continue;
+        }
+        const issueType = annotationType as IssueType;
+        const issueTitle =
+          annotationType === "ambiguity"
+            ? `Ambiguity: ${annotation.source_span_text}`
+            : annotationType === "glossary"
+              ? `Glossary: ${annotation.source_span_text}`
+              : annotationType === "exact_memory"
+                ? "Trusted exact memory reuse"
+                : "Semantic memory reuse";
+        collected.push({
+          key: `issue-${annotation.id}`,
+          type: issueType,
+          segmentId: segment.id,
+          segmentIndex: segment.segment_index,
+          blockId: segment.block_id,
+          title: issueTitle,
+        });
+      }
+    }
+    return collected.sort((a, b) => (a.segmentIndex === b.segmentIndex ? a.key.localeCompare(b.key) : a.segmentIndex - b.segmentIndex));
+  }, [allSegments]);
+  const issuesBySegmentId = useMemo(() => {
+    const map = new Map<number, ReviewIssue[]>();
+    for (const issue of issues) {
+      const list = map.get(issue.segmentId) ?? [];
+      list.push(issue);
+      map.set(issue.segmentId, list);
+    }
+    return map;
+  }, [issues]);
+  const issuesByKey = useMemo(() => new Map(issues.map((issue) => [issue.key, issue])), [issues]);
+  const visibleIssues = useMemo(
+    () => (activeIssueFilter === "all" ? issues : issues.filter((issue) => issue.type === activeIssueFilter)),
+    [activeIssueFilter, issues]
+  );
+  const currentIssueIndex = visibleIssues.findIndex((issue) => issue.key === selectedIssueKey);
+  const selectedIssue = selectedIssueKey ? issuesByKey.get(selectedIssueKey) ?? null : null;
   const selectedEntry = useMemo(
     () => allSegments.find(({ segment }) => segment.id === selectedId) ?? filteredSegments[0] ?? null,
     [allSegments, filteredSegments, selectedId]
@@ -348,6 +479,41 @@ export default function TranslationReviewPage() {
     if (!selectedId) return;
     segmentRefs.current[selectedId]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!visibleIssues.length) {
+      setSelectedIssueKey(null);
+      return;
+    }
+    if (!selectedIssueKey || !visibleIssues.some((issue) => issue.key === selectedIssueKey)) {
+      setSelectedIssueKey(visibleIssues[0].key);
+    }
+  }, [visibleIssues, selectedIssueKey]);
+
+  useEffect(() => {
+    if (!selectedIssueKey) return;
+    const issue = issuesByKey.get(selectedIssueKey);
+    if (!issue) return;
+    if (selectedId !== issue.segmentId) {
+      setSelectedId(issue.segmentId);
+    }
+  }, [selectedIssueKey, issuesByKey, selectedId]);
+
+  function selectIssue(issueKey: string) {
+    const issue = issuesByKey.get(issueKey);
+    if (!issue) return;
+    setSelectedIssueKey(issueKey);
+    setSelectedId(issue.segmentId);
+    setMessage("");
+    setError("");
+  }
+
+  function goToIssue(step: 1 | -1) {
+    if (!visibleIssues.length) return;
+    const start = currentIssueIndex === -1 ? 0 : currentIssueIndex;
+    const nextIndex = (start + step + visibleIssues.length) % visibleIssues.length;
+    selectIssue(visibleIssues[nextIndex].key);
+  }
 
   async function loadReviewBlocks() {
     const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/review-blocks`).then(async (res) => {
@@ -432,13 +598,16 @@ export default function TranslationReviewPage() {
 
     return block.segments.map((segment, idx) => {
       const isSelected = selectedSegment?.id === segment.id;
+      const segmentHasSelectedIssue = Boolean(
+        selectedIssueKey && issuesBySegmentId.get(segment.id)?.some((issue) => issue.key === selectedIssueKey)
+      );
       const text =
         side === "source"
           ? segment.source_text
           : isSelected && isEditing
             ? draftTranslation
             : segment.final_translation;
-      const ranges = buildHighlightRanges(segment, side);
+      const ranges = buildHighlightRanges(segment, side, selectedIssueKey);
       const wrapperProps =
         side === "target"
           ? getTranslationWrapperProps(segment)
@@ -449,14 +618,20 @@ export default function TranslationReviewPage() {
           key={segment.id}
           onClick={() => {
             setSelectedId(segment.id);
+            const firstIssue = issuesBySegmentId.get(segment.id)?.[0];
+            setSelectedIssueKey(firstIssue?.key ?? null);
             setMessage("");
             setError("");
           }}
           className={`rounded-md transition-colors cursor-pointer ${
-            isSelected ? "bg-slate-100/80" : "hover:bg-slate-100/70"
+            segmentHasSelectedIssue
+              ? "bg-slate-100/90 ring-1 ring-slate-400"
+              : isSelected
+                ? "bg-slate-100/80"
+                : "hover:bg-slate-100/70"
           }`}
         >
-          {renderHighlightedText(text, ranges, wrapperProps.className, wrapperProps.title)}
+          {renderHighlightedText(text, ranges, wrapperProps.className, wrapperProps.title, selectIssue)}
           {idx < block.segments.length - 1 ? " " : ""}
         </span>
       );
@@ -836,29 +1011,82 @@ export default function TranslationReviewPage() {
         </section>
 
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["all", "flagged", "ambiguities", "glossary", "memory"] as ReviewFilter[]).map((filter) => {
-              const count =
-                filter === "all"
-                  ? allSegments.length
-                  : filter === "flagged"
-                    ? flagged.length
-                    : allSegments.filter(({ segment }) => matchesFilter(segment, filter)).length;
-              return (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {(["all", "flagged", "ambiguities", "glossary", "memory"] as ReviewFilter[]).map((filter) => {
+                const count =
+                  filter === "all"
+                    ? allSegments.length
+                    : filter === "flagged"
+                      ? flagged.length
+                      : allSegments.filter(({ segment }) => matchesFilter(segment, filter)).length;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setActiveFilter(filter)}
+                    className={`rounded-full px-3 py-1.5 text-sm ${
+                      activeFilter === filter
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {filter} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-xs text-slate-500">Continuous side-by-side document review</div>
+          </div>
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issues</span>
+                {(["all", "ambiguity", "glossary", "exact_memory", "semantic_memory"] as IssueFilter[]).map(
+                  (filter) => {
+                    const count =
+                      filter === "all" ? issues.length : issues.filter((issue) => issue.type === filter).length;
+                    return (
+                      <button
+                        key={filter}
+                        type="button"
+                        onClick={() => setActiveIssueFilter(filter)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                          activeIssueFilter === filter
+                            ? "bg-slate-900 text-white"
+                            : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {filter === "all" ? "all" : issueTypeLabel(filter as IssueType)} ({count})
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  key={filter}
                   type="button"
-                  onClick={() => setActiveFilter(filter)}
-                  className={`rounded-full px-3 py-1.5 text-sm ${
-                    activeFilter === filter
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
+                  onClick={() => goToIssue(-1)}
+                  disabled={!visibleIssues.length}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  {filter} ({count})
+                  Previous issue
                 </button>
-              );
-            })}
+                <button
+                  type="button"
+                  onClick={() => goToIssue(1)}
+                  disabled={!visibleIssues.length}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Next issue
+                </button>
+                <span className="text-xs text-slate-500">
+                  {visibleIssues.length
+                    ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}`
+                    : "No issues in this filter"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -867,10 +1095,14 @@ export default function TranslationReviewPage() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="grid border-b border-slate-200 bg-slate-50 px-8 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="pr-6">Source document</div>
+              <div className="pl-6">Final translated document</div>
+            </div>
             {!displayedNodes.length ? (
               <div className="p-8 text-slate-600">No document content in the current filter.</div>
             ) : (
-              <div className="h-[72vh] overflow-y-auto px-8 py-8">
+              <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
                 {displayedNodes.map((node) => {
                   const nodeSegments =
                     node.type === "bullet_list" ? node.blocks.flatMap((b) => b.segments) : node.block.segments;
@@ -885,8 +1117,10 @@ export default function TranslationReviewPage() {
                       }}
                     >
                       <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                        <div className="min-w-0 pr-2">{renderNode(node, "source")}</div>
-                        <div className="min-w-0 pl-2">{renderNode(node, "target")}</div>
+                        <div className="min-w-0 rounded-lg bg-white/80 p-2 pr-3">{renderNode(node, "source")}</div>
+                        <div className="min-w-0 rounded-lg bg-white p-2 pl-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)]">
+                          {renderNode(node, "target")}
+                        </div>
                       </div>
                     </div>
                   );
@@ -905,13 +1139,31 @@ export default function TranslationReviewPage() {
               <>
                 <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
                 <p className="mt-1 text-sm text-slate-500">Block {selectedBlock.block_index + 1}</p>
+                {selectedIssue && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${issueBadgeClass(selectedIssue.type)}`}
+                      >
+                        {issueTypeLabel(selectedIssue.type)}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {visibleIssues.length ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}` : "Issue"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-700">{selectedIssue.title}</p>
+                  </div>
+                )}
 
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="font-medium text-slate-900">Source</p>
                   <div className="mt-2 whitespace-pre-wrap text-slate-700">
                     {renderHighlightedText(
                       selectedSegment.source_text,
-                      buildHighlightRanges(selectedSegment, "source")
+                      buildHighlightRanges(selectedSegment, "source", selectedIssueKey),
+                      undefined,
+                      undefined,
+                      selectIssue
                     )}
                   </div>
                 </div>
@@ -957,9 +1209,10 @@ export default function TranslationReviewPage() {
                     <div className="mt-3 whitespace-pre-wrap text-slate-700">
                       {renderHighlightedText(
                         draftTranslation,
-                        buildHighlightRanges(selectedSegment, "target"),
+                        buildHighlightRanges(selectedSegment, "target", selectedIssueKey),
                         getTranslationWrapperProps(selectedSegment).className,
-                        getTranslationWrapperProps(selectedSegment).title
+                        getTranslationWrapperProps(selectedSegment).title,
+                        selectIssue
                       )}
                     </div>
                   )}
@@ -1005,10 +1258,11 @@ export default function TranslationReviewPage() {
                     </p>
                   )}
                   <p className="text-xs text-slate-500">
-                    Flagged queue position:{" "}
-                    {selectedFlaggedIndex === -1
-                      ? "not in queue"
-                      : `${selectedFlaggedIndex + 1} / ${flagged.length}`}
+                    {visibleIssues.length
+                      ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssues.length}`
+                      : selectedFlaggedIndex === -1
+                        ? "No open issues in current filter."
+                        : `Flagged queue position: ${selectedFlaggedIndex + 1} / ${flagged.length}`}
                   </p>
                 </div>
               </>
