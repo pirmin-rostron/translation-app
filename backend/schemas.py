@@ -219,6 +219,11 @@ class ReviewSummaryResponse(BaseModel):
     total_segments: int
     approved_segments: int
     edited_segments: int
+    safe_unresolved_segments: int
+    review_complete: bool
+    unresolved_count: int
+    unresolved_ambiguities: int
+    unresolved_semantic_reviews: int
     unresolved_segments: int
     ambiguity_count: int
     semantic_memory_review_count: int

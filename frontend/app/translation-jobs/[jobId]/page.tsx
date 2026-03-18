@@ -106,6 +106,11 @@ type ReviewSummary = {
   total_segments: number;
   approved_segments: number;
   edited_segments: number;
+  safe_unresolved_segments: number;
+  review_complete: boolean;
+  unresolved_count: number;
+  unresolved_ambiguities: number;
+  unresolved_semantic_reviews: number;
   unresolved_segments: number;
   ambiguity_count: number;
   semantic_memory_review_count: number;
@@ -453,7 +458,7 @@ export default function TranslationReviewPage() {
     setMessage("");
     setError("");
     try {
-      await saveResult(selectedSegment.id, draftTranslation, "reviewed");
+      await saveResult(selectedSegment.id, draftTranslation, "edited");
       setMessage("Draft saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");
@@ -526,7 +531,7 @@ export default function TranslationReviewPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/ready-for-export`, {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/mark-ready`, {
         method: "POST",
       });
       const payload = await res.json().catch(() => ({}));
@@ -535,6 +540,26 @@ export default function TranslationReviewPage() {
       setMessage("Marked as ready for export.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark ready for export");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleApproveAllSafeSegments() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/approve-safe-segments`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.detail || "Failed to approve safe segments");
+      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks()]);
+      setMessage("Approved all safe unresolved segments.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve safe segments");
     } finally {
       setActionLoading(false);
     }
@@ -566,7 +591,13 @@ export default function TranslationReviewPage() {
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
-  const unresolvedSegments = reviewSummary?.unresolved_segments ?? allSegments.length;
+  const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? allSegments.length;
+  const unresolvedAmbiguities =
+    reviewSummary?.unresolved_ambiguities ?? reviewSummary?.ambiguity_count ?? 0;
+  const unresolvedSemanticReviews =
+    reviewSummary?.unresolved_semantic_reviews ?? reviewSummary?.semantic_memory_review_count ?? 0;
+  const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
+  const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
   const workflowStatusLabel =
     workflowStatus === "exported"
@@ -576,13 +607,15 @@ export default function TranslationReviewPage() {
         : workflowStatus === "draft_saved"
           ? "Draft Saved"
           : "In Review";
-  const showSaveWorkflowDraft =
-    unresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
+  const showSaveWorkflowDraft = !reviewComplete && !["ready_for_export", "exported"].includes(workflowStatus);
   const showMarkReadyForExport =
-    unresolvedSegments === 0 &&
-    Boolean(reviewSummary?.can_mark_ready_for_export) &&
+    reviewComplete &&
     !["ready_for_export", "exported"].includes(workflowStatus);
   const showExportAction = workflowStatus === "ready_for_export";
+  const showApproveAllSafeSegments =
+    unresolvedSegments > 0 &&
+    safeUnresolvedSegments > 0 &&
+    !["ready_for_export", "exported"].includes(workflowStatus);
   const showDownloadLink = workflowStatus === "exported" && exportResult?.download_url;
 
   return (
@@ -613,14 +646,20 @@ export default function TranslationReviewPage() {
               <p className="mt-1 text-sm text-slate-600">
                 Approved: <span className="font-semibold text-slate-900">{reviewSummary?.approved_segments ?? 0}</span>{" "}
                 • Edited: <span className="font-semibold text-slate-900">{reviewSummary?.edited_segments ?? 0}</span> •
-                Unresolved: <span className="font-semibold text-slate-900">{reviewSummary?.unresolved_segments ?? 0}</span>
+                Unresolved: <span className="font-semibold text-slate-900">{unresolvedSegments}</span>
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Ambiguities: <span className="font-semibold text-slate-900">{reviewSummary?.ambiguity_count ?? 0}</span> •
+                Safe unresolved: <span className="font-semibold text-slate-900">{safeUnresolvedSegments}</span>
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> •
                 Semantic memory reviews:{" "}
                 <span className="font-semibold text-slate-900">
-                  {reviewSummary?.semantic_memory_review_count ?? 0}
+                  {unresolvedSemanticReviews}
                 </span>
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Progress: In Review → Draft Saved → Ready for Export → Exported
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 Last saved:{" "}
@@ -640,6 +679,16 @@ export default function TranslationReviewPage() {
                   className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                 >
                   Save draft
+                </button>
+              )}
+              {showApproveAllSafeSegments && (
+                <button
+                  type="button"
+                  onClick={handleApproveAllSafeSegments}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                >
+                  Approve all safe segments
                 </button>
               )}
               {showMarkReadyForExport && (
@@ -676,9 +725,9 @@ export default function TranslationReviewPage() {
           </div>
           <p className="mt-3 text-sm text-slate-600">
             {showSaveWorkflowDraft
-              ? "Review is still in progress. Save your draft while unresolved items remain."
+              ? `In Review: ${unresolvedSegments} unresolved segments remain. Next step: approve all safe segments or review flagged items.`
               : showMarkReadyForExport
-                ? "All required review items are resolved. Mark this job ready for export."
+                ? "All segments must be in approved/edited/memory_match with zero unresolved ambiguities and semantic reviews. Mark this job ready for export."
                 : showExportAction
                   ? "This job is finalized and ready to export."
                   : workflowStatus === "exported"
@@ -837,7 +886,7 @@ export default function TranslationReviewPage() {
                     disabled={actionLoading || !draftTranslation.trim()}
                     className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                   >
-                    Save draft
+                    Save segment edit
                   </button>
                   <p className="text-xs text-slate-500">
                     Flagged queue position:{" "}

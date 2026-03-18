@@ -221,7 +221,7 @@ def _has_review_signal(result: TranslationResult) -> bool:
 
 
 def _is_flagged_result(result: TranslationResult) -> bool:
-    if getattr(result, "review_status", "") == "approved":
+    if _is_acceptable_final_status(getattr(result, "review_status", "")):
         return False
     return _has_review_signal(result)
 
@@ -432,32 +432,42 @@ def _serialize_review_segment(
     )
 
 
+def _is_acceptable_final_status(review_status: str) -> bool:
+    # "reviewed" is kept as a backward-compatible alias for older saved data.
+    return review_status in {"approved", "edited", "memory_match", "reviewed"}
+
+
 def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummaryResponse:
     results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
     total_segments = len(results)
     approved_segments = sum(1 for result in results if result.review_status == "approved")
-    edited_segments = sum(
+    edited_segments = sum(1 for result in results if result.review_status == "edited")
+    unresolved_count = sum(1 for result in results if not _is_acceptable_final_status(result.review_status))
+    unresolved_ambiguities = sum(
         1
         for result in results
-        if (result.final_translation or "").strip() != (result.primary_translation or "").strip()
+        if bool(result.ambiguity_detected) and not _is_acceptable_final_status(result.review_status)
     )
-    unresolved_segments = total_segments - approved_segments
-    ambiguity_count = sum(
+    unresolved_semantic_reviews = sum(
         1
         for result in results
-        if bool(result.ambiguity_detected) and result.review_status != "approved"
+        if bool(result.semantic_memory_used) and not _is_acceptable_final_status(result.review_status)
     )
-    semantic_memory_review_count = sum(
+    safe_unresolved_segments = sum(
         1
         for result in results
-        if bool(result.semantic_memory_used) and result.review_status != "approved"
+        if not _is_acceptable_final_status(result.review_status)
+        and not bool(result.ambiguity_detected)
+        and not bool(result.semantic_memory_used)
+        and bool((result.final_translation or "").strip())
     )
-    can_mark_ready_for_export = (
+    review_complete = (
         total_segments > 0
-        and unresolved_segments == 0
-        and ambiguity_count == 0
-        and semantic_memory_review_count == 0
+        and unresolved_count == 0
+        and unresolved_ambiguities == 0
+        and unresolved_semantic_reviews == 0
     )
+    can_mark_ready_for_export = review_complete
     overall_status = (
         job.status if job.status in {"in_review", "draft_saved", "ready_for_export", "exported"} else "in_review"
     )
@@ -466,9 +476,14 @@ def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummary
         total_segments=total_segments,
         approved_segments=approved_segments,
         edited_segments=edited_segments,
-        unresolved_segments=unresolved_segments,
-        ambiguity_count=ambiguity_count,
-        semantic_memory_review_count=semantic_memory_review_count,
+        safe_unresolved_segments=safe_unresolved_segments,
+        review_complete=review_complete,
+        unresolved_count=unresolved_count,
+        unresolved_ambiguities=unresolved_ambiguities,
+        unresolved_semantic_reviews=unresolved_semantic_reviews,
+        unresolved_segments=unresolved_count,
+        ambiguity_count=unresolved_ambiguities,
+        semantic_memory_review_count=unresolved_semantic_reviews,
         overall_status=overall_status,
         last_saved_at=job.last_saved_at,
         can_mark_ready_for_export=can_mark_ready_for_export,
@@ -829,19 +844,19 @@ def list_translation_results(
     for r in results:
         if filter == "ambiguities" and not getattr(r, "ambiguity_detected", False):
             continue
-        if filter == "ambiguities" and getattr(r, "review_status", "") == "approved":
+        if filter == "ambiguities" and _is_acceptable_final_status(getattr(r, "review_status", "")):
             continue
         if filter == "semantic-memory" and not _is_semantic_memory_result(r):
             continue
-        if filter == "semantic-memory" and getattr(r, "review_status", "") == "approved":
+        if filter == "semantic-memory" and _is_acceptable_final_status(getattr(r, "review_status", "")):
             continue
         if filter == "glossary" and not getattr(r, "glossary_applied", False):
             continue
-        if filter == "glossary" and getattr(r, "review_status", "") == "approved":
+        if filter == "glossary" and _is_acceptable_final_status(getattr(r, "review_status", "")):
             continue
         if filter == "memory" and not _has_memory_signal(r):
             continue
-        if filter == "memory" and getattr(r, "review_status", "") == "approved":
+        if filter == "memory" and _is_acceptable_final_status(getattr(r, "review_status", "")):
             continue
         if filter == "flagged" and not _is_flagged_result(r):
             continue
@@ -952,6 +967,41 @@ def save_review_draft(job_id: int, db: Session = Depends(get_db)):
     return _calculate_review_summary(db, job)
 
 
+@router.post("/translation-jobs/{job_id}/approve-safe-segments", response_model=ReviewSummaryResponse)
+def approve_safe_segments(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == "exported":
+        raise HTTPException(status_code=400, detail="Cannot approve segments after export")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    changed = 0
+    for result in results:
+        if _is_acceptable_final_status(result.review_status):
+            continue
+        if bool(result.ambiguity_detected):
+            continue
+        if bool(result.semantic_memory_used):
+            continue
+        if not (result.final_translation or "").strip():
+            continue
+        result.review_status = "approved"
+        changed += 1
+
+    if changed > 0 and job.status not in {"ready_for_export", "exported"}:
+        job.status = "in_review"
+        doc.status = "in_review"
+
+    db.commit()
+    logger.info("Bulk approved safe segments for translation_job_id=%d count=%d", job.id, changed)
+    return _calculate_review_summary(db, job)
+
+
 @router.post("/translation-jobs/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
 def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
@@ -961,10 +1011,10 @@ def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Job is already exported")
 
     summary = _calculate_review_summary(db, job)
-    if not summary.can_mark_ready_for_export:
+    if not summary.review_complete:
         raise HTTPException(
             status_code=400,
-            detail="All review items must be approved before marking ready for export",
+            detail="All required review items must be resolved before marking ready for export",
         )
 
     doc = db.query(Document).filter(Document.id == job.document_id).first()
@@ -976,6 +1026,11 @@ def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
     return _calculate_review_summary(db, job)
+
+
+@router.post("/translation-jobs/{job_id}/mark-ready", response_model=ReviewSummaryResponse)
+def mark_ready_for_export_alias(job_id: int, db: Session = Depends(get_db)):
+    return mark_ready_for_export(job_id=job_id, db=db)
 
 
 @router.post("/translation-jobs/{job_id}/export", response_model=ExportResponse)
