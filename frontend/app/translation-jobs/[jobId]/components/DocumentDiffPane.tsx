@@ -23,6 +23,8 @@ type FilterChip = {
 type DocumentDiffPaneProps = {
   activeFilter: ReviewFilter;
   onFilterChange: (filter: ReviewFilter) => void;
+  showMarkup: boolean;
+  onToggleMarkup: () => void;
   reviewMode: ReviewMode;
   filterChips: FilterChip[];
   visibleIssuesLength: number;
@@ -36,6 +38,8 @@ type DocumentDiffPaneProps = {
 export function DocumentDiffPane({
   activeFilter,
   onFilterChange,
+  showMarkup,
+  onToggleMarkup,
   reviewMode,
   filterChips,
   visibleIssuesLength,
@@ -65,8 +69,21 @@ export function DocumentDiffPane({
               </button>
             ))}
           </div>
-          <div className="text-xs text-slate-500">
-            Default view: full side-by-side document. Use filters to narrow to issues.
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleMarkup}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                showMarkup
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              Markup: {showMarkup ? "Visible" : "Hidden"}
+            </button>
+            <div className="text-xs text-slate-500">
+              Default view: full side-by-side document. Use filters to narrow to issues.
+            </div>
           </div>
         </div>
 

@@ -107,6 +107,10 @@ type DocumentBlock = {
   block_index: number;
   block_type: "heading" | "paragraph" | "bullet_item";
   formatting_json: Record<string, unknown> | null;
+  source_text_raw?: string;
+  source_text_display?: string;
+  translated_text_raw?: string | null;
+  translated_text_display?: string | null;
   text_original: string;
   text_translated: string | null;
   segments: ReviewSegment[];
@@ -591,6 +595,7 @@ export default function TranslationReviewPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
+  const [showMarkup, setShowMarkup] = useState(false);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -1012,6 +1017,28 @@ export default function TranslationReviewPage() {
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
+    if (!showMarkup) {
+      const sourceDisplay = (block.source_text_display || "").trim() || cleanPanelText(block.text_original);
+      const translatedDisplay =
+        (block.translated_text_display || "").trim() ||
+        cleanPanelText(block.text_translated || block.translated_text_raw || "");
+      const text = side === "source" ? sourceDisplay : translatedDisplay;
+      const selected = selectedBlock?.id === block.id;
+      return (
+        <span
+          onClick={() => {
+            const defaultSegmentId = block.segments[0]?.id;
+            if (defaultSegmentId != null) {
+              selectBlockById(block.id, defaultSegmentId);
+            }
+          }}
+          className={`cursor-pointer rounded-md transition-colors ${selected ? "bg-slate-100/80" : "hover:bg-slate-100/70"}`}
+        >
+          {text}
+        </span>
+      );
+    }
+
     if (!block.segments.length) {
       return side === "source" ? block.text_original : (block.text_translated ?? "");
     }
@@ -1681,6 +1708,8 @@ export default function TranslationReviewPage() {
           <DocumentDiffPane
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
+            showMarkup={showMarkup}
+            onToggleMarkup={() => setShowMarkup((current) => !current)}
             reviewMode={reviewMode}
             filterChips={filterChips}
             visibleIssuesLength={visibleIssues.length}

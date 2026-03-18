@@ -1382,14 +1382,20 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
             )
             translated_parts.append(result.final_translation)
 
+        translated_text_raw = _compose_block_translation(block.block_type, translated_parts)
+        translated_text_display = _clean_export_translation(translated_text_raw) if translated_text_raw else None
         review_blocks.append(
             ReviewBlockResponse(
                 id=block.id,
                 document_id=block.document_id,
                 block_index=block.block_index,
                 block_type=block.block_type,
+                source_text_raw=block.text_original,
+                source_text_display=_clean_export_translation(block.text_original),
+                translated_text_raw=translated_text_raw,
+                translated_text_display=translated_text_display,
                 text_original=block.text_original,
-                text_translated=_compose_block_translation(block.block_type, translated_parts),
+                text_translated=translated_text_raw,
                 formatting_json=block.formatting_json,
                 segments=block_segments,
             )

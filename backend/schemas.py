@@ -222,6 +222,10 @@ class ReviewBlockResponse(BaseModel):
     document_id: int
     block_index: int
     block_type: str
+    source_text_raw: str
+    source_text_display: str
+    translated_text_raw: str | None
+    translated_text_display: str | None
     text_original: str
     text_translated: str | None
     formatting_json: dict | None
