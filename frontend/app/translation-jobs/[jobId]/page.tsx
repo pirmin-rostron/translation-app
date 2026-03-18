@@ -98,9 +98,8 @@ type DocumentNode =
   | { key: string; type: "block"; block: DocumentBlock }
   | { key: string; type: "bullet_list"; blocks: DocumentBlock[] };
 
-type ReviewFilter = "all" | "flagged" | "ambiguities" | "glossary" | "memory";
+type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
 type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
-type IssueFilter = "all" | IssueType;
 
 type HighlightRange = {
   start: number;
@@ -183,7 +182,7 @@ function isFlagged(segment: ReviewSegment) {
 
 function matchesFilter(segment: ReviewSegment, filter: ReviewFilter) {
   if (filter === "all") return true;
-  if (filter === "flagged") return isFlagged(segment);
+  if (filter === "issues") return isFlagged(segment);
   if (filter === "ambiguities") return segment.ambiguity_detected;
   if (filter === "glossary") return segment.glossary_applied;
   return hasMemory(segment);
@@ -375,7 +374,6 @@ export default function TranslationReviewPage() {
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
-  const [activeIssueFilter, setActiveIssueFilter] = useState<IssueFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
@@ -451,10 +449,13 @@ export default function TranslationReviewPage() {
     return map;
   }, [issues]);
   const issuesByKey = useMemo(() => new Map(issues.map((issue) => [issue.key, issue])), [issues]);
-  const visibleIssues = useMemo(
-    () => (activeIssueFilter === "all" ? issues : issues.filter((issue) => issue.type === activeIssueFilter)),
-    [activeIssueFilter, issues]
-  );
+  const visibleIssues = useMemo(() => {
+    if (activeFilter === "ambiguities") return issues.filter((issue) => issue.type === "ambiguity");
+    if (activeFilter === "glossary") return issues.filter((issue) => issue.type === "glossary");
+    if (activeFilter === "memory")
+      return issues.filter((issue) => issue.type === "exact_memory" || issue.type === "semantic_memory");
+    return issues;
+  }, [activeFilter, issues]);
   const currentIssueIndex = visibleIssues.findIndex((issue) => issue.key === selectedIssueKey);
   const selectedIssue = selectedIssueKey ? issuesByKey.get(selectedIssueKey) ?? null : null;
   const selectedEntry = useMemo(
@@ -519,6 +520,14 @@ export default function TranslationReviewPage() {
     const start = currentIssueIndex === -1 ? 0 : currentIssueIndex;
     const nextIndex = (start + step + visibleIssues.length) % visibleIssues.length;
     selectIssue(visibleIssues[nextIndex].key);
+  }
+
+  function handleReviewAmbiguities() {
+    setActiveFilter("ambiguities");
+    const firstAmbiguity = issues.find((issue) => issue.type === "ambiguity");
+    if (firstAmbiguity) {
+      selectIssue(firstAmbiguity.key);
+    }
   }
 
   async function loadReviewBlocks() {
@@ -901,6 +910,26 @@ export default function TranslationReviewPage() {
     safeUnresolvedSegments > 0 &&
     !["ready_for_export", "exported"].includes(workflowStatus);
   const showDownloadLink = workflowStatus === "exported" && exportResult?.download_url;
+  const guidanceTitle =
+    workflowStatus === "exported"
+      ? "Document exported"
+      : showExportAction
+        ? "Ready for export"
+        : showMarkReadyForExport
+          ? "All segments reviewed"
+          : unresolvedAmbiguities > 0
+            ? `${unresolvedAmbiguities} ambiguities require review`
+            : `Review in progress — ${unresolvedSegments} segments remaining`;
+  const guidanceDetail =
+    workflowStatus === "exported"
+      ? "Download the final file or re-open review if you need changes."
+      : showExportAction
+        ? "Export the finalized document."
+        : showMarkReadyForExport
+          ? "All required review items are resolved."
+          : unresolvedAmbiguities > 0
+            ? "Review ambiguity highlights first, then continue with remaining segments."
+            : "Approve safe segments first, then review any remaining flagged items.";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -942,8 +971,10 @@ export default function TranslationReviewPage() {
         <section className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Workflow</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Guidance</p>
               <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
+              <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
+              <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
               <p className="mt-1 text-sm text-slate-600">
                 Approved: <span className="font-semibold text-slate-900">{reviewSummary?.approved_segments ?? 0}</span>{" "}
                 • Edited: <span className="font-semibold text-slate-900">{reviewSummary?.edited_segments ?? 0}</span> •
@@ -972,6 +1003,16 @@ export default function TranslationReviewPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {unresolvedAmbiguities > 0 && !["ready_for_export", "exported"].includes(workflowStatus) && (
+                <button
+                  type="button"
+                  onClick={handleReviewAmbiguities}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-60"
+                >
+                  Review ambiguity
+                </button>
+              )}
               {showSaveWorkflowDraft && (
                 <button
                   type="button"
@@ -1035,15 +1076,20 @@ export default function TranslationReviewPage() {
             </div>
           </div>
           <p className="mt-3 text-sm text-slate-600">
-            {showSaveWorkflowDraft
-              ? `In Review: ${unresolvedSegments} unresolved segments remain. Next step: approve all safe segments or review flagged items.`
-              : showMarkReadyForExport
-                ? "All segments must be in approved/edited/memory_match with zero unresolved ambiguities and semantic reviews. Mark this job ready for export."
+            Next best action:{" "}
+            <span className="font-medium text-slate-800">
+              {workflowStatus === "exported"
+                ? "Download file or re-open review"
                 : showExportAction
-                  ? "This job is finalized and ready to export."
-                  : workflowStatus === "exported"
-                    ? `Export completed successfully${reviewSummary?.last_saved_at ? ` at ${new Date(reviewSummary.last_saved_at).toLocaleString()}` : ""}.`
-                    : "Continue reviewing translated segments."}
+                  ? "Export document"
+                  : showMarkReadyForExport
+                    ? "Mark ready for export"
+                    : unresolvedAmbiguities > 0
+                      ? "Review ambiguity"
+                      : showApproveAllSafeSegments
+                        ? "Approve all safe segments"
+                        : "Save draft and continue review"}
+            </span>
           </p>
           {showDownloadLink && (
             <a
@@ -1060,18 +1106,18 @@ export default function TranslationReviewPage() {
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {(["all", "flagged", "ambiguities", "glossary", "memory"] as ReviewFilter[]).map((filter) => {
+              {(["all", "issues", "ambiguities", "glossary", "memory"] as ReviewFilter[]).map((filter) => {
                 const count =
                   filter === "all"
                     ? allSegments.length
-                    : filter === "flagged"
+                    : filter === "issues"
                       ? flagged.length
                       : allSegments.filter(({ segment }) => matchesFilter(segment, filter)).length;
                 const filterLabel =
                   filter === "all"
                     ? "All Content"
-                    : filter === "flagged"
-                      ? "Flagged only"
+                    : filter === "issues"
+                      ? "Issues"
                       : filter === "ambiguities"
                         ? "Ambiguities"
                         : filter === "glossary"
@@ -1099,29 +1145,9 @@ export default function TranslationReviewPage() {
           </div>
           <div className="mt-4 border-t border-slate-200 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issues</span>
-                {(["all", "ambiguity", "glossary", "exact_memory", "semantic_memory"] as IssueFilter[]).map(
-                  (filter) => {
-                    const count =
-                      filter === "all" ? issues.length : issues.filter((issue) => issue.type === filter).length;
-                    return (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => setActiveIssueFilter(filter)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                          activeIssueFilter === filter
-                            ? "bg-slate-900 text-white"
-                            : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        {filter === "all" ? "all" : issueTypeLabel(filter as IssueType)} ({count})
-                      </button>
-                    );
-                  }
-                )}
-              </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Issue navigation
+              </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1142,10 +1168,15 @@ export default function TranslationReviewPage() {
                 <span className="text-xs text-slate-500">
                   {visibleIssues.length
                     ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}`
-                    : "No issues in this filter"}
+                    : "No issues found — you're all good here"}
                 </span>
               </div>
             </div>
+            {!visibleIssues.length && (
+              <p className="mt-2 text-xs text-slate-500">
+                Try <span className="font-medium">All Content</span> to continue full document review.
+              </p>
+            )}
           </div>
         </div>
 
@@ -1159,7 +1190,9 @@ export default function TranslationReviewPage() {
               <div className="pl-6">Final translated document</div>
             </div>
             {!displayedNodes.length ? (
-              <div className="p-8 text-slate-600">No document content in the current filter.</div>
+              <div className="p-8 text-slate-600">
+                No issues found — you're all good here. Try switching back to All Content for full document context.
+              </div>
             ) : (
               <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
                 {displayedNodes.map((node) => {
