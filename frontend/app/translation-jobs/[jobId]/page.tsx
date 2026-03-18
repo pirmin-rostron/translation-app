@@ -163,6 +163,7 @@ type ExportResult = {
 };
 
 type ExportMode = "clean_text" | "preserve_formatting";
+type ExportFormat = "txt";
 
 type ExportFile = {
   filename: string;
@@ -512,6 +513,7 @@ export default function TranslationReviewPage() {
   const [exportHistory, setExportHistory] = useState<ExportFile[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>("clean_text");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -1278,26 +1280,34 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleExportFinalDocument(selectedMode: ExportMode) {
+  function triggerExportDownload(payload: ExportResult) {
+    if (!payload.download_url) return;
+    const url = `${API_URL}${payload.download_url}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleExportFinalDocument(selectedMode: ExportMode, selectedFormat: ExportFormat) {
     if (!job) return;
     setActionLoading(true);
     setError("");
     setMessage("");
     try {
       const res = await fetch(
-        `${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt&export_mode=${selectedMode}`,
+        `${API_URL}/api/translation-jobs/${job.id}/export?export_format=${selectedFormat}&export_mode=${selectedMode}`,
         {
           method: "POST",
         }
       );
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to export document");
-      setExportResult(payload as ExportResult);
+      const exportPayload = payload as ExportResult;
+      setExportResult(exportPayload);
+      triggerExportDownload(exportPayload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage(
         selectedMode === "preserve_formatting"
-          ? "Export completed with preserved formatting."
-          : "Export completed as clean text."
+          ? "Export completed with preserved formatting. Your file is downloading."
+          : "Export completed as clean text. Your file is downloading."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
@@ -1311,6 +1321,7 @@ export default function TranslationReviewPage() {
       (block) =>
         block.block_type !== "paragraph" || (block.formatting_json && Object.keys(block.formatting_json).length > 0)
     );
+    setExportFormat("txt");
     setExportMode(hasFormattingSignals ? "preserve_formatting" : "clean_text");
     setShowExportModal(true);
   }
@@ -1318,9 +1329,10 @@ export default function TranslationReviewPage() {
   async function handleExportDocumentWorkflow() {
     if (!job) return;
     const selectedMode = exportMode;
+    const selectedFormat = exportFormat;
     setShowExportModal(false);
     if (workflowStatus === "ready_for_export") {
-      await handleExportFinalDocument(selectedMode);
+      await handleExportFinalDocument(selectedMode, selectedFormat);
       return;
     }
     if (!reviewComplete) {
@@ -1337,16 +1349,18 @@ export default function TranslationReviewPage() {
       const readyPayload = await markReady.json().catch(() => ({}));
       if (!markReady.ok) throw new Error(readyPayload.detail || "Failed to mark ready for export");
 
-      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt&export_mode=${selectedMode}`;
+      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?export_format=${selectedFormat}&export_mode=${selectedMode}`;
       const exportRes2 = await fetch(exportUrl, { method: "POST" });
       const exportPayload = await exportRes2.json().catch(() => ({}));
       if (!exportRes2.ok) throw new Error(exportPayload.detail || "Failed to export document");
-      setExportResult(exportPayload as ExportResult);
+      const payload = exportPayload as ExportResult;
+      setExportResult(payload);
+      triggerExportDownload(payload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage(
         selectedMode === "preserve_formatting"
-          ? "Document finalized and exported with preserved formatting."
-          : "Document finalized and exported as clean text."
+          ? "Document finalized and exported with preserved formatting. Your file is downloading."
+          : "Document finalized and exported as clean text. Your file is downloading."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
@@ -1444,7 +1458,8 @@ export default function TranslationReviewPage() {
   const showReviewSafeSegments =
     safeUnresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
   const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
-  const showDownloadLink = workflowStatus === "exported" && Boolean((latestExport ?? exportResult)?.download_url);
+  const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
+  const lastExportMode = exportResult?.export_mode ?? null;
   const guidanceTitle =
     workflowStatus === "exported"
       ? "Document exported"
@@ -1457,7 +1472,7 @@ export default function TranslationReviewPage() {
             : `Review in progress — ${unresolvedSegments} segments remaining`;
   const guidanceDetail =
     workflowStatus === "exported"
-      ? "Download the final file or re-open review if you need changes."
+      ? "Export again to download a file with your chosen formatting settings."
       : showExportAction
         ? "This document is ready for export."
         : reviewComplete
@@ -1558,6 +1573,23 @@ export default function TranslationReviewPage() {
                     : "Not saved yet"}
                 </span>
               </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Last export:{" "}
+                <span className="font-medium text-slate-900">
+                  {lastExportTimestamp ? new Date(lastExportTimestamp).toLocaleString() : "No export yet"}
+                </span>
+                {" • "}
+                Format: <span className="font-medium text-slate-900">TXT</span>
+                {" • "}
+                Formatting mode:{" "}
+                <span className="font-medium text-slate-900">
+                  {lastExportMode === "preserve_formatting"
+                    ? "Preserve original formatting"
+                    : lastExportMode === "clean_text"
+                      ? "Clean text only"
+                      : "Not available"}
+                </span>
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               {unresolvedAmbiguities > 0 && !["ready_for_export", "exported"].includes(workflowStatus) && (
@@ -1613,6 +1645,16 @@ export default function TranslationReviewPage() {
                   Export document
                 </button>
               )}
+              {workflowStatus === "exported" && (
+                <button
+                  type="button"
+                  onClick={handleOpenExportModal}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
+                >
+                  Export / download again
+                </button>
+              )}
               {isReadOnly && (
                 <button
                   type="button"
@@ -1639,7 +1681,7 @@ export default function TranslationReviewPage() {
             Next best action:{" "}
             <span className="font-medium text-slate-800">
               {workflowStatus === "exported"
-                ? "Download file or re-open review"
+                ? "Export / download again"
                 : showExportAction
                   ? "Export document"
                   : segmentsRequiringAttention > 0
@@ -1649,33 +1691,14 @@ export default function TranslationReviewPage() {
                         : "Save draft and continue review"}
             </span>
           </p>
-          {showDownloadLink && (
-            <a
-              href={`${API_URL}${(latestExport?.download_url ?? exportResult?.download_url) || ""}`}
-              className="mt-2 inline-block text-sm font-medium text-indigo-700 underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Download latest export
-            </a>
-          )}
           {exportHistory.length > 1 && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous exports</p>
               <ul className="mt-2 space-y-1 text-sm">
                 {exportHistory.slice(1).map((entry) => (
                   <li key={entry.filename} className="flex items-center justify-between gap-3">
-                    <span className="text-slate-600">
-                      v{entry.version} • {new Date(entry.generated_at).toLocaleString()}
-                    </span>
-                    <a
-                      href={`${API_URL}${entry.download_url}`}
-                      className="font-medium text-indigo-700 underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download
-                    </a>
+                    <span className="text-slate-600">v{entry.version} • {new Date(entry.generated_at).toLocaleString()}</span>
+                    <span className="text-xs text-slate-500">Use Export / download again to choose options.</span>
                   </li>
                 ))}
               </ul>
@@ -2168,9 +2191,31 @@ export default function TranslationReviewPage() {
             <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
               <h3 className="text-lg font-semibold text-slate-900">Export settings</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Choose how formatting should be handled for the exported reviewed document.
+                Choose export options for this download.
               </p>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Export format</p>
+                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="export-format"
+                        value="txt"
+                        checked={exportFormat === "txt"}
+                        onChange={() => setExportFormat("txt")}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">TXT (plain text)</p>
+                        <p className="mt-1 text-xs text-slate-600">Simple text export for reviewed content.</p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formatting mode</p>
+                </div>
                 <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
                   <div className="flex items-start gap-2">
                     <input
@@ -2207,6 +2252,16 @@ export default function TranslationReviewPage() {
                     </div>
                   </div>
                 </label>
+                {lastExportTimestamp && (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    Last export: {new Date(lastExportTimestamp).toLocaleString()} • Format: TXT • Last mode:{" "}
+                    {lastExportMode === "preserve_formatting"
+                      ? "Preserve original formatting"
+                      : lastExportMode === "clean_text"
+                        ? "Clean text only"
+                        : "Not available"}
+                  </p>
+                )}
               </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button
