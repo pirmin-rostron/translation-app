@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const INTRO_UPLOAD_MS = 1500;
+const INTRO_PARSE_MS = 1500;
+const INTRO_TOTAL_MS = INTRO_UPLOAD_MS + INTRO_PARSE_MS;
 
 type DocumentRecord = {
   id: number;
@@ -58,6 +61,7 @@ export default function ProcessingPage() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [introPhase, setIntroPhase] = useState<"idle" | "upload" | "parse" | "done">("idle");
+  const [introStartTime, setIntroStartTime] = useState<number | null>(null);
   const introPlayedRef = useRef(false);
 
   const latestJob = jobs[0] ?? null;
@@ -174,23 +178,35 @@ export default function ProcessingPage() {
   useEffect(() => {
     introPlayedRef.current = false;
     setIntroPhase("idle");
+    setIntroStartTime(null);
   }, [documentId]);
 
   useEffect(() => {
-    if (shouldRunIntro) {
+    if (hasFailure && introStartTime !== null) {
+      // Failures always break out of intro immediately.
+      setIntroStartTime(null);
+      setIntroPhase("done");
+      return;
+    }
+    if (shouldRunIntro && introStartTime === null && introPhase === "idle") {
       introPlayedRef.current = true;
+      setIntroStartTime(Date.now());
       setIntroPhase("upload");
-      const parseTimer = window.setTimeout(() => setIntroPhase("parse"), 1000);
-      const doneTimer = window.setTimeout(() => setIntroPhase("done"), 2000);
-      return () => {
-        window.clearTimeout(parseTimer);
-        window.clearTimeout(doneTimer);
-      };
     }
-    if (introPlayedRef.current) {
-      setIntroPhase((prev) => (prev === "done" ? prev : "done"));
-    }
-  }, [shouldRunIntro]);
+  }, [hasFailure, introPhase, introStartTime, shouldRunIntro]);
+
+  useEffect(() => {
+    if (introStartTime === null) return;
+    const parseTimer = window.setTimeout(() => setIntroPhase("parse"), INTRO_UPLOAD_MS);
+    const doneTimer = window.setTimeout(() => {
+      setIntroPhase("done");
+      setIntroStartTime(null);
+    }, INTRO_TOTAL_MS);
+    return () => {
+      window.clearTimeout(parseTimer);
+      window.clearTimeout(doneTimer);
+    };
+  }, [introStartTime]);
 
   const parseProgressValue = parsingDone ? 100 : docProgress?.is_active ? Math.max(0, Math.min(100, docProgress.percentage)) : 0;
   const translationProgressValue = translationDone
@@ -209,7 +225,7 @@ export default function ProcessingPage() {
   else if (translationStarted) currentStep = 2;
   else if (docProgress?.is_active || parsingDone) currentStep = 1;
 
-  const introActive = introPhase === "upload" || introPhase === "parse";
+  const introActive = introStartTime !== null && (introPhase === "upload" || introPhase === "parse");
   const introSteps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
     {
       title: "Upload",
