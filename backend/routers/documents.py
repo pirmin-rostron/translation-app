@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import Document, DocumentBlock, DocumentSegment, ProcessingStageJob, SegmentAnnotation
+from models import Document, DocumentBlock, DocumentSegment, ProcessingStageJob, SegmentAnnotation, TranslationJob
 from schemas import (
     DocumentProgressResponse,
     DocumentBlockResponse,
@@ -35,6 +35,11 @@ FAILED_STATUS = "failed"
 PARSED_STATUS = "parsed"
 SEGMENTED_STATUS = "segmented"  # backward-compatible legacy status
 PARSING_STATUS = "parsing"
+
+
+class _ImmediateBackgroundTasks:
+    def add_task(self, func, *args, **kwargs):
+        func(*args, **kwargs)
 
 
 def _queue_stage_job(
@@ -111,6 +116,58 @@ def _run_document_pipeline(document_id: int):
                 db.commit()
                 logger.exception("Stage failure: stage=%s document_id=%d", stage_job.stage_name, document_id)
                 return
+    finally:
+        db.close()
+
+
+def _run_default_upload_to_review_pipeline(document_id: int):
+    """Happy-path orchestration: parse document, then create and execute translation job."""
+    db = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            return
+
+        immediate_tasks = _ImmediateBackgroundTasks()
+        if doc.status in {"uploaded", "failed"}:
+            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db)
+            db.expire_all()
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if not doc:
+                return
+
+        if doc.status == FAILED_STATUS:
+            logger.warning("Auto pipeline stopped after parse failure for document_id=%d", document_id)
+            return
+
+        active_or_completed_job = (
+            db.query(TranslationJob)
+            .filter(TranslationJob.document_id == document_id)
+            .filter(
+                TranslationJob.status.in_(
+                    [
+                        "translation_queued",
+                        "translating",
+                        "translated",
+                        "in_review",
+                        "draft_saved",
+                        "ready_for_export",
+                        "exported",
+                    ]
+                )
+            )
+            .first()
+        )
+        if active_or_completed_job:
+            return
+
+        if doc.status in {PARSED_STATUS, SEGMENTED_STATUS}:
+            # Import lazily to avoid circular import at module load time.
+            from routers.translation_jobs import create_translation_job
+
+            create_translation_job(document_id=document_id, background_tasks=immediate_tasks, db=db)
+    except Exception:
+        logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
     finally:
         db.close()
 
@@ -372,6 +429,29 @@ def upload_document(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+    return doc
+
+
+@router.post("/upload-and-translate", response_model=DocumentResponse)
+def upload_and_translate_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    target_language: str = Form(..., min_length=1, max_length=50),
+    industry: str | None = Form(None, max_length=100),
+    domain: str | None = Form(None, max_length=100),
+    customer_id: str | None = Form(None, max_length=100),
+    db: Session = Depends(get_db),
+):
+    """Upload document and automatically run parse + translation for the default flow."""
+    doc = upload_document(
+        file=file,
+        target_language=target_language,
+        industry=industry,
+        domain=domain,
+        customer_id=customer_id,
+        db=db,
+    )
+    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id)
     return doc
 
 

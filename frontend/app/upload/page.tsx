@@ -37,7 +37,6 @@ export default function UploadPage() {
   const [industry, setIndustry] = useState("");
   const [domain, setDomain] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const isValidFile = (f: File) => {
@@ -83,7 +82,7 @@ export default function UploadPage() {
       if (industry.trim()) formData.append("industry", industry.trim());
       if (domain.trim()) formData.append("domain", domain.trim());
 
-      const res = await fetch(`${API_URL}/api/documents/upload`, {
+      const res = await fetch(`${API_URL}/api/documents/upload-and-translate`, {
         method: "POST",
         body: formData,
       });
@@ -92,12 +91,8 @@ export default function UploadPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `Upload failed (${res.status})`);
       }
-      setSuccess(true);
-      setFile(null);
-      setTargetLanguage("");
-      setIndustry("");
-      setDomain("");
-      (e.target as HTMLFormElement).reset();
+      const created = await res.json();
+      router.push(`/processing/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -111,6 +106,9 @@ export default function UploadPage() {
         <h1 className="text-2xl font-bold text-slate-900 mb-6">
           Upload Document
         </h1>
+        <p className="mb-4 text-sm text-slate-600">
+          Upload once and start translation immediately. We will parse, translate, and open review automatically.
+        </p>
         <form
           onSubmit={handleSubmit}
           className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm space-y-4"
@@ -194,18 +192,13 @@ export default function UploadPage() {
           {error && (
             <p className="text-red-600 text-sm">{error}</p>
           )}
-          {success && (
-            <p className="text-green-600 text-sm font-medium">
-              Document uploaded successfully!
-            </p>
-          )}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
               disabled={loading}
               className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Uploading…" : "Upload"}
+              {loading ? "Starting translation…" : "Translate document"}
             </button>
             <button
               type="button"
