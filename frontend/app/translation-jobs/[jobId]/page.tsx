@@ -100,6 +100,7 @@ type DocumentNode =
 
 type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
 type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
+type ReviewMode = "document" | "issues";
 
 type HighlightRange = {
   start: number;
@@ -387,6 +388,7 @@ export default function TranslationReviewPage() {
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
@@ -544,6 +546,7 @@ export default function TranslationReviewPage() {
   function selectIssue(issueKey: string) {
     const issue = issuesByKey.get(issueKey);
     if (!issue) return;
+    setReviewMode("issues");
     setSelectedIssueKey(issueKey);
     setSelectedId(issue.segmentId);
     setMessage("");
@@ -587,6 +590,7 @@ export default function TranslationReviewPage() {
   }
 
   function handleReviewAmbiguities() {
+    setReviewMode("issues");
     setActiveFilter("ambiguities");
     const firstAmbiguity = issues.find((issue) => issue.type === "ambiguity");
     if (firstAmbiguity) {
@@ -595,6 +599,7 @@ export default function TranslationReviewPage() {
   }
 
   function handleReviewSafeSegments() {
+    setReviewMode("document");
     setActiveFilter("all");
     if (!safeSegments.length) return;
     setSelectedIssueKey(null);
@@ -611,6 +616,23 @@ export default function TranslationReviewPage() {
     setSelectedId(safeSegments[nextIndex].segment.id);
     setMessage("");
     setError("");
+  }
+
+  function switchToDocumentMode() {
+    setReviewMode("document");
+    if (activeFilter === "issues") {
+      setActiveFilter("all");
+    }
+  }
+
+  function switchToIssuesMode() {
+    setReviewMode("issues");
+    if (activeFilter === "all") {
+      setActiveFilter("issues");
+    }
+    if (!selectedIssueKey && visibleIssues.length > 0) {
+      selectIssue(visibleIssues[0].key);
+    }
   }
 
   async function loadReviewBlocks() {
@@ -1078,6 +1100,30 @@ export default function TranslationReviewPage() {
           </p>
           <p className="mt-2 text-sm text-slate-600">Follow the workflow below to save, finalize, and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
+          <div className="mt-4 inline-flex rounded-lg border border-slate-300 bg-white p-1">
+            <button
+              type="button"
+              onClick={switchToDocumentMode}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                reviewMode === "document"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              Full Document
+            </button>
+            <button
+              type="button"
+              onClick={switchToIssuesMode}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                reviewMode === "issues"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              Issues Only
+            </button>
+          </div>
         </div>
 
         {translationProgress && !translationProgress.is_complete && (
@@ -1283,41 +1329,47 @@ export default function TranslationReviewPage() {
               Default view: full side-by-side document. Use filters to narrow to issues.
             </div>
           </div>
-          <div className="mt-4 border-t border-slate-200 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Issue navigation
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => goToIssue(-1)}
-                  disabled={!visibleIssues.length}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Previous issue
-                </button>
-                <button
-                  type="button"
-                  onClick={() => goToIssue(1)}
-                  disabled={!visibleIssues.length}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Next issue
-                </button>
-                <span className="text-xs text-slate-500">
-                  {visibleIssues.length
-                    ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}`
-                    : "No issues found — you're all good here"}
+          {reviewMode === "issues" ? (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Issue navigation
                 </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToIssue(-1)}
+                    disabled={!visibleIssues.length}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Previous issue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToIssue(1)}
+                    disabled={!visibleIssues.length}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Next issue
+                  </button>
+                  <span className="text-xs text-slate-500">
+                    {visibleIssues.length
+                      ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssues.length}`
+                      : "No issues found — you're all good here"}
+                  </span>
+                </div>
               </div>
+              {!visibleIssues.length && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Try <span className="font-medium">All Content</span> to continue full document review.
+                </p>
+              )}
             </div>
-            {!visibleIssues.length && (
-              <p className="mt-2 text-xs text-slate-500">
-                Try <span className="font-medium">All Content</span> to continue full document review.
-              </p>
-            )}
-          </div>
+          ) : (
+            <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500">
+              Issue navigation is available in <span className="font-medium">Issues Only</span> mode.
+            </div>
+          )}
         </div>
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
@@ -1370,27 +1422,39 @@ export default function TranslationReviewPage() {
             ) : (
               <>
                 <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocks.length}
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePreviousBlock}
-                    disabled={selectedBlockPosition <= 0}
-                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Previous block
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextBlock}
-                    disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
-                    className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Next block
-                  </button>
-                </div>
+                {reviewMode === "document" ? (
+                  <>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocks.length}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handlePreviousBlock}
+                        disabled={selectedBlockPosition <= 0}
+                        className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Previous block
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextBlock}
+                        disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
+                        className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Next block
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {visibleIssues.length
+                      ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssues.length}${
+                          selectedIssue ? ` (${issueTypeLabel(selectedIssue.type)} • Block ${selectedBlock.block_index + 1})` : ""
+                        }`
+                      : "No issue selected"}
+                  </p>
+                )}
                 {selectedSegmentIsSafe && (
                   <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
                     <span className="inline-flex rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-medium text-emerald-800">
