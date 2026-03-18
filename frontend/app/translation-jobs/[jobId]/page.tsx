@@ -1282,6 +1282,22 @@ export default function TranslationReviewPage() {
     }
   }
 
+  async function handleStartHereAction() {
+    if (workflowStatus === "exported" || showExportAction) {
+      handleOpenExportModal();
+      return;
+    }
+    if (segmentsRequiringAttention > 0) {
+      switchToIssuesMode();
+      return;
+    }
+    if (showApproveAllSafeSegments) {
+      await handleApproveAllSafeSegments();
+      return;
+    }
+    switchToDocumentMode();
+  }
+
   function triggerExportDownload(payload: ExportResult) {
     if (!payload.download_url) return;
     const url = `${API_URL}${payload.download_url}`;
@@ -1459,6 +1475,8 @@ export default function TranslationReviewPage() {
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
+  const totalBlocks = orderedBlocks.length;
+  const flaggedIssuesCount = flagged.length;
   const guidanceTitle =
     workflowStatus === "exported"
       ? "Document exported"
@@ -1479,6 +1497,16 @@ export default function TranslationReviewPage() {
           : segmentsRequiringAttention > 0
             ? "Review flagged items next to finish the document review."
             : "Approve safe segments first, then review any remaining flagged items.";
+  const startHereActionLabel =
+    workflowStatus === "exported"
+      ? "Export / download again"
+      : showExportAction
+        ? "Export document"
+        : segmentsRequiringAttention > 0
+          ? "Review flagged items"
+          : showApproveAllSafeSegments
+            ? `Approve ${safeUnresolvedSegments} safe ${safeUnresolvedSegments === 1 ? "segment" : "segments"}`
+            : "Review Block 1";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1548,19 +1576,40 @@ export default function TranslationReviewPage() {
               <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
               <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
               <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
-              <p className="mt-1 text-sm text-slate-600">
-                <span className="font-semibold text-slate-900">{totalSegments}</span> total segments
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                <span className="font-semibold text-slate-900">{safeUnresolvedSegments}</span> safe to approve
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                <span className="font-semibold text-slate-900">{segmentsRequiringAttention}</span> require attention
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Blocks</p>
+                  <p className="font-semibold text-slate-900">{totalBlocks}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Segments</p>
+                  <p className="font-semibold text-slate-900">{totalSegments}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Safe</p>
+                  <p className="font-semibold text-slate-900">{safeUnresolvedSegments}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Flagged issues</p>
+                  <p className="font-semibold text-slate-900">{flaggedIssuesCount}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Unresolved</p>
+                  <p className="font-semibold text-slate-900">{unresolvedSegments}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Needs attention</p>
+                  <p className="font-semibold text-slate-900">{segmentsRequiringAttention}</p>
+                </div>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
                 Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span> • Semantic
                 memory reviews: <span className="font-semibold text-slate-900">{unresolvedSemanticReviews}</span>
               </p>
+              <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Start here</p>
+                <p className="mt-1 text-sm text-slate-700">{startHereActionLabel}</p>
+              </div>
               <p className="mt-1 text-sm text-slate-600">
                 Progress: In Review → Draft Saved → Ready for Export → Exported
               </p>
@@ -1591,6 +1640,14 @@ export default function TranslationReviewPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleStartHereAction}
+                disabled={actionLoading}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+              >
+                Start here
+              </button>
               {unresolvedAmbiguities > 0 && !["ready_for_export", "exported"].includes(workflowStatus) && (
                 <button
                   type="button"
@@ -1679,15 +1736,7 @@ export default function TranslationReviewPage() {
           <p className="mt-3 text-sm text-slate-600">
             Next best action:{" "}
             <span className="font-medium text-slate-800">
-              {workflowStatus === "exported"
-                ? "Export / download again"
-                : showExportAction
-                  ? "Export document"
-                  : segmentsRequiringAttention > 0
-                      ? "Review issues"
-                      : showApproveAllSafeSegments
-                        ? "Approve all safe segments"
-                        : "Save draft and continue review"}
+              {startHereActionLabel}
             </span>
           </p>
           {exportHistory.length > 1 && (
@@ -1964,22 +2013,9 @@ export default function TranslationReviewPage() {
                 )}
 
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="font-medium text-slate-900">Source</p>
-                  <div className="mt-2 whitespace-pre-wrap text-slate-700">
-                    {renderHighlightedText(
-                      selectedSegment.source_text,
-                      buildHighlightRanges(selectedSegment, "source", selectedIssueKey),
-                      undefined,
-                      undefined,
-                      selectIssue
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900">Final translation</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-slate-900">Decision status</p>
                       {selectedSegmentStatus === "approved" && (
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                           Approved
@@ -1995,36 +2031,37 @@ export default function TranslationReviewPage() {
                           Accepted from memory
                         </span>
                       )}
+                      {selectedSegmentStatus === "unreviewed" && (
+                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                          Needs review
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
                       disabled={!canEditSelectedSegment}
                       onClick={() => setIsEditing((v) => !v)}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {isReadOnly ? "Read only" : isEditing ? "Cancel edit" : "Edit again"}
+                      {isReadOnly ? "Read only" : isEditing ? "Cancel edit" : "Edit translation"}
                     </button>
                   </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    Full source and translated context stays in the side-by-side document view.
+                  </p>
+                </div>
 
-                  {isEditing && canEditSelectedSegment ? (
+                {isEditing && canEditSelectedSegment && (
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit selected translation</p>
                     <textarea
                       value={draftTranslation}
                       onChange={(e) => setDraftTranslation(e.target.value)}
-                      rows={8}
-                      className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                      rows={6}
+                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
                     />
-                  ) : (
-                    <div className="mt-3 whitespace-pre-wrap text-slate-700">
-                      {renderHighlightedText(
-                        draftTranslation,
-                        buildHighlightRanges(selectedSegment, "target", selectedIssueKey),
-                        getTranslationWrapperProps(selectedSegment).className,
-                        getTranslationWrapperProps(selectedSegment).title,
-                        selectIssue
-                      )}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {glossaryMatches.length > 0 && (
                   <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm">
