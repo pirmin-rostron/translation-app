@@ -70,9 +70,11 @@ def _migrate_schema():
 
     if "translation_jobs" in table_names:
         job_columns = {column["name"] for column in inspector.get_columns("translation_jobs")}
-        if "error_message" not in job_columns:
-            with engine.begin() as conn:
+        with engine.begin() as conn:
+            if "error_message" not in job_columns:
                 conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN error_message TEXT"))
+            if "last_saved_at" not in job_columns:
+                conn.execute(text("ALTER TABLE translation_jobs ADD COLUMN last_saved_at TIMESTAMP"))
 
     if "processing_stage_jobs" not in table_names:
         with engine.begin() as conn:

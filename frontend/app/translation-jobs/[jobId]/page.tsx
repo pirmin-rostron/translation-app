@@ -14,6 +14,7 @@ type TranslationJob = {
   target_language: string;
   status: string;
   error_message: string | null;
+  last_saved_at: string | null;
   translation_provider: string | null;
   created_at: string;
 };
@@ -98,6 +99,27 @@ type HighlightRange = {
   end: number;
   className: string;
   title: string;
+};
+
+type ReviewSummary = {
+  job_id: number;
+  total_segments: number;
+  approved_segments: number;
+  edited_segments: number;
+  unresolved_segments: number;
+  ambiguity_count: number;
+  semantic_memory_review_count: number;
+  overall_status: string;
+  last_saved_at: string | null;
+  can_mark_ready_for_export: boolean;
+};
+
+type ExportResult = {
+  job_id: number;
+  status: string;
+  export_format: string;
+  filename: string;
+  download_url: string;
 };
 
 function hasMemory(segment: ReviewSegment) {
@@ -235,6 +257,8 @@ export default function TranslationReviewPage() {
   const [job, setJob] = useState<TranslationJob | null>(null);
   const [doc, setDoc] = useState<DocumentMeta | null>(null);
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("flagged");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
@@ -312,6 +336,15 @@ export default function TranslationReviewPage() {
     return payload as TranslationJob;
   }
 
+  async function loadReviewSummary() {
+    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/review-summary`).then(async (res) => {
+      if (!res.ok) throw new Error("Failed to load review summary");
+      return res.json();
+    });
+    setReviewSummary(payload);
+    return payload as ReviewSummary;
+  }
+
   useEffect(() => {
     if (Number.isNaN(jobId)) {
       setError("Invalid job ID");
@@ -319,7 +352,7 @@ export default function TranslationReviewPage() {
       return;
     }
 
-    Promise.all([loadJobMeta(), loadReviewBlocks()])
+    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary()])
       .then(async ([loadedJob]) => {
         const docRes = await fetch(`${API_URL}/api/documents/${loadedJob.document_id}`);
         if (!docRes.ok) return null;
@@ -336,6 +369,7 @@ export default function TranslationReviewPage() {
     const timer = window.setInterval(() => {
       void loadJobMeta();
       void loadReviewBlocks();
+      void loadReviewSummary();
     }, 2500);
     return () => window.clearInterval(timer);
   }, [job?.status]);
@@ -348,7 +382,7 @@ export default function TranslationReviewPage() {
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.detail || "Failed to save translation result");
-    await loadReviewBlocks();
+    await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta()]);
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
@@ -413,7 +447,7 @@ export default function TranslationReviewPage() {
     return <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>;
   }
 
-  async function handleSaveDraft() {
+  async function handleSaveSegmentDraft() {
     if (!selectedSegment) return;
     setActionLoading(true);
     setMessage("");
@@ -466,11 +500,90 @@ export default function TranslationReviewPage() {
     }
   }
 
+  async function handleSaveWorkflowDraft() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/save-draft`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.detail || "Failed to save workflow draft");
+      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      setMessage("Review workflow draft saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save workflow draft");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleMarkReadyForExport() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/ready-for-export`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.detail || "Failed to mark ready for export");
+      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      setMessage("Marked as ready for export.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to mark ready for export");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleExportFinalDocument() {
+    if (!job) return;
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.detail || "Failed to export document");
+      setExportResult(payload as ExportResult);
+      await Promise.all([loadJobMeta(), loadReviewSummary()]);
+      setMessage("Export completed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export document");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
   if (error && !job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
+  const unresolvedSegments = reviewSummary?.unresolved_segments ?? allSegments.length;
+  const workflowStatus = reviewSummary?.overall_status ?? job.status;
+  const workflowStatusLabel =
+    workflowStatus === "exported"
+      ? "Exported"
+      : workflowStatus === "ready_for_export"
+        ? "Ready for Export"
+        : workflowStatus === "draft_saved"
+          ? "Draft Saved"
+          : "In Review";
+  const showSaveWorkflowDraft =
+    unresolvedSegments > 0 && !["ready_for_export", "exported"].includes(workflowStatus);
+  const showMarkReadyForExport =
+    unresolvedSegments === 0 &&
+    Boolean(reviewSummary?.can_mark_ready_for_export) &&
+    !["ready_for_export", "exported"].includes(workflowStatus);
+  const showExportAction = workflowStatus === "ready_for_export";
+  const showDownloadLink = workflowStatus === "exported" && exportResult?.download_url;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -488,24 +601,101 @@ export default function TranslationReviewPage() {
             {doc?.filename ?? `#${job.document_id}`} • {getLanguageDisplayName(job.source_language)} →{" "}
             {getLanguageDisplayName(job.target_language)}
           </p>
-          <p className="mt-2 text-sm text-slate-600">
-            Job status: <span className="font-medium">{job.status}</span>
-          </p>
+          <p className="mt-2 text-sm text-slate-600">Follow the workflow below to save, finalize, and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
-          <p className="mt-2 text-sm text-slate-600">
-            Headings, paragraphs, and bullet lists render as continuous documents on both sides.
-          </p>
-          {job.status === "failed" && (
-            <button
-              type="button"
-              onClick={handleRetryJob}
-              disabled={actionLoading}
-              className="mt-3 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              Retry failed stages
-            </button>
-          )}
         </div>
+
+        <section className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Workflow</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Approved: <span className="font-semibold text-slate-900">{reviewSummary?.approved_segments ?? 0}</span>{" "}
+                • Edited: <span className="font-semibold text-slate-900">{reviewSummary?.edited_segments ?? 0}</span> •
+                Unresolved: <span className="font-semibold text-slate-900">{reviewSummary?.unresolved_segments ?? 0}</span>
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Ambiguities: <span className="font-semibold text-slate-900">{reviewSummary?.ambiguity_count ?? 0}</span> •
+                Semantic memory reviews:{" "}
+                <span className="font-semibold text-slate-900">
+                  {reviewSummary?.semantic_memory_review_count ?? 0}
+                </span>
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Last saved:{" "}
+                <span className="font-medium text-slate-900">
+                  {reviewSummary?.last_saved_at
+                    ? new Date(reviewSummary.last_saved_at).toLocaleString()
+                    : "Not saved yet"}
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {showSaveWorkflowDraft && (
+                <button
+                  type="button"
+                  onClick={handleSaveWorkflowDraft}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Save draft
+                </button>
+              )}
+              {showMarkReadyForExport && (
+                <button
+                  type="button"
+                  onClick={handleMarkReadyForExport}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                >
+                  Mark ready for export
+                </button>
+              )}
+              {showExportAction && (
+                <button
+                  type="button"
+                  onClick={handleExportFinalDocument}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
+                >
+                  Export final document
+                </button>
+              )}
+              {job.status === "failed" && (
+                <button
+                  type="button"
+                  onClick={handleRetryJob}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Retry failed stages
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            {showSaveWorkflowDraft
+              ? "Review is still in progress. Save your draft while unresolved items remain."
+              : showMarkReadyForExport
+                ? "All required review items are resolved. Mark this job ready for export."
+                : showExportAction
+                  ? "This job is finalized and ready to export."
+                  : workflowStatus === "exported"
+                    ? "Export completed successfully."
+                    : "Continue reviewing translated segments."}
+          </p>
+          {showDownloadLink && (
+            <a
+              href={`${API_URL}${exportResult?.download_url ?? ""}`}
+              className="mt-2 inline-block text-sm font-medium text-indigo-700 underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Download latest export
+            </a>
+          )}
+        </section>
 
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -643,7 +833,7 @@ export default function TranslationReviewPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleSaveDraft}
+                    onClick={handleSaveSegmentDraft}
                     disabled={actionLoading || !draftTranslation.trim()}
                     className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                   >

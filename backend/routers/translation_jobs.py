@@ -1,8 +1,11 @@
 import logging
+import os
+from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -18,7 +21,9 @@ from models import (
     TranslationResult,
 )
 from schemas import (
+    ExportResponse,
     ProcessingStageJobResponse,
+    ReviewSummaryResponse,
     ReviewBlockResponse,
     ReviewSegmentResponse,
     SegmentAnnotationResponse,
@@ -42,6 +47,7 @@ router = APIRouter(prefix="/api", tags=["translation-jobs"])
 TRANSLATION_STAGE = "translation"
 AMBIGUITY_STAGE = "ambiguity_detection"
 RECONSTRUCTION_STAGE = "reconstruction"
+EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "exports"))
 
 
 def _queue_stage_job(
@@ -426,6 +432,89 @@ def _serialize_review_segment(
     )
 
 
+def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummaryResponse:
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    total_segments = len(results)
+    approved_segments = sum(1 for result in results if result.review_status == "approved")
+    edited_segments = sum(
+        1
+        for result in results
+        if (result.final_translation or "").strip() != (result.primary_translation or "").strip()
+    )
+    unresolved_segments = total_segments - approved_segments
+    ambiguity_count = sum(
+        1
+        for result in results
+        if bool(result.ambiguity_detected) and result.review_status != "approved"
+    )
+    semantic_memory_review_count = sum(
+        1
+        for result in results
+        if bool(result.semantic_memory_used) and result.review_status != "approved"
+    )
+    can_mark_ready_for_export = (
+        total_segments > 0
+        and unresolved_segments == 0
+        and ambiguity_count == 0
+        and semantic_memory_review_count == 0
+    )
+    overall_status = (
+        job.status if job.status in {"in_review", "draft_saved", "ready_for_export", "exported"} else "in_review"
+    )
+    return ReviewSummaryResponse(
+        job_id=job.id,
+        total_segments=total_segments,
+        approved_segments=approved_segments,
+        edited_segments=edited_segments,
+        unresolved_segments=unresolved_segments,
+        ambiguity_count=ambiguity_count,
+        semantic_memory_review_count=semantic_memory_review_count,
+        overall_status=overall_status,
+        last_saved_at=job.last_saved_at,
+        can_mark_ready_for_export=can_mark_ready_for_export,
+    )
+
+
+def _build_export_text(db: Session, job: TranslationJob) -> str:
+    blocks = (
+        db.query(DocumentBlock)
+        .filter(DocumentBlock.document_id == job.document_id)
+        .order_by(DocumentBlock.block_index)
+        .all()
+    )
+    segments = (
+        db.query(DocumentSegment)
+        .filter(DocumentSegment.document_id == job.document_id)
+        .order_by(DocumentSegment.segment_index)
+        .all()
+    )
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    result_by_segment_id = {result.segment_id: result for result in results}
+    segments_by_block_id: dict[int | None, list[DocumentSegment]] = defaultdict(list)
+    for segment in segments:
+        segments_by_block_id[segment.block_id].append(segment)
+
+    output_lines: list[str] = []
+    for block in blocks:
+        block_segments = segments_by_block_id.get(block.id, [])
+        translated_parts: list[str] = []
+        for segment in block_segments:
+            result = result_by_segment_id.get(segment.id)
+            if not result:
+                continue
+            translated_parts.append((result.final_translation or "").strip())
+        translated_text = _compose_block_translation(block.block_type, translated_parts) or ""
+        translated_text = translated_text.strip()
+        if not translated_text:
+            continue
+        if block.block_type == "bullet_item":
+            output_lines.append(f"- {translated_text}")
+        else:
+            output_lines.append(translated_text)
+        output_lines.append("")
+    return "\n".join(output_lines).strip() + "\n"
+
+
 def _execute_translation_stage(db: Session, translation_job_id: int):
     job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
     if not job:
@@ -646,9 +735,9 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
     for block_id in touched_block_ids:
         _refresh_document_block_translation(db, block_id, translation_job_id)
 
-    job.status = "review_ready"
+    job.status = "in_review"
     job.error_message = None
-    doc.status = "review_ready"
+    doc.status = "in_review"
     doc.error_message = None
     db.commit()
 
@@ -663,7 +752,7 @@ def create_translation_job(
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.status not in {"segmented", "review_ready", "failed"}:
+    if doc.status not in {"segmented", "in_review", "draft_saved", "ready_for_export", "failed"}:
         raise HTTPException(
             status_code=400,
             detail="Document must be segmented before creating a translation job",
@@ -692,6 +781,7 @@ def create_translation_job(
         translation_provider=None,
         translation_batch_size=None,
         error_message=None,
+        last_saved_at=None,
     )
     db.add(job)
     db.flush()
@@ -834,6 +924,112 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
     return review_blocks
 
 
+@router.get("/translation-jobs/{job_id}/review-summary", response_model=ReviewSummaryResponse)
+def get_review_summary(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    return _calculate_review_summary(db, job)
+
+
+@router.post("/translation-jobs/{job_id}/save-draft", response_model=ReviewSummaryResponse)
+def save_review_draft(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == "exported":
+        raise HTTPException(status_code=400, detail="Cannot save draft after export")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    job.status = "draft_saved"
+    job.last_saved_at = datetime.utcnow()
+    doc.status = "draft_saved"
+    db.commit()
+    db.refresh(job)
+    return _calculate_review_summary(db, job)
+
+
+@router.post("/translation-jobs/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
+def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == "exported":
+        raise HTTPException(status_code=400, detail="Job is already exported")
+
+    summary = _calculate_review_summary(db, job)
+    if not summary.can_mark_ready_for_export:
+        raise HTTPException(
+            status_code=400,
+            detail="All review items must be approved before marking ready for export",
+        )
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    job.status = "ready_for_export"
+    doc.status = "ready_for_export"
+    db.commit()
+    db.refresh(job)
+    return _calculate_review_summary(db, job)
+
+
+@router.post("/translation-jobs/{job_id}/export", response_model=ExportResponse)
+def export_translation_job(
+    job_id: int,
+    export_format: str = Query(default="txt"),
+    db: Session = Depends(get_db),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if export_format.lower() != "txt":
+        raise HTTPException(status_code=400, detail="Only txt export is supported currently")
+    if job.status != "ready_for_export":
+        raise HTTPException(status_code=400, detail="Job must be ready_for_export before export")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    safe_stem = Path(doc.filename).stem or f"document-{doc.id}"
+    filename = f"{safe_stem}-job-{job.id}.txt"
+    filepath = EXPORT_DIR / filename
+    filepath.write_text(_build_export_text(db, job), encoding="utf-8")
+
+    job.status = "exported"
+    doc.status = "exported"
+    db.commit()
+    return ExportResponse(
+        job_id=job.id,
+        status=job.status,
+        export_format="txt",
+        filename=filename,
+        download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
+    )
+
+
+@router.get("/translation-jobs/{job_id}/exports/{filename}")
+def download_export(job_id: int, filename: str, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    filepath = (EXPORT_DIR / filename).resolve()
+    export_root = EXPORT_DIR.resolve()
+    if not str(filepath).startswith(str(export_root)):
+        raise HTTPException(status_code=400, detail="Invalid export filename")
+    if not filepath.exists() or not filepath.is_file():
+        raise HTTPException(status_code=404, detail="Export file not found")
+
+    return FileResponse(path=str(filepath), filename=filename, media_type="text/plain")
+
+
 @router.patch("/translation-results/{result_id}", response_model=TranslationResultResponse)
 def update_translation_result(
     result_id: int,
@@ -879,6 +1075,11 @@ def update_translation_result(
     _replace_segment_annotations(db, segment, result)
     if segment.block_id is not None:
         _refresh_document_block_translation(db, segment.block_id, result.job_id)
+    if job.status not in {"ready_for_export", "exported"}:
+        job.status = "in_review"
+        document = db.query(Document).filter(Document.id == job.document_id).first()
+        if document:
+            document.status = "in_review"
     db.commit()
     db.refresh(result)
 
@@ -888,20 +1089,6 @@ def update_translation_result(
             result.id,
             result.review_status,
         )
-        remaining_unapproved = (
-            db.query(TranslationResult)
-            .filter(
-                TranslationResult.job_id == job.id,
-                TranslationResult.review_status != "approved",
-            )
-            .count()
-        )
-        if remaining_unapproved == 0:
-            job.status = "approved"
-            document = db.query(Document).filter(Document.id == job.document_id).first()
-            if document:
-                document.status = "approved"
-            db.commit()
     else:
         logger.info(
             "Saved reviewed translation result_id=%d review_status=%s without storing translation memory",

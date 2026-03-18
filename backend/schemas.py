@@ -88,6 +88,7 @@ class TranslationJobResponse(BaseModel):
     domain: str | None
     status: str
     error_message: str | None
+    last_saved_at: datetime | None
     translation_provider: str | None
     translation_batch_size: int | None
     created_at: datetime
@@ -211,3 +212,24 @@ class ProcessingStageJobResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReviewSummaryResponse(BaseModel):
+    job_id: int
+    total_segments: int
+    approved_segments: int
+    edited_segments: int
+    unresolved_segments: int
+    ambiguity_count: int
+    semantic_memory_review_count: int
+    overall_status: str
+    last_saved_at: datetime | None
+    can_mark_ready_for_export: bool
+
+
+class ExportResponse(BaseModel):
+    job_id: int
+    status: str
+    export_format: str
+    filename: str
+    download_url: str
