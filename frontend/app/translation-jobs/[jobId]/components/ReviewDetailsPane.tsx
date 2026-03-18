@@ -40,6 +40,8 @@ type ReviewDetailsPaneProps = {
   unresolvedBlocks: number;
   visibleIssuesLength: number;
   currentIssueIndex: number;
+  onPreviousIssue: () => void;
+  onNextIssue: () => void;
   selectedIssue: ReviewIssue | null;
   issueTypeLabel: (issueType: IssueType) => string;
   selectedSegmentIsSafe: boolean;
@@ -100,6 +102,8 @@ export function ReviewDetailsPane({
   unresolvedBlocks,
   visibleIssuesLength,
   currentIssueIndex,
+  onPreviousIssue,
+  onNextIssue,
   selectedIssue,
   issueTypeLabel,
   selectedSegmentIsSafe,
@@ -213,13 +217,33 @@ export function ReviewDetailsPane({
               )}
             </>
           ) : (
-            <p className="mt-1 text-sm text-slate-500">
-              {visibleIssuesLength
-                ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssuesLength}${
-                    selectedIssue ? ` (${issueTypeLabel(selectedIssue.type)} • Block ${selectedBlock.block_index + 1})` : ""
-                  }`
-                : "No issue selected"}
-            </p>
+            <div className="mt-1">
+              <p className="text-sm text-slate-500">
+                {visibleIssuesLength
+                  ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssuesLength}${
+                      selectedIssue ? ` (${issueTypeLabel(selectedIssue.type)} • Block ${selectedBlock.block_index + 1})` : ""
+                    }`
+                  : "No issue selected"}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onPreviousIssue}
+                  disabled={!visibleIssuesLength}
+                  className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Previous issue
+                </button>
+                <button
+                  type="button"
+                  onClick={onNextIssue}
+                  disabled={!visibleIssuesLength}
+                  className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Next issue
+                </button>
+              </div>
+            </div>
           )}
           {selectedSegmentIsSafe && (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">

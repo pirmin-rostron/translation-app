@@ -6,7 +6,7 @@ type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
 type ReviewMode = "document" | "issues";
 
 type SegmentRef = { id: number };
-type DiffBlock = { segments: SegmentRef[] };
+type DiffBlock = { block_index: number; segments: SegmentRef[] };
 type DocumentNode = {
   key: string;
   type: "block" | "bullet_list";
@@ -26,9 +26,6 @@ type DocumentDiffPaneProps = {
   reviewMode: ReviewMode;
   filterChips: FilterChip[];
   visibleIssuesLength: number;
-  currentIssueIndex: number;
-  onPreviousIssue: () => void;
-  onNextIssue: () => void;
   displayedNodes: DocumentNode[];
   allNodesCount: number;
   getNodeSpacing: (node: DocumentNode) => string;
@@ -42,9 +39,6 @@ export function DocumentDiffPane({
   reviewMode,
   filterChips,
   visibleIssuesLength,
-  currentIssueIndex,
-  onPreviousIssue,
-  onNextIssue,
   displayedNodes,
   allNodesCount,
   getNodeSpacing,
@@ -78,32 +72,9 @@ export function DocumentDiffPane({
 
         {reviewMode === "issues" ? (
           <div className="mt-4 border-t border-slate-200 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issue navigation</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onPreviousIssue}
-                  disabled={!visibleIssuesLength}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Previous issue
-                </button>
-                <button
-                  type="button"
-                  onClick={onNextIssue}
-                  disabled={!visibleIssuesLength}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Next issue
-                </button>
-                <span className="text-xs text-slate-500">
-                  {visibleIssuesLength
-                    ? `Reviewing Issue ${currentIssueIndex + 1} of ${visibleIssuesLength}`
-                    : "No issues found — you're all good here"}
-                </span>
-              </div>
-            </div>
+            <p className="text-xs text-slate-500">
+              Issues-only content view ({visibleIssuesLength} items). Use Review Details for issue navigation.
+            </p>
             {!visibleIssuesLength && (
               <p className="mt-2 text-xs text-slate-500">
                 Try <span className="font-medium">All Content</span> to continue full document review.
@@ -130,6 +101,14 @@ export function DocumentDiffPane({
           {displayedNodes.map((node) => {
             const nodeSegments =
               node.type === "bullet_list" ? node.blocks?.flatMap((b) => b.segments) ?? [] : node.block?.segments ?? [];
+            const blockLabel =
+              node.type === "bullet_list"
+                ? node.blocks?.length
+                  ? `Blocks ${node.blocks[0].block_index + 1}-${node.blocks[node.blocks.length - 1].block_index + 1}`
+                  : "Blocks"
+                : node.block
+                  ? `Block ${node.block.block_index + 1}`
+                  : "Block";
             return (
               <div
                 key={node.key}
@@ -140,6 +119,7 @@ export function DocumentDiffPane({
                   });
                 }}
               >
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{blockLabel}</p>
                 <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                   <div className="min-w-0 rounded-lg bg-white/80 p-2 pr-3">{renderNode(node, "source")}</div>
                   <div className="min-w-0 rounded-lg bg-white p-2 pl-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)]">

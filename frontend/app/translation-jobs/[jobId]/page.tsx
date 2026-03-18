@@ -1287,26 +1287,6 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleSaveWorkflowDraft() {
-    if (!job) return;
-    setActionLoading(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/save-draft`, {
-        method: "POST",
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to save workflow draft");
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress()]);
-      setMessage("Review workflow draft saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save workflow draft");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   async function handleApproveAllSafeSegments() {
     if (!job) return;
     const safeCountToApprove = safeUnresolvedSegments;
@@ -1422,26 +1402,6 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleReopenReview() {
-    if (!job) return;
-    setActionLoading(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/reopen-review`, {
-        method: "POST",
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to re-open review");
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
-      setMessage("Review re-opened. You can edit segments again.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to re-open review");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
   if (error && !job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
@@ -1524,7 +1484,6 @@ export default function TranslationReviewPage() {
         : workflowStatus === "draft_saved"
           ? "Draft Saved"
           : "In Review";
-  const showSaveWorkflowDraft = !reviewComplete && !["ready_for_export", "exported"].includes(workflowStatus);
   const showExportAction = reviewComplete && workflowStatus !== "exported";
   const showApproveAllSafeSegments =
     unresolvedSegments > 0 &&
@@ -1534,11 +1493,6 @@ export default function TranslationReviewPage() {
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
-  const latestExportHref = latestExport?.download_url
-    ? `${API_URL}${latestExport.download_url}`
-    : exportResult?.download_url
-      ? `${API_URL}${exportResult.download_url}`
-      : null;
   const resolvedItemsCount = Math.max(totalSegments - unresolvedSegments, 0);
   const totalBlocks = orderedBlocks.length;
   const flaggedIssuesCount = flagged.length;
@@ -1666,17 +1620,11 @@ export default function TranslationReviewPage() {
           lastExportTimestamp={lastExportTimestamp}
           lastExportMode={lastExportMode}
           lastExportFormat={lastExportFormat}
-          showSaveWorkflowDraft={showSaveWorkflowDraft}
           actionLoading={actionLoading}
-          onSaveWorkflowDraft={handleSaveWorkflowDraft}
           onPrimaryGuidanceAction={handlePrimaryGuidanceAction}
           primaryGuidanceLabel={primaryGuidanceLabel}
           isReadOnly={isReadOnly}
-          showExportPrimary={showExportAction || workflowStatus === "exported"}
-          onReopenReview={handleReopenReview}
           jobFailed={job.status === "failed"}
-          exportHistory={exportHistory}
-          latestExportHref={latestExportHref}
         />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
@@ -1689,9 +1637,6 @@ export default function TranslationReviewPage() {
             reviewMode={reviewMode}
             filterChips={filterChips}
             visibleIssuesLength={visibleIssues.length}
-            currentIssueIndex={currentIssueIndex}
-            onPreviousIssue={() => goToIssue(-1)}
-            onNextIssue={() => goToIssue(1)}
             displayedNodes={displayedNodes}
             allNodesCount={allNodes.length}
             getNodeSpacing={getNodeSpacing}
@@ -1714,6 +1659,8 @@ export default function TranslationReviewPage() {
             unresolvedBlocks={unresolvedBlocks}
             visibleIssuesLength={visibleIssues.length}
             currentIssueIndex={currentIssueIndex}
+            onPreviousIssue={() => goToIssue(-1)}
+            onNextIssue={() => goToIssue(1)}
             selectedIssue={selectedIssue}
             issueTypeLabel={issueTypeLabel}
             selectedSegmentIsSafe={selectedSegmentIsSafe}

@@ -1,15 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import type { RefObject } from "react";
 
 type ExportMode = "clean_text" | "preserve_formatting";
-
-type ExportHistoryItem = {
-  filename: string;
-  generated_at: string;
-  version: number;
-};
 
 type TranslationProgress = {
   stage_label: string;
@@ -47,17 +40,11 @@ type ReviewGuidancePanelProps = {
   lastExportTimestamp: string | null;
   lastExportMode: ExportMode | null;
   lastExportFormat: string;
-  showSaveWorkflowDraft: boolean;
   actionLoading: boolean;
-  onSaveWorkflowDraft: () => void;
   onPrimaryGuidanceAction: () => void;
   primaryGuidanceLabel: string;
   isReadOnly: boolean;
-  showExportPrimary: boolean;
-  onReopenReview: () => void;
   jobFailed: boolean;
-  exportHistory: ExportHistoryItem[];
-  latestExportHref: string | null;
 };
 
 export function ReviewGuidancePanel({
@@ -88,17 +75,11 @@ export function ReviewGuidancePanel({
   lastExportTimestamp,
   lastExportMode,
   lastExportFormat,
-  showSaveWorkflowDraft,
   actionLoading,
-  onSaveWorkflowDraft,
   onPrimaryGuidanceAction,
   primaryGuidanceLabel,
   isReadOnly,
-  showExportPrimary,
-  onReopenReview,
   jobFailed,
-  exportHistory,
-  latestExportHref,
 }: ReviewGuidancePanelProps) {
   return (
     <>
@@ -133,16 +114,6 @@ export function ReviewGuidancePanel({
                 <p className="mt-1 text-xs text-slate-700">
                   Export completed at {new Date(lastExportTimestamp).toLocaleString()}.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  {latestExportHref && (
-                    <a href={latestExportHref} target="_blank" rel="noreferrer" className="font-medium text-emerald-800 underline">
-                      Download again
-                    </a>
-                  )}
-                  <Link href="/" className="font-medium text-slate-700 underline">
-                    Back to all translations
-                  </Link>
-                </div>
               </div>
             )}
             <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-3">
@@ -236,16 +207,6 @@ export function ReviewGuidancePanel({
             </p>
           </div>
           <div className="flex min-w-[220px] flex-col items-end gap-2">
-            {showSaveWorkflowDraft && (
-              <button
-                type="button"
-                onClick={onSaveWorkflowDraft}
-                disabled={actionLoading}
-                className="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-800 disabled:opacity-60"
-              >
-                Save draft
-              </button>
-            )}
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
@@ -255,35 +216,12 @@ export function ReviewGuidancePanel({
               >
                 {primaryGuidanceLabel}
               </button>
-              {isReadOnly && !showExportPrimary && (
-                <button
-                  type="button"
-                  onClick={onReopenReview}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Re-open review
-                </button>
-              )}
               {jobFailed && (
                 <p className="text-xs text-slate-500">Use retry to re-run failed workflow stages.</p>
               )}
             </div>
           </div>
         </div>
-        {exportHistory.length > 1 && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous exports</p>
-            <ul className="mt-2 space-y-1 text-sm">
-              {exportHistory.slice(1).map((entry) => (
-                <li key={entry.filename} className="flex items-center justify-between gap-3">
-                  <span className="text-slate-600">v{entry.version} • {new Date(entry.generated_at).toLocaleString()}</span>
-                  <span className="text-xs text-slate-500">Use Export / download again to choose options.</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </section>
     </>
   );
