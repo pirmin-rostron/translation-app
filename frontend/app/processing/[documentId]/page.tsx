@@ -59,7 +59,7 @@ export default function ProcessingPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const latestJob = jobs[0] ?? null;
-  const reviewReadyStatuses = new Set(["in_review", "draft_saved", "ready_for_export", "exported"]);
+  const reviewReadyStatuses = new Set(["in_review", "draft_saved", "review_complete", "ready_for_export", "exported"]);
 
   const loadState = useCallback(async () => {
     if (Number.isNaN(documentId)) {
@@ -104,7 +104,7 @@ export default function ProcessingPage() {
 
   const shouldPoll = useMemo(() => {
     if (!doc) return true;
-    if (doc.status === "failed") return false;
+    if (doc.status === "parse_failed" || doc.status === "failed") return false;
     if (latestJob?.status === "failed") return false;
     if (latestJob && reviewReadyStatuses.has(latestJob.status)) return false;
     return true;
@@ -151,10 +151,10 @@ export default function ProcessingPage() {
 
   const docStatus = doc?.status ?? "uploaded";
   const uploadDone = true;
-  const parsingDone = ["parsed", "segmented", "translation_queued", "translating", "translated", "in_review", "draft_saved", "ready_for_export", "exported"].includes(docStatus);
+  const parsingDone = ["parsed", "segmented"].includes(docStatus);
   const translationStarted = Boolean(latestJob);
   const translationDone = Boolean(latestJob && reviewReadyStatuses.has(latestJob.status));
-  const parseFailed = docStatus === "failed";
+  const parseFailed = docStatus === "parse_failed" || docStatus === "failed";
   const translationFailed = latestJob?.status === "failed";
   const hasFailure = parseFailed || translationFailed;
 

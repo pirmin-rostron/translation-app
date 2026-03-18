@@ -1504,6 +1504,8 @@ export default function TranslationReviewPage() {
       ? "Exported"
       : workflowStatus === "ready_for_export"
         ? "Ready for Export"
+        : workflowStatus === "review_complete"
+          ? "Review Complete"
         : workflowStatus === "draft_saved"
           ? "Draft Saved"
           : "In Review";

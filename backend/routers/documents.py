@@ -32,9 +32,19 @@ DEFAULT_CUSTOMER_ID = os.getenv("DEFAULT_CUSTOMER_ID", "default")
 PARSING_STAGE = "parsing"
 SEGMENT_STAGE = "segmenting"
 FAILED_STATUS = "failed"
+PARSE_FAILED_STATUS = "parse_failed"
 PARSED_STATUS = "parsed"
 SEGMENTED_STATUS = "segmented"  # backward-compatible legacy status
 PARSING_STATUS = "parsing"
+ACTIVE_TRANSLATION_JOB_STATUSES = {
+    "translation_queued",
+    "translating",
+    "in_review",
+    "draft_saved",
+    "review_complete",
+    "ready_for_export",
+    "exported",
+}
 
 
 class _ImmediateBackgroundTasks:
@@ -80,7 +90,7 @@ def _run_document_pipeline(document_id: int):
             stage_job.started_at = datetime.utcnow()
             stage_job.error_message = None
             doc = db.query(Document).filter(Document.id == document_id).first()
-            if doc and doc.status != FAILED_STATUS:
+            if doc and doc.status not in {FAILED_STATUS, PARSE_FAILED_STATUS}:
                 doc.status = PARSING_STATUS
             db.commit()
             logger.info(
@@ -106,7 +116,7 @@ def _run_document_pipeline(document_id: int):
                 db.rollback()
                 doc = db.query(Document).filter(Document.id == document_id).first()
                 if doc:
-                    doc.status = FAILED_STATUS
+                    doc.status = PARSE_FAILED_STATUS
                     doc.error_message = str(exc)
                 failed_stage = db.query(ProcessingStageJob).filter(ProcessingStageJob.id == stage_job.id).first()
                 if failed_stage:
@@ -129,14 +139,14 @@ def _run_default_upload_to_review_pipeline(document_id: int):
             return
 
         immediate_tasks = _ImmediateBackgroundTasks()
-        if doc.status in {"uploaded", "failed"}:
+        if doc.status in {"uploaded", FAILED_STATUS, PARSE_FAILED_STATUS}:
             parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db)
             db.expire_all()
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
                 return
 
-        if doc.status == FAILED_STATUS:
+        if doc.status in {FAILED_STATUS, PARSE_FAILED_STATUS}:
             logger.warning("Auto pipeline stopped after parse failure for document_id=%d", document_id)
             return
 
@@ -148,9 +158,9 @@ def _run_default_upload_to_review_pipeline(document_id: int):
                     [
                         "translation_queued",
                         "translating",
-                        "translated",
                         "in_review",
                         "draft_saved",
+                        "review_complete",
                         "ready_for_export",
                         "exported",
                     ]
@@ -311,7 +321,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
             is_complete=True,
             is_active=False,
         )
-    if status == FAILED_STATUS:
+    if status in {FAILED_STATUS, PARSE_FAILED_STATUS}:
         return DocumentProgressResponse(
             document_id=doc.id,
             stage_label="Parsing failed",
@@ -503,8 +513,14 @@ def parse_document_by_id(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if doc.status in {"translation_queued", "translating"}:
-        raise HTTPException(status_code=409, detail="Cannot parse while translation is in progress")
+    active_job = (
+        db.query(TranslationJob)
+        .filter(TranslationJob.document_id == document_id)
+        .filter(TranslationJob.status.in_(list(ACTIVE_TRANSLATION_JOB_STATUSES)))
+        .first()
+    )
+    if active_job:
+        raise HTTPException(status_code=409, detail="Cannot parse while a translation workflow is active")
 
     db.query(ProcessingStageJob).filter(
         ProcessingStageJob.document_id == document_id,

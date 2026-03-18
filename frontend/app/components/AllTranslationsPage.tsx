@@ -20,16 +20,25 @@ type Document = {
   created_at: string;
 };
 
+type TranslationJobOverview = {
+  id: number;
+  status: string;
+  error_message?: string | null;
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
 
-const IN_PROGRESS_STATUSES = new Set(["parsing", "parsed", "segmented", "translation_queued", "translating", "translated"]);
-const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "ready_for_export", "exported"]);
+const PARSE_READY_STATUSES = new Set(["uploaded", "failed", "parse_failed"]);
+const PARSE_IN_PROGRESS_STATUSES = new Set(["parsing"]);
+const TRANSLATION_IN_PROGRESS_STATUSES = new Set(["translation_queued", "translating", "failed"]);
+const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "review_complete", "ready_for_export", "exported"]);
 
 export default function AllTranslationsPage() {
   const router = useRouter();
   const [docs, setDocs] = useState<Document[]>([]);
+  const [latestJobsByDocumentId, setLatestJobsByDocumentId] = useState<Record<number, TranslationJobOverview | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [parsingId, setParsingId] = useState<number | null>(null);
@@ -40,6 +49,19 @@ export default function AllTranslationsPage() {
     if (!res.ok) throw new Error(`Failed to load (${res.status})`);
     const payload = (await res.json()) as Document[];
     setDocs(payload);
+    const jobsByDocEntries = await Promise.all(
+      payload.map(async (doc) => {
+        try {
+          const jobsRes = await fetch(`${API_URL}/api/documents/${doc.id}/translation-jobs`);
+          if (!jobsRes.ok) return [doc.id, null] as const;
+          const jobs = (await jobsRes.json()) as TranslationJobOverview[];
+          return [doc.id, jobs[0] ?? null] as const;
+        } catch {
+          return [doc.id, null] as const;
+        }
+      })
+    );
+    setLatestJobsByDocumentId(Object.fromEntries(jobsByDocEntries));
   };
 
   const handleParse = async (docId: number) => {
@@ -65,16 +87,13 @@ export default function AllTranslationsPage() {
     setError("");
     setOpeningDocId(doc.id);
     try {
-      if (REVIEW_STATUSES.has(doc.status)) {
-        const res = await fetch(`${API_URL}/api/documents/${doc.id}/translation-jobs`);
-        if (!res.ok) throw new Error(`Failed to load translation jobs (${res.status})`);
-        const jobs = (await res.json()) as Array<{ id: number }>;
-        if (jobs.length > 0) {
-          router.push(`/translation-jobs/${jobs[0].id}`);
-          return;
-        }
+      const latestJob = latestJobsByDocumentId[doc.id];
+      const workflowStatus = latestJob?.status ?? doc.status;
+      if (latestJob && REVIEW_STATUSES.has(workflowStatus)) {
+        router.push(`/translation-jobs/${latestJob.id}`);
+        return;
       }
-      if (IN_PROGRESS_STATUSES.has(doc.status)) {
+      if (TRANSLATION_IN_PROGRESS_STATUSES.has(workflowStatus) || PARSE_IN_PROGRESS_STATUSES.has(workflowStatus)) {
         router.push(`/processing/${doc.id}`);
         return;
       }
@@ -152,7 +171,11 @@ export default function AllTranslationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {docs.map((doc) => (
+                {docs.map((doc) => {
+                  const latestJob = latestJobsByDocumentId[doc.id];
+                  const workflowStatus = latestJob?.status ?? doc.status;
+                  const workflowError = latestJob?.error_message ?? doc.error_message;
+                  return (
                   <tr key={doc.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">
                       <Link href={`/documents/${doc.id}`} className="text-slate-900 hover:underline">
@@ -170,9 +193,9 @@ export default function AllTranslationsPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">{doc.domain ?? "—"}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-800">
-                        {doc.status}
+                        {workflowStatus}
                       </span>
-                      {doc.error_message && <p className="mt-1 text-xs text-red-600">{doc.error_message}</p>}
+                      {workflowError && <p className="mt-1 text-xs text-red-600">{workflowError}</p>}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatDate(doc.created_at)}</td>
                     <td className="px-6 py-4 flex gap-2">
@@ -184,24 +207,24 @@ export default function AllTranslationsPage() {
                       >
                         {openingDocId === doc.id
                           ? "Opening…"
-                          : IN_PROGRESS_STATUSES.has(doc.status)
+                          : TRANSLATION_IN_PROGRESS_STATUSES.has(workflowStatus) || PARSE_IN_PROGRESS_STATUSES.has(workflowStatus)
                           ? "View progress"
-                          : REVIEW_STATUSES.has(doc.status)
+                          : REVIEW_STATUSES.has(workflowStatus)
                             ? "Open review/export"
                             : "Open details"}
                       </button>
-                      {(doc.status === "uploaded" || doc.status === "failed") && (
+                      {PARSE_READY_STATUSES.has(doc.status) && (
                         <button
                           onClick={() => handleParse(doc.id)}
                           disabled={parsingId === doc.id}
                           className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
                         >
-                          {parsingId === doc.id ? "Processing…" : doc.status === "failed" ? "Retry" : "Parse"}
+                          {parsingId === doc.id ? "Processing…" : doc.status === "uploaded" ? "Parse" : "Retry parse"}
                         </button>
                       )}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

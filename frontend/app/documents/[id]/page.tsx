@@ -306,6 +306,7 @@ export default function DocumentDetailPage() {
   if (!doc) return null;
   const latestDocStage = docStages[docStages.length - 1];
   const latestJob = jobs[0];
+  const parseFailed = doc.status === "parse_failed" || doc.status === "failed";
   const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
 
   return (
@@ -389,7 +390,7 @@ export default function DocumentDetailPage() {
               <dd className="font-medium">{doc.domain ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Status</dt>
+              <dt className="text-slate-500">Document status</dt>
               <dd>
                 <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">
                   {doc.status}
@@ -400,6 +401,15 @@ export default function DocumentDetailPage() {
                     Stage: {latestDocStage.stage_name} ({latestDocStage.status})
                   </p>
                 )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Translation lifecycle</dt>
+              <dd>
+                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">
+                  {latestJob?.status ?? "no_translation_job"}
+                </span>
+                {latestJob?.error_message && <p className="mt-1 text-xs text-red-600">{latestJob.error_message}</p>}
               </dd>
             </div>
             <div>
@@ -439,12 +449,12 @@ export default function DocumentDetailPage() {
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-3">
-            {(doc.status === "uploaded" || doc.status === "failed") && (
+            {(doc.status === "uploaded" || parseFailed) && (
               <button
-                onClick={doc.status === "failed" ? handleRetryDoc : handleParse}
+                onClick={parseFailed ? handleRetryDoc : handleParse}
                 className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
               >
-                {doc.status === "failed" ? "Retry document processing" : "Parse document"}
+                {parseFailed ? "Retry document processing" : "Parse document"}
               </button>
             )}
             {(doc.status === "parsed" || doc.status === "segmented") && segments.length > 0 && (
@@ -471,7 +481,7 @@ export default function DocumentDetailPage() {
 
         <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Parsed blocks</h2>
-          {blocks.length === 0 && (doc.status === "uploaded" || doc.status === "failed") && (
+          {blocks.length === 0 && (doc.status === "uploaded" || parseFailed) && (
             <p className="text-slate-600">
               Parse the document to view headings, paragraphs, and bullet items.
             </p>
