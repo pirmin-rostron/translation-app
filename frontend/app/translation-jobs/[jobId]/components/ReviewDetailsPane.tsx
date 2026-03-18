@@ -78,7 +78,7 @@ type ReviewDetailsPaneProps = {
   actionLoading: boolean;
   onSkipBlock: () => void;
   hasDraftChanges: boolean;
-  onSaveSegmentDraft: () => void;
+  onSaveSegmentEdit: () => void;
   onNextSafeSegment: () => void;
   selectedFlaggedIndex: number;
   flaggedLength: number;
@@ -137,7 +137,7 @@ export function ReviewDetailsPane({
   actionLoading,
   onSkipBlock,
   hasDraftChanges,
-  onSaveSegmentDraft,
+  onSaveSegmentEdit,
   onNextSafeSegment,
   selectedFlaggedIndex,
   flaggedLength,
@@ -460,7 +460,7 @@ export function ReviewDetailsPane({
             {!isReadOnly && !isDocumentMode && (selectedSegmentStatus === "unreviewed" || (isEditing && hasDraftChanges)) && (
               <button
                 type="button"
-                onClick={onSaveSegmentDraft}
+                onClick={onSaveSegmentEdit}
                 disabled={actionLoading || !draftTranslation.trim()}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
@@ -470,7 +470,7 @@ export function ReviewDetailsPane({
             {!isReadOnly && isDocumentMode && isEditing && hasDraftChanges && (
               <button
                 type="button"
-                onClick={onSaveSegmentDraft}
+                onClick={onSaveSegmentEdit}
                 disabled={actionLoading || !draftTranslation.trim()}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >

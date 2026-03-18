@@ -1182,7 +1182,7 @@ export default function TranslationReviewPage() {
     setDraftTranslation(selectedSegment.final_translation || "");
   }
 
-  async function handleSaveSegmentDraft() {
+  async function handleSaveSegmentEdit() {
     if (!selectedSegment) return;
     const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
     const finalTranslation = getSelectedDecisionTranslation();
@@ -1203,7 +1203,7 @@ export default function TranslationReviewPage() {
         setMessage("Saved and approved.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save draft");
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setActionLoading(false);
     }
@@ -1383,17 +1383,41 @@ export default function TranslationReviewPage() {
     }
   }
 
+  function getFirstUnresolvedAmbiguityBlockId() {
+    const firstAmbiguity = orderedBlocks.find((block) =>
+      block.segments.some(
+        (segment) => !isAcceptableFinalStatus(segment.review_status) && getAmbiguityChoiceDetails(segment).ambiguityChoiceFound
+      )
+    );
+    return firstAmbiguity?.id ?? null;
+  }
+
+  function getNextUnresolvedBlockId() {
+    const nextUnresolved = orderedBlocks.find((block) => !isBlockResolved(block));
+    return nextUnresolved?.id ?? null;
+  }
+
+  function getRecommendedReviewBlockId() {
+    return getFirstUnresolvedAmbiguityBlockId() ?? getNextUnresolvedBlockId();
+  }
+
+  function handleDownloadLatestExport() {
+    if (!latestExport?.download_url) return;
+    const url = `${API_URL}${latestExport.download_url}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   function handlePrimaryGuidanceAction() {
-    if (job?.status === "failed") {
-      void handleRetryJob();
+    if (guidanceStatusLabel === "Exported") {
+      handleDownloadLatestExport();
       return;
     }
-    if (workflowStatus === "exported" || showExportAction) {
+    if (guidanceStatusLabel === "Review Complete") {
       handleOpenExportModal();
       return;
     }
-    // Start/continue review always uses sequential full-document flow.
     switchToDocumentMode();
+    moveToBlockById(getRecommendedReviewBlockId());
   }
 
   function triggerExportDownload(payload: ExportResult) {
@@ -1533,28 +1557,12 @@ export default function TranslationReviewPage() {
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
-  const workflowStatusLabel =
-    workflowStatus === "exported"
-      ? "Exported"
-      : workflowStatus === "ready_for_export"
-        ? "Ready for Export"
-        : workflowStatus === "review_complete"
-          ? "Review Complete"
-        : workflowStatus === "draft_saved"
-          ? "Draft Saved"
-          : "In Review";
-  const showExportAction = reviewComplete && workflowStatus !== "exported";
-  const showApproveAllSafeSegments =
-    unresolvedSegments > 0 &&
-    safeUnresolvedSegments > 0 &&
-    !["ready_for_export", "exported"].includes(workflowStatus);
+  const guidanceStatusLabel = workflowStatus === "exported" ? "Exported" : reviewComplete ? "Review Complete" : "In Review";
   const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
-  const resolvedItemsCount = Math.max(totalSegments - unresolvedSegments, 0);
   const totalBlocks = orderedBlocks.length;
-  const flaggedIssuesCount = flagged.length;
   const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
     { key: "all", label: "All Content", count: allSegments.length },
     { key: "issues", label: "Issues", count: flagged.length },
@@ -1562,48 +1570,25 @@ export default function TranslationReviewPage() {
     { key: "glossary", label: "Glossary", count: allSegments.filter(({ segment }) => matchesFilter(segment, "glossary")).length },
     { key: "memory", label: "Memory", count: allSegments.filter(({ segment }) => matchesFilter(segment, "memory")).length },
   ];
-  const reviewProgressPercent =
-    totalBlocks > 0 ? Math.round((completedBlocks / totalBlocks) * 100) : 0;
-  const guidanceTitle =
-    workflowStatus === "exported"
-      ? "Document exported"
-      : showExportAction
-        ? "Review complete"
-        : reviewComplete
-          ? "This document is ready for export"
-          : segmentsRequiringAttention > 0
-            ? `${segmentsRequiringAttention} items still require review`
-            : `Review in progress — ${unresolvedSegments} segments remaining`;
-  const guidanceDetail =
-    workflowStatus === "exported"
-      ? "Export again to download a file with your chosen formatting settings."
-      : showExportAction
-        ? "This document is ready for export."
-        : reviewComplete
-          ? "Export to generate the final deliverable."
-          : segmentsRequiringAttention > 0
-            ? "Review flagged items next to finish the document review."
-            : "Approve safe segments first, then review any remaining flagged items.";
-  const startHereActionLabel =
-    workflowStatus === "exported"
-      ? "Export / download again"
-      : showExportAction
-        ? "Export document"
-        : segmentsRequiringAttention > 0
-          ? "Review flagged items"
-          : showApproveAllSafeSegments
-            ? `Approve ${safeUnresolvedSegments} safe ${safeUnresolvedSegments === 1 ? "segment" : "segments"}`
-            : "Review Block 1";
+  const firstUnresolvedAmbiguityBlockId = getFirstUnresolvedAmbiguityBlockId();
+  const nextUnresolvedBlockId = getNextUnresolvedBlockId();
+  const recommendedNextStep =
+    guidanceStatusLabel === "Exported"
+      ? "Download the latest exported file."
+      : guidanceStatusLabel === "Review Complete"
+        ? "Review complete — ready to export."
+        : firstUnresolvedAmbiguityBlockId != null
+          ? `Resolve ambiguity in Block ${((orderedBlocks.find((b) => b.id === firstUnresolvedAmbiguityBlockId)?.block_index ?? 0) + 1).toString()} next.`
+          : nextUnresolvedBlockId != null
+            ? `Continue with Block ${((orderedBlocks.find((b) => b.id === nextUnresolvedBlockId)?.block_index ?? 0) + 1).toString()}.`
+            : "Review complete — ready to export.";
   const primaryGuidanceLabel =
-    job.status === "failed"
-      ? "Retry failed stages"
-      : workflowStatus === "exported"
-        ? "Export / download again"
-        : showExportAction
-          ? "Export document"
-          : completedBlocks > 0 || workflowStatus === "draft_saved"
-            ? "Continue review"
-            : "Start review";
+    guidanceStatusLabel === "Exported"
+      ? "Download Latest Export"
+      : guidanceStatusLabel === "Review Complete"
+        ? "Export Document"
+        : "Continue Review";
+  const isPrimaryGuidanceDisabled = guidanceStatusLabel === "Exported" && !latestExport?.download_url;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1621,9 +1606,7 @@ export default function TranslationReviewPage() {
             {doc?.filename ?? `#${job.document_id}`} • {getLanguageDisplayName(job.source_language)} →{" "}
             {getLanguageDisplayName(job.target_language)}
           </p>
-          <p className="mt-2 text-sm text-slate-600">
-            Follow the workflow below to save, finalize, and export.
-          </p>
+          <p className="mt-2 text-sm text-slate-600">Follow the workflow below to review and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
           <div className="mt-4 inline-flex rounded-lg border border-slate-300 bg-white p-1">
             <button
@@ -1653,37 +1636,17 @@ export default function TranslationReviewPage() {
 
         <ReviewGuidancePanel
           reviewGuidanceRef={reviewGuidanceRef}
-          translationProgress={translationProgress}
-          formatEta={formatEta}
-          workflowStatusLabel={workflowStatusLabel}
-          guidanceTitle={guidanceTitle}
-          guidanceDetail={guidanceDetail}
+          statusLabel={guidanceStatusLabel}
           completedBlocks={completedBlocks}
           totalBlocks={totalBlocks}
-          reviewProgressPercent={reviewProgressPercent}
           unresolvedBlocks={unresolvedBlocks}
-          totalSegments={totalSegments}
-          safeUnresolvedSegments={safeUnresolvedSegments}
-          flaggedIssuesCount={flaggedIssuesCount}
-          unresolvedSegments={unresolvedSegments}
-          segmentsRequiringAttention={segmentsRequiringAttention}
           unresolvedAmbiguities={unresolvedAmbiguities}
-          unresolvedGlossaryReviews={unresolvedGlossaryReviews}
-          unresolvedMemoryReviews={unresolvedMemoryReviews}
-          unresolvedSemanticReviews={unresolvedSemanticReviews}
+          recommendedNextStep={recommendedNextStep}
           translationStyle={job.translation_style === "literal" ? "literal" : "natural"}
-          reviewComplete={reviewComplete}
-          resolvedItemsCount={resolvedItemsCount}
-          startHereActionLabel={startHereActionLabel}
-          lastSavedAt={reviewSummary?.last_saved_at ?? null}
-          lastExportTimestamp={lastExportTimestamp}
-          lastExportMode={lastExportMode}
-          lastExportFormat={lastExportFormat}
+          primaryActionLabel={primaryGuidanceLabel}
+          isPrimaryActionDisabled={isPrimaryGuidanceDisabled}
           actionLoading={actionLoading}
-          onPrimaryGuidanceAction={handlePrimaryGuidanceAction}
-          primaryGuidanceLabel={primaryGuidanceLabel}
-          isReadOnly={isReadOnly}
-          jobFailed={job.status === "failed"}
+          onPrimaryAction={handlePrimaryGuidanceAction}
         />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
@@ -1756,7 +1719,7 @@ export default function TranslationReviewPage() {
             actionLoading={actionLoading}
             onSkipBlock={handleSkipBlock}
             hasDraftChanges={hasDraftChanges}
-            onSaveSegmentDraft={handleSaveSegmentDraft}
+            onSaveSegmentEdit={handleSaveSegmentEdit}
             onNextSafeSegment={handleNextSafeSegment}
             selectedFlaggedIndex={selectedFlaggedIndex}
             flaggedLength={flagged.length}
