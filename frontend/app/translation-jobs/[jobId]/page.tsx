@@ -1451,6 +1451,7 @@ export default function TranslationReviewPage() {
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const hasGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
+  const isSafeDecisionOnlyMode = selectedSegmentIsSafe && !selectedIssue && !hasGuidedChoice;
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const workflowStatusLabel =
@@ -1941,7 +1942,7 @@ export default function TranslationReviewPage() {
                     </p>
                   </div>
                 )}
-                {selectedIssue && (
+                {selectedIssue && !isSafeDecisionOnlyMode && (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span
@@ -1956,7 +1957,7 @@ export default function TranslationReviewPage() {
                     <p className="mt-2 text-sm text-slate-700">{cleanPanelText(selectedIssue.title)}</p>
                   </div>
                 )}
-                {hasAmbiguityChoice && (
+                {hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
                     <p className="font-medium text-amber-900">Ambiguity detected</p>
                     {ambiguityChoiceDetails.explanation && (
@@ -2001,6 +2002,7 @@ export default function TranslationReviewPage() {
                   </div>
                 )}
 
+                {!isSafeDecisionOnlyMode && (
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -2045,8 +2047,9 @@ export default function TranslationReviewPage() {
                     Full source and translated context stays in the side-by-side document view.
                   </p>
                 </div>
+                )}
 
-                {isEditing && canEditSelectedSegment && (
+                {isEditing && canEditSelectedSegment && !isSafeDecisionOnlyMode && (
                   <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit selected translation</p>
                     <textarea
@@ -2058,7 +2061,7 @@ export default function TranslationReviewPage() {
                   </div>
                 )}
 
-                {glossaryMatches.length > 0 && (
+                {glossaryMatches.length > 0 && !isSafeDecisionOnlyMode && (
                   <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm">
                     <p className="font-medium text-violet-900">Glossary matches</p>
                     <ul className="mt-2 space-y-1 text-slate-700">
@@ -2071,7 +2074,7 @@ export default function TranslationReviewPage() {
                   </div>
                 )}
 
-                {hasSemanticChoice && !hasAmbiguityChoice && (
+                {hasSemanticChoice && !hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
                   <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
                     <p className="font-medium text-sky-900">Semantic translation choice available</p>
                     <p className="mt-1 text-xs text-sky-700">
