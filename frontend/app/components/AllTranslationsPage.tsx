@@ -30,7 +30,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
 
-const PARSE_READY_STATUSES = new Set(["uploaded", "failed", "parse_failed"]);
+const PARSE_READY_STATUSES = new Set(["uploaded", "parse_failed"]);
 const PARSE_IN_PROGRESS_STATUSES = new Set(["parsing"]);
 const TRANSLATION_IN_PROGRESS_STATUSES = new Set(["translation_queued", "translating", "failed"]);
 const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "review_complete", "ready_for_export", "exported"]);

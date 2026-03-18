@@ -306,7 +306,7 @@ export default function DocumentDetailPage() {
   if (!doc) return null;
   const latestDocStage = docStages[docStages.length - 1];
   const latestJob = jobs[0];
-  const parseFailed = doc.status === "parse_failed" || doc.status === "failed";
+  const parseFailed = doc.status === "parse_failed";
   const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
 
   return (
@@ -457,7 +457,7 @@ export default function DocumentDetailPage() {
                 {parseFailed ? "Retry document processing" : "Parse document"}
               </button>
             )}
-            {(doc.status === "parsed" || doc.status === "segmented") && segments.length > 0 && (
+            {doc.status === "parsed" && segments.length > 0 && (
               <button
                 onClick={handleCreateJob}
                 className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
@@ -486,10 +486,10 @@ export default function DocumentDetailPage() {
               Parse the document to view headings, paragraphs, and bullet items.
             </p>
           )}
-          {blocks.length === 0 && (doc.status === "parsed" || doc.status === "segmented") && (
+          {blocks.length === 0 && doc.status === "parsed" && (
             <p className="text-slate-600">No parsed blocks (document may be empty).</p>
           )}
-          {(doc.status === "parsed" || doc.status === "segmented") && segments.length > 0 && (
+          {doc.status === "parsed" && segments.length > 0 && (
             <p className="mb-3 text-sm text-emerald-700">
               Parsed successfully: {segments.length} segments ready for translation.
             </p>

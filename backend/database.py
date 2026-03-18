@@ -25,6 +25,7 @@ def init_db():
     import models  # noqa: F401 - registers models with Base
     Base.metadata.create_all(bind=engine)
     _migrate_schema()
+    _normalize_status_values()
 
 
 def _migrate_schema():
@@ -169,3 +170,34 @@ def _backfill_document_blocks():
             session.commit()
     finally:
         session.close()
+
+
+def _normalize_status_values():
+    """Normalize legacy status values to the canonical model."""
+    with engine.begin() as conn:
+        # Canonical document parse/ingest statuses:
+        # uploaded, parsing, parsed, parse_failed
+        conn.execute(
+            text(
+                "UPDATE documents SET status = 'parse_failed' WHERE status = 'failed'"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE documents SET status = 'parsed' WHERE status = 'segmented'"
+            )
+        )
+
+        # Canonical translation lifecycle statuses:
+        # translation_queued, translating, in_review, draft_saved,
+        # review_complete, ready_for_export, exported, failed
+        conn.execute(
+            text(
+                "UPDATE translation_jobs SET status = 'translation_queued' WHERE status = 'queued'"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE translation_jobs SET status = 'translating' WHERE status = 'translated'"
+            )
+        )

@@ -896,7 +896,7 @@ export default function TranslationReviewPage() {
 
   useEffect(() => {
     if (!job) return;
-    if (!["translation_queued", "translating", "translated"].includes(job.status)) return;
+    if (!["translation_queued", "translating"].includes(job.status)) return;
     const timer = window.setInterval(() => {
       void loadJobMeta();
       void loadReviewBlocks();

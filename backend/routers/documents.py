@@ -31,10 +31,8 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 DEFAULT_CUSTOMER_ID = os.getenv("DEFAULT_CUSTOMER_ID", "default")
 PARSING_STAGE = "parsing"
 SEGMENT_STAGE = "segmenting"
-FAILED_STATUS = "failed"
 PARSE_FAILED_STATUS = "parse_failed"
 PARSED_STATUS = "parsed"
-SEGMENTED_STATUS = "segmented"  # backward-compatible legacy status
 PARSING_STATUS = "parsing"
 ACTIVE_TRANSLATION_JOB_STATUSES = {
     "translation_queued",
@@ -90,7 +88,7 @@ def _run_document_pipeline(document_id: int):
             stage_job.started_at = datetime.utcnow()
             stage_job.error_message = None
             doc = db.query(Document).filter(Document.id == document_id).first()
-            if doc and doc.status not in {FAILED_STATUS, PARSE_FAILED_STATUS}:
+            if doc and doc.status != PARSE_FAILED_STATUS:
                 doc.status = PARSING_STATUS
             db.commit()
             logger.info(
@@ -139,14 +137,14 @@ def _run_default_upload_to_review_pipeline(document_id: int):
             return
 
         immediate_tasks = _ImmediateBackgroundTasks()
-        if doc.status in {"uploaded", FAILED_STATUS, PARSE_FAILED_STATUS}:
+        if doc.status in {"uploaded", PARSE_FAILED_STATUS}:
             parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db)
             db.expire_all()
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
                 return
 
-        if doc.status in {FAILED_STATUS, PARSE_FAILED_STATUS}:
+        if doc.status == PARSE_FAILED_STATUS:
             logger.warning("Auto pipeline stopped after parse failure for document_id=%d", document_id)
             return
 
@@ -171,7 +169,7 @@ def _run_default_upload_to_review_pipeline(document_id: int):
         if active_or_completed_job:
             return
 
-        if doc.status in {PARSED_STATUS, SEGMENTED_STATUS}:
+        if doc.status == PARSED_STATUS:
             # Import lazily to avoid circular import at module load time.
             from routers.translation_jobs import create_translation_job
 
@@ -312,7 +310,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
     parsing_job = next((job for job in stage_jobs if job.stage_name == PARSING_STAGE), None)
     segment_job = next((job for job in stage_jobs if job.stage_name == SEGMENT_STAGE), None)
 
-    if status in {PARSED_STATUS, SEGMENTED_STATUS}:
+    if status == PARSED_STATUS:
         return DocumentProgressResponse(
             document_id=doc.id,
             stage_label="Parsing complete",
@@ -321,7 +319,7 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
             is_complete=True,
             is_active=False,
         )
-    if status in {FAILED_STATUS, PARSE_FAILED_STATUS}:
+    if status == PARSE_FAILED_STATUS:
         return DocumentProgressResponse(
             document_id=doc.id,
             stage_label="Parsing failed",
