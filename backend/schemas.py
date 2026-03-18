@@ -150,6 +150,11 @@ class GlossaryMatchesResponse(BaseModel):
     matches: list[GlossaryMatchResponse]
 
 
+class AmbiguityChoiceOptionResponse(BaseModel):
+    meaning: str
+    translation: str
+
+
 class TranslationResultResponse(BaseModel):
     id: int
     job_id: int
@@ -165,6 +170,9 @@ class TranslationResultResponse(BaseModel):
     suggested_translation: str | None = None
     similarity_score: float | None = None
     current_translation: str
+    ambiguity_choice_found: bool = False
+    ambiguity_source_phrase: str | None = None
+    ambiguity_options: list[AmbiguityChoiceOptionResponse] = []
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False
@@ -194,6 +202,9 @@ class ReviewSegmentResponse(BaseModel):
     suggested_translation: str | None = None
     similarity_score: float | None = None
     current_translation: str
+    ambiguity_choice_found: bool = False
+    ambiguity_source_phrase: str | None = None
+    ambiguity_options: list[AmbiguityChoiceOptionResponse] = []
     ambiguity_detected: bool
     ambiguity_details: dict | None
     glossary_applied: bool = False

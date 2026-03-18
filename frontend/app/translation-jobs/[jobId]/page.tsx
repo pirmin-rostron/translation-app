@@ -37,6 +37,11 @@ type AmbiguityDetails = {
   alternatives: AmbiguityAlternative[];
 };
 
+type AmbiguityChoiceOption = {
+  meaning: string;
+  translation: string;
+};
+
 type GlossaryMatch = {
   source_term: string;
   target_term: string;
@@ -75,6 +80,9 @@ type ReviewSegment = {
   suggested_translation?: string | null;
   similarity_score?: number | null;
   current_translation?: string;
+  ambiguity_choice_found?: boolean;
+  ambiguity_source_phrase?: string | null;
+  ambiguity_options?: AmbiguityChoiceOption[];
   semantic_memory_details: {
     match_type: "semantic_memory";
     suggested_translation: string;
@@ -188,6 +196,38 @@ function isBlockResolved(block: DocumentBlock) {
 
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
+}
+
+function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
+  if (!segment) {
+    return {
+      ambiguityChoiceFound: false,
+      sourcePhrase: "",
+      explanation: "",
+      options: [] as AmbiguityChoiceOption[],
+      currentTranslation: "",
+    };
+  }
+
+  const rawOptions = Array.isArray(segment.ambiguity_options) ? segment.ambiguity_options : [];
+  const options = rawOptions
+    .map((option, idx) => {
+      const translation = (option?.translation || "").trim();
+      if (!translation) return null;
+      const meaning = (option?.meaning || "").trim() || `Possible meaning ${idx + 1}`;
+      return { meaning, translation };
+    })
+    .filter((option): option is AmbiguityChoiceOption => Boolean(option));
+  const sourcePhrase =
+    (segment.ambiguity_source_phrase || "").trim() || (segment.ambiguity_details?.source_span || "").trim();
+  const explanation = (segment.ambiguity_details?.explanation || "").trim();
+  const currentTranslation = segment.current_translation || segment.final_translation || "";
+  const ambiguityChoiceFound = Boolean(segment.ambiguity_choice_found ?? (segment.ambiguity_detected && options.length > 0));
+  return { ambiguityChoiceFound, sourcePhrase, explanation, options, currentTranslation };
+}
+
+function hasAmbiguityChoiceInBlock(block: DocumentBlock) {
+  return block.segments.some((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
 }
 
 function getSemanticChoiceDetails(segment: ReviewSegment | null) {
@@ -432,6 +472,7 @@ export default function TranslationReviewPage() {
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
   const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
+  const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | "current">("current");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -558,6 +599,7 @@ export default function TranslationReviewPage() {
     if (!selectedSegment) return;
     setDraftTranslation(selectedSegment.final_translation);
     setSemanticChoice("current");
+    setAmbiguityChoiceIndex("current");
     setIsEditing(false);
   }, [selectedSegment?.id, selectedSegment?.final_translation]);
 
@@ -617,8 +659,9 @@ export default function TranslationReviewPage() {
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
     if (!block || !block.segments.length) return;
+    const ambiguityChoiceSegment = block.segments.find((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
     const semanticChoiceSegment = block.segments.find((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
-    const fallbackSegmentId = preferredSegmentId ?? semanticChoiceSegment?.id ?? block.segments[0].id;
+    const fallbackSegmentId = preferredSegmentId ?? ambiguityChoiceSegment?.id ?? semanticChoiceSegment?.id ?? block.segments[0].id;
     if (reviewMode === "issues") {
       const firstIssue = block.segments
         .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
@@ -856,6 +899,7 @@ export default function TranslationReviewPage() {
           {node.blocks.map((block) => {
             const isActiveBlock = selectedBlock?.id === block.id;
             const hasSemanticChoice = hasSemanticChoiceInBlock(block);
+            const hasAmbiguityChoice = hasAmbiguityChoiceInBlock(block);
             return (
               <li
                 key={block.id}
@@ -873,6 +917,11 @@ export default function TranslationReviewPage() {
                       Semantic choice available
                     </span>
                   )}
+                  {hasAmbiguityChoice && (
+                    <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                      Ambiguity
+                    </span>
+                  )}
                 </div>
                 <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
                   {renderInlineSegments(block, side)}
@@ -888,6 +937,7 @@ export default function TranslationReviewPage() {
     const body = renderInlineSegments(block, side);
     const isActiveBlock = selectedBlock?.id === block.id;
     const hasSemanticChoice = hasSemanticChoiceInBlock(block);
+    const hasAmbiguityChoice = hasAmbiguityChoiceInBlock(block);
     if (block.block_type === "heading") {
       const H = getHeadingTag(block);
       return (
@@ -904,6 +954,11 @@ export default function TranslationReviewPage() {
             {hasSemanticChoice && (
               <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
                 Semantic choice available
+              </span>
+            )}
+            {hasAmbiguityChoice && (
+              <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                Ambiguity
               </span>
             )}
           </div>
@@ -925,6 +980,11 @@ export default function TranslationReviewPage() {
           {hasSemanticChoice && (
             <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
               Semantic choice available
+            </span>
+          )}
+          {hasAmbiguityChoice && (
+            <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+              Ambiguity
             </span>
           )}
         </div>
@@ -1017,10 +1077,15 @@ export default function TranslationReviewPage() {
 
   async function handleUseSelectedTranslation() {
     if (!selectedSegment) return;
-    if (semanticChoice === "suggested" && !semanticSuggestionText.trim()) return;
+    if (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) return;
+    if (!hasAmbiguityChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim()) return;
     const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
-    const chosenTranslation = semanticChoice === "suggested" ? semanticSuggestionText : draftTranslation;
-    const chosenStatus = semanticChoice === "suggested" ? "memory_match" : "approved";
+    const chosenTranslation = hasAmbiguityChoice
+      ? selectedAmbiguityTranslation
+      : semanticChoice === "suggested"
+        ? semanticSuggestionText
+        : draftTranslation;
+    const chosenStatus = hasAmbiguityChoice ? "approved" : semanticChoice === "suggested" ? "memory_match" : "approved";
     setActionLoading(true);
     setMessage("");
     setError("");
@@ -1030,11 +1095,9 @@ export default function TranslationReviewPage() {
       if (reviewMode === "document") {
         moveToBlockById(nextBlockId);
       }
-      setMessage(
-        semanticChoice === "suggested"
-          ? "Selected semantic memory translation and moved forward."
-          : "Selected current translation and moved forward."
-      );
+      setMessage(hasAmbiguityChoice ? "Selected ambiguity meaning and moved forward." : semanticChoice === "suggested"
+        ? "Selected semantic memory translation and moved forward."
+        : "Selected current translation and moved forward.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply selected translation");
     } finally {
@@ -1043,7 +1106,9 @@ export default function TranslationReviewPage() {
   }
 
   function handleEditSelectedTranslation() {
-    if (semanticChoice === "suggested" && semanticSuggestionText.trim()) {
+    if (hasAmbiguityChoice && selectedAmbiguityTranslation.trim()) {
+      setDraftTranslation(selectedAmbiguityTranslation);
+    } else if (semanticChoice === "suggested" && semanticSuggestionText.trim()) {
       setDraftTranslation(semanticSuggestionText);
     } else {
       setDraftTranslation(selectedSegment?.final_translation ?? draftTranslation);
@@ -1203,10 +1268,20 @@ export default function TranslationReviewPage() {
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
+  const ambiguityChoiceDetails = getAmbiguityChoiceDetails(selectedSegment);
+  const hasAmbiguityChoice = ambiguityChoiceDetails.ambiguityChoiceFound;
+  const ambiguityOptions = ambiguityChoiceDetails.options;
+  const selectedAmbiguityOption =
+    ambiguityChoiceIndex === "current" ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
+  const selectedAmbiguityTranslation =
+    ambiguityChoiceIndex === "current"
+      ? ambiguityChoiceDetails.currentTranslation
+      : (selectedAmbiguityOption?.translation ?? "");
   const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
   const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
+  const hasGuidedChoice = hasAmbiguityChoice || hasSemanticChoice;
   const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const workflowStatusLabel =
@@ -1661,6 +1736,61 @@ export default function TranslationReviewPage() {
                     <p className="mt-2 text-sm text-slate-700">{selectedIssue.title}</p>
                   </div>
                 )}
+                {hasAmbiguityChoice && (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
+                    <p className="font-medium text-amber-900">Ambiguity detected</p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Source phrase:{" "}
+                      <span className="font-medium">
+                        {ambiguityChoiceDetails.sourcePhrase || selectedSegment.ambiguity_details?.source_span || "Ambiguous phrase"}
+                      </span>
+                    </p>
+                    {ambiguityChoiceDetails.explanation && (
+                      <p className="mt-2 text-xs text-slate-700">{ambiguityChoiceDetails.explanation}</p>
+                    )}
+                    <div className="mt-3 space-y-2">
+                      <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="ambiguity-choice"
+                            value="current"
+                            checked={ambiguityChoiceIndex === "current"}
+                            onChange={() => setAmbiguityChoiceIndex("current")}
+                            disabled={isReadOnly}
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current translation</p>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{ambiguityChoiceDetails.currentTranslation}</p>
+                          </div>
+                        </div>
+                      </label>
+                      {ambiguityOptions.map((option, idx) => (
+                        <label
+                          key={`${option.meaning}-${idx}`}
+                          className="block cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-2"
+                        >
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="radio"
+                              name="ambiguity-choice"
+                              value={`option-${idx}`}
+                              checked={ambiguityChoiceIndex === idx}
+                              onChange={() => setAmbiguityChoiceIndex(idx)}
+                              disabled={isReadOnly}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{option.meaning}</p>
+                              <p className="mt-1 whitespace-pre-wrap text-slate-700">{option.translation}</p>
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="font-medium text-slate-900">Source</p>
@@ -1738,7 +1868,7 @@ export default function TranslationReviewPage() {
                   </div>
                 )}
 
-                {hasSemanticChoice && (
+                {hasSemanticChoice && !hasAmbiguityChoice && (
                   <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
                     <p className="font-medium text-sky-900">Semantic translation choice available</p>
                     <p className="mt-1 text-xs text-sky-700">
@@ -1793,19 +1923,23 @@ export default function TranslationReviewPage() {
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        onClick={hasSemanticChoice ? handleUseSelectedTranslation : handleApproveCurrentBlock}
-                        disabled={actionLoading || (hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim())}
+                        onClick={hasGuidedChoice ? handleUseSelectedTranslation : handleApproveCurrentBlock}
+                        disabled={
+                          actionLoading ||
+                          (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) ||
+                          (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && !semanticSuggestionText.trim())
+                        }
                         className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                       >
-                        {hasSemanticChoice ? "Use selected translation" : "Approve"}
+                        {hasGuidedChoice ? "Use selected translation" : "Approve"}
                       </button>
                       <button
                         type="button"
-                        onClick={hasSemanticChoice ? handleEditSelectedTranslation : () => setIsEditing(true)}
+                        onClick={hasGuidedChoice ? handleEditSelectedTranslation : () => setIsEditing(true)}
                         disabled={actionLoading || !canEditSelectedSegment}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                       >
-                        {hasSemanticChoice ? "Edit selected translation" : "Edit"}
+                        {hasGuidedChoice ? "Edit selected translation" : "Edit"}
                       </button>
                       <button
                         type="button"

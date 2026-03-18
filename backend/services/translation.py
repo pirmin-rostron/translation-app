@@ -95,15 +95,23 @@ def _safe_ambiguity_details(obj: object) -> dict | None:
     source_span = obj.get("source_span")
     explanation = obj.get("explanation")
     alternatives = obj.get("alternatives")
-    if not source_span or not explanation or not isinstance(alternatives, list):
+    if not source_span or not isinstance(alternatives, list):
         return None
     valid_alts = []
-    for a in alternatives:
-        if isinstance(a, dict) and a.get("translation") is not None and a.get("meaning") is not None:
-            valid_alts.append({"translation": str(a["translation"]), "meaning": str(a["meaning"])})
+    for idx, a in enumerate(alternatives):
+        if not isinstance(a, dict):
+            continue
+        translation = str(a.get("translation", "")).strip()
+        if not translation:
+            continue
+        meaning = str(a.get("meaning", "")).strip() or f"Possible meaning {idx + 1}"
+        valid_alts.append({"translation": translation, "meaning": meaning})
     if not valid_alts:
         return None
-    return {"source_span": str(source_span), "explanation": str(explanation), "alternatives": valid_alts}
+    explanation_text = str(explanation).strip() if explanation is not None else ""
+    if not explanation_text:
+        explanation_text = "The source phrase can be interpreted in more than one way."
+    return {"source_span": str(source_span), "explanation": explanation_text, "alternatives": valid_alts}
 
 
 def _build_glossary_instruction_for_segment(glossary_terms: list[dict] | None) -> str:

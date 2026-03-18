@@ -245,9 +245,53 @@ def _semantic_choice_payload(result: TranslationResult) -> tuple[bool, str | Non
     return semantic_match_found, suggested_translation, similarity_score, current_translation
 
 
+def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | None, list[dict[str, str]]]:
+    details = getattr(result, "ambiguity_details", None)
+    source_phrase: str | None = None
+    options: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    if isinstance(details, dict):
+        raw_source_phrase = details.get("source_span")
+        if isinstance(raw_source_phrase, str) and raw_source_phrase.strip():
+            source_phrase = raw_source_phrase.strip()
+        raw_alternatives = details.get("alternatives")
+        if isinstance(raw_alternatives, list):
+            for idx, option in enumerate(raw_alternatives):
+                if not isinstance(option, dict):
+                    continue
+                translation = str(option.get("translation", "")).strip()
+                if not translation:
+                    continue
+                meaning = str(option.get("meaning", "")).strip() or f"Possible meaning {idx + 1}"
+                key = (meaning, translation)
+                if key in seen:
+                    continue
+                seen.add(key)
+                options.append({"meaning": meaning, "translation": translation})
+
+    # Fallback: keep ambiguity actionable even when upstream options are sparse.
+    current_translation = (result.final_translation or "").strip()
+    primary_translation = (result.primary_translation or "").strip()
+    if current_translation:
+        key = ("Current model translation", current_translation)
+        if key not in seen:
+            seen.add(key)
+            options.append({"meaning": "Current model translation", "translation": current_translation})
+    if primary_translation and primary_translation != current_translation:
+        key = ("Alternative model phrasing", primary_translation)
+        if key not in seen:
+            seen.add(key)
+            options.append({"meaning": "Alternative model phrasing", "translation": primary_translation})
+
+    ambiguity_choice_found = bool(getattr(result, "ambiguity_detected", False) and options)
+    return ambiguity_choice_found, source_phrase, options
+
+
 def _serialize_translation_result(result: TranslationResult, segment: DocumentSegment | None) -> TranslationResultResponse:
     seg_resp = SegmentResponse.model_validate(segment) if segment else None
     semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
+    ambiguity_choice_found, ambiguity_source_phrase, ambiguity_options = _ambiguity_choice_payload(result)
     return TranslationResultResponse(
         id=result.id,
         job_id=result.job_id,
@@ -263,6 +307,9 @@ def _serialize_translation_result(result: TranslationResult, segment: DocumentSe
         suggested_translation=suggested_translation,
         similarity_score=similarity_score,
         current_translation=current_translation,
+        ambiguity_choice_found=ambiguity_choice_found,
+        ambiguity_source_phrase=ambiguity_source_phrase,
+        ambiguity_options=ambiguity_options,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -437,6 +484,7 @@ def _serialize_review_segment(
     annotations: list[SegmentAnnotation],
 ) -> ReviewSegmentResponse:
     semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
+    ambiguity_choice_found, ambiguity_source_phrase, ambiguity_options = _ambiguity_choice_payload(result)
     return ReviewSegmentResponse(
         id=result.id,
         segment_id=segment.id,
@@ -455,6 +503,9 @@ def _serialize_review_segment(
         suggested_translation=suggested_translation,
         similarity_score=similarity_score,
         current_translation=current_translation,
+        ambiguity_choice_found=ambiguity_choice_found,
+        ambiguity_source_phrase=ambiguity_source_phrase,
+        ambiguity_options=ambiguity_options,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
@@ -1332,6 +1383,7 @@ def update_translation_result(
     db.commit()
     db.refresh(result)
     semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
+    ambiguity_choice_found, ambiguity_source_phrase, ambiguity_options = _ambiguity_choice_payload(result)
 
     if review_status in {"approved", "edited"}:
         logger.info(
@@ -1361,6 +1413,9 @@ def update_translation_result(
         suggested_translation=suggested_translation,
         similarity_score=similarity_score,
         current_translation=current_translation,
+        ambiguity_choice_found=ambiguity_choice_found,
+        ambiguity_source_phrase=ambiguity_source_phrase,
+        ambiguity_options=ambiguity_options,
         ambiguity_detected=getattr(result, "ambiguity_detected", False) or False,
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
