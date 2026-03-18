@@ -1280,19 +1280,12 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleStartHereAction() {
+  function handleStartHereAction() {
     if (workflowStatus === "exported" || showExportAction) {
       handleOpenExportModal();
       return;
     }
-    if (segmentsRequiringAttention > 0) {
-      switchToIssuesMode();
-      return;
-    }
-    if (showApproveAllSafeSegments) {
-      await handleApproveAllSafeSegments();
-      return;
-    }
+    // "Start/Continue review" should always begin the sequential full-document flow.
     switchToDocumentMode();
   }
 
