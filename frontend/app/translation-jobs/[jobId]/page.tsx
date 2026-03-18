@@ -224,6 +224,18 @@ function normalizeChoiceText(value: string) {
   return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
+function cleanPanelText(value: string | null | undefined) {
+  if (!value) return "";
+  return value
+    .replace(/\\r\\n/g, " ")
+    .replace(/\\n/g, " ")
+    .replace(/\\'[0-9a-fA-F]{2}/g, " ")
+    .replace(/\\[a-z]+-?\d*\s?/gi, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function replaceFirstOccurrence(haystack: string, needle: string, replacement: string) {
   const idx = haystack.indexOf(needle);
   if (idx === -1) return haystack;
@@ -1941,20 +1953,14 @@ export default function TranslationReviewPage() {
                         {visibleIssues.length ? `Issue ${currentIssueIndex + 1} of ${visibleIssues.length}` : "Issue"}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-700">{selectedIssue.title}</p>
+                    <p className="mt-2 text-sm text-slate-700">{cleanPanelText(selectedIssue.title)}</p>
                   </div>
                 )}
                 {hasAmbiguityChoice && (
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
                     <p className="font-medium text-amber-900">Ambiguity detected</p>
-                    <p className="mt-1 text-xs text-amber-800">
-                      Source phrase:{" "}
-                      <span className="font-medium">
-                        {ambiguityChoiceDetails.sourcePhrase || selectedSegment.ambiguity_details?.source_span || "Ambiguous phrase"}
-                      </span>
-                    </p>
                     {ambiguityChoiceDetails.explanation && (
-                      <p className="mt-2 text-xs text-slate-700">{ambiguityChoiceDetails.explanation}</p>
+                      <p className="mt-2 text-xs text-slate-700">{cleanPanelText(ambiguityChoiceDetails.explanation)}</p>
                     )}
                     {blockAmbiguityIssues.length > 1 && (
                       <p className="mt-2 text-xs font-medium text-amber-800">
@@ -1982,7 +1988,7 @@ export default function TranslationReviewPage() {
                             />
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                                {option.meaning}
+                                {cleanPanelText(option.meaning)}
                                 {idx === currentSuggestionIndex
                                   ? " - Current suggestion"
                                   : ""}
