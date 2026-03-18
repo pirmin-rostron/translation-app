@@ -1187,9 +1187,10 @@ export default function TranslationReviewPage() {
   }
 
   function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string) {
-    const selectedChoice = cleanChoiceTranslationText(choiceTranslation);
-    if (!selectedChoice) return selectedChoice;
+    const selectedChoice = (choiceTranslation || "").trim();
+    if (!selectedChoice) return segment.final_translation || "";
     const currentText = segment.final_translation || "";
+    if (!currentText.trim()) return selectedChoice;
     const ambiguityAnnotation = segment.annotations.find((annotation) => annotation.annotation_type === "ambiguity");
     const rawAmbiguousTarget = (ambiguityAnnotation?.target_span_text || "").trim();
     const currentAmbiguousTarget = cleanChoiceTranslationText(ambiguityAnnotation?.target_span_text || "");
@@ -1199,8 +1200,18 @@ export default function TranslationReviewPage() {
     if (currentAmbiguousTarget && currentText.includes(currentAmbiguousTarget)) {
       return replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice);
     }
-    // Fallback to full replacement when no reliable span replacement exists.
-    return selectedChoice;
+    const alternativeCandidates = (segment.ambiguity_details?.alternatives || [])
+      .flatMap((alternative) => [String(alternative?.translation || "").trim(), cleanChoiceTranslationText(alternative?.translation || "")])
+      .filter((value) => value.length > 0);
+    const candidates = [...new Set(alternativeCandidates)];
+    for (const candidate of candidates) {
+      if (candidate === selectedChoice) continue;
+      if (currentText.includes(candidate)) {
+        return replaceFirstOccurrence(currentText, candidate, selectedChoice);
+      }
+    }
+    // No reliable in-context span match: keep full segment text to avoid collapsing content.
+    return currentText;
   }
 
   async function handleUseSelectedTranslation() {
