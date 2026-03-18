@@ -249,7 +249,7 @@ def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | No
     details = getattr(result, "ambiguity_details", None)
     source_phrase: str | None = None
     options: list[dict[str, str]] = []
-    seen: set[tuple[str, str]] = set()
+    seen_translations: set[str] = set()
 
     if isinstance(details, dict):
         raw_source_phrase = details.get("source_span")
@@ -264,24 +264,24 @@ def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | No
                 if not translation:
                     continue
                 meaning = str(option.get("meaning", "")).strip() or f"Possible meaning {idx + 1}"
-                key = (meaning, translation)
-                if key in seen:
+                normalized_translation = translation.casefold()
+                if normalized_translation in seen_translations:
                     continue
-                seen.add(key)
+                seen_translations.add(normalized_translation)
                 options.append({"meaning": meaning, "translation": translation})
 
     # Fallback: keep ambiguity actionable even when upstream options are sparse.
     current_translation = (result.final_translation or "").strip()
     primary_translation = (result.primary_translation or "").strip()
     if current_translation:
-        key = ("Current model translation", current_translation)
-        if key not in seen:
-            seen.add(key)
+        normalized_current = current_translation.casefold()
+        if normalized_current not in seen_translations:
+            seen_translations.add(normalized_current)
             options.append({"meaning": "Current model translation", "translation": current_translation})
     if primary_translation and primary_translation != current_translation:
-        key = ("Alternative model phrasing", primary_translation)
-        if key not in seen:
-            seen.add(key)
+        normalized_primary = primary_translation.casefold()
+        if normalized_primary not in seen_translations:
+            seen_translations.add(normalized_primary)
             options.append({"meaning": "Alternative model phrasing", "translation": primary_translation})
 
     ambiguity_choice_found = bool(getattr(result, "ambiguity_detected", False) and options)

@@ -194,6 +194,10 @@ function isBlockResolved(block: DocumentBlock) {
   return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
 }
 
+function normalizeChoiceText(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -210,14 +214,17 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
   }
 
   const rawOptions = Array.isArray(segment.ambiguity_options) ? segment.ambiguity_options : [];
-  const options = rawOptions
-    .map((option, idx) => {
-      const translation = (option?.translation || "").trim();
-      if (!translation) return null;
-      const meaning = (option?.meaning || "").trim() || `Possible meaning ${idx + 1}`;
-      return { meaning, translation };
-    })
-    .filter((option): option is AmbiguityChoiceOption => Boolean(option));
+  const seen = new Set<string>();
+  const options = rawOptions.reduce<AmbiguityChoiceOption[]>((acc, option, idx) => {
+    const translation = (option?.translation || "").trim();
+    if (!translation) return acc;
+    const normalized = normalizeChoiceText(translation);
+    if (seen.has(normalized)) return acc;
+    seen.add(normalized);
+    const meaning = (option?.meaning || "").trim() || `Possible meaning ${idx + 1}`;
+    acc.push({ meaning, translation });
+    return acc;
+  }, []);
   const sourcePhrase =
     (segment.ambiguity_source_phrase || "").trim() || (segment.ambiguity_details?.source_span || "").trim();
   const explanation = (segment.ambiguity_details?.explanation || "").trim();
@@ -472,7 +479,7 @@ export default function TranslationReviewPage() {
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
   const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
-  const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | "current">("current");
+  const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -599,7 +606,12 @@ export default function TranslationReviewPage() {
     if (!selectedSegment) return;
     setDraftTranslation(selectedSegment.final_translation);
     setSemanticChoice("current");
-    setAmbiguityChoiceIndex("current");
+    const ambiguityDetails = getAmbiguityChoiceDetails(selectedSegment);
+    const currentTranslationNormalized = normalizeChoiceText(ambiguityDetails.currentTranslation);
+    const currentChoiceIndex = ambiguityDetails.options.findIndex(
+      (option) => normalizeChoiceText(option.translation) === currentTranslationNormalized
+    );
+    setAmbiguityChoiceIndex(currentChoiceIndex >= 0 ? currentChoiceIndex : null);
     setIsEditing(false);
   }, [selectedSegment?.id, selectedSegment?.final_translation]);
 
@@ -1271,12 +1283,8 @@ export default function TranslationReviewPage() {
   const ambiguityChoiceDetails = getAmbiguityChoiceDetails(selectedSegment);
   const hasAmbiguityChoice = ambiguityChoiceDetails.ambiguityChoiceFound;
   const ambiguityOptions = ambiguityChoiceDetails.options;
-  const selectedAmbiguityOption =
-    ambiguityChoiceIndex === "current" ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
-  const selectedAmbiguityTranslation =
-    ambiguityChoiceIndex === "current"
-      ? ambiguityChoiceDetails.currentTranslation
-      : (selectedAmbiguityOption?.translation ?? "");
+  const selectedAmbiguityOption = ambiguityChoiceIndex == null ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
+  const selectedAmbiguityTranslation = selectedAmbiguityOption?.translation ?? "";
   const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
   const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
   const semanticSuggestionText = semanticChoiceDetails.suggestedTranslation;
@@ -1748,24 +1756,10 @@ export default function TranslationReviewPage() {
                     {ambiguityChoiceDetails.explanation && (
                       <p className="mt-2 text-xs text-slate-700">{ambiguityChoiceDetails.explanation}</p>
                     )}
+                    {ambiguityChoiceIndex == null && (
+                      <p className="mt-2 text-xs text-amber-800">Choose one meaning to continue.</p>
+                    )}
                     <div className="mt-3 space-y-2">
-                      <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="radio"
-                            name="ambiguity-choice"
-                            value="current"
-                            checked={ambiguityChoiceIndex === "current"}
-                            onChange={() => setAmbiguityChoiceIndex("current")}
-                            disabled={isReadOnly}
-                            className="mt-0.5"
-                          />
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current translation</p>
-                            <p className="mt-1 whitespace-pre-wrap text-slate-700">{ambiguityChoiceDetails.currentTranslation}</p>
-                          </div>
-                        </div>
-                      </label>
                       {ambiguityOptions.map((option, idx) => (
                         <label
                           key={`${option.meaning}-${idx}`}
@@ -1782,7 +1776,13 @@ export default function TranslationReviewPage() {
                               className="mt-0.5"
                             />
                             <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{option.meaning}</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                                {option.meaning}
+                                {normalizeChoiceText(option.translation) ===
+                                normalizeChoiceText(ambiguityChoiceDetails.currentTranslation)
+                                  ? " - Current suggestion"
+                                  : ""}
+                              </p>
                               <p className="mt-1 whitespace-pre-wrap text-slate-700">{option.translation}</p>
                             </div>
                           </div>
