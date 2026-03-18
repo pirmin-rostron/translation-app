@@ -262,6 +262,24 @@ def _clean_choice_translation(text: str | None) -> str:
     return " ".join(cleaned.split()).strip()
 
 
+def _clean_export_translation(text: str | None) -> str:
+    if not text:
+        return ""
+    cleaned = text.replace("\\n", "\n")
+    cleaned = cleaned.replace("\\r\\n", "\n")
+    # Preserve paragraph boundaries from RTF-like markers before stripping control words.
+    cleaned = re.sub(r"\\par\b", "\n", cleaned, flags=re.IGNORECASE)
+    cleaned = _RTF_HEX_ESCAPE_PATTERN.sub(" ", cleaned)
+    cleaned = _RTF_CONTROL_PATTERN.sub(" ", cleaned)
+    cleaned = cleaned.replace("{", " ").replace("}", " ")
+    # Normalize whitespace but keep meaningful line breaks.
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = "\n".join(line.strip() for line in cleaned.splitlines())
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | None, list[dict[str, str]]]:
     details = getattr(result, "ambiguity_details", None)
     source_phrase: str | None = None
@@ -476,8 +494,10 @@ def _refresh_document_block_translation(db: Session, block_id: int, job_id: int)
             .filter(TranslationResult.job_id == job_id, TranslationResult.segment_id == segment.id)
             .first()
         )
-        if result and result.final_translation.strip():
-            translated_parts.append(result.final_translation)
+        if result:
+            cleaned = _clean_export_translation(result.final_translation)
+            if cleaned:
+                translated_parts.append(cleaned)
     block.text_translated = _compose_block_translation(block.block_type, translated_parts)
 
 
@@ -604,20 +624,19 @@ def _build_export_text(db: Session, job: TranslationJob) -> str:
 
     output_lines: list[str] = []
     for block in blocks:
-        block_segments = segments_by_block_id.get(block.id, [])
+        block_segments = sorted(
+            segments_by_block_id.get(block.id, []),
+            key=lambda segment: segment.segment_index,
+        )
         translated_parts: list[str] = []
-        last_part = ""
         for segment in block_segments:
             result = result_by_segment_id.get(segment.id)
             if not result:
                 continue
-            cleaned_part = _clean_choice_translation(result.final_translation)
+            cleaned_part = _clean_export_translation(result.final_translation)
             if not cleaned_part:
                 continue
-            if cleaned_part == last_part:
-                continue
             translated_parts.append(cleaned_part)
-            last_part = cleaned_part
         translated_text = _compose_block_translation(block.block_type, translated_parts) or ""
         translated_text = translated_text.strip()
         if not translated_text:
