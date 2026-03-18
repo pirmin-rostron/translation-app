@@ -16,17 +16,23 @@ const navItems: NavItem[] = [
     match: (pathname) =>
       pathname === "/" ||
       pathname.startsWith("/documents") ||
+      pathname.startsWith("/processing") ||
       pathname.startsWith("/translation-jobs"),
+  },
+  {
+    label: "Upload",
+    href: "/upload",
+    match: (pathname) => pathname.startsWith("/upload"),
   },
   {
     label: "Glossary",
     href: "/glossary",
-    match: (pathname) => pathname.startsWith("/glossary"),
+    match: (pathname) => pathname.startsWith("/glossary") || pathname.startsWith("/imports"),
   },
   {
-    label: "Imports",
-    href: "/imports",
-    match: (pathname) => pathname.startsWith("/imports") || pathname.startsWith("/upload"),
+    label: "Certified Translation",
+    href: "/certified-translation",
+    match: (pathname) => pathname.startsWith("/certified-translation"),
   },
   {
     label: "Settings",
@@ -42,7 +48,7 @@ export default function Nav() {
     <nav className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
         <Link href="/" className="text-lg font-semibold text-slate-900 hover:text-slate-700">
-          Document Translation
+          Translation Workspace
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">

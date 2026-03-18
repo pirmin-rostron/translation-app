@@ -23,6 +23,9 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
 
+const IN_PROGRESS_STATUSES = new Set(["parsing", "parsed", "segmented", "translation_queued", "translating", "translated"]);
+const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "ready_for_export", "exported"]);
+
 export default function AllTranslationsPage() {
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,8 +156,19 @@ export default function AllTranslationsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{formatDate(doc.created_at)}</td>
                     <td className="px-6 py-4 flex gap-2">
-                      <Link href={`/documents/${doc.id}`} className="text-sm text-slate-600 hover:text-slate-900">
-                        View
+                      <Link
+                        href={
+                          IN_PROGRESS_STATUSES.has(doc.status)
+                            ? `/processing/${doc.id}`
+                            : `/documents/${doc.id}`
+                        }
+                        className="text-sm text-slate-600 hover:text-slate-900"
+                      >
+                        {IN_PROGRESS_STATUSES.has(doc.status)
+                          ? "View progress"
+                          : REVIEW_STATUSES.has(doc.status)
+                            ? "Open review/export"
+                            : "Open details"}
                       </Link>
                       {(doc.status === "uploaded" || doc.status === "failed") && (
                         <button

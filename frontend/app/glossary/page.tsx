@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -107,6 +108,19 @@ export default function GlossaryPage() {
     <div className="min-h-screen bg-slate-50">
       <main className="mx-auto max-w-5xl px-6 py-12">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Glossary</h1>
+
+        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Bulk CSV import</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Use bulk import to seed terminology quickly, then manage terms here with create/delete actions.
+          </p>
+          <Link
+            href="/imports"
+            className="mt-4 inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Open glossary CSV import
+          </Link>
+        </div>
 
         <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm mb-8">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Add term</h2>
