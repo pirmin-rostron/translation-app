@@ -1515,6 +1515,8 @@ export default function TranslationReviewPage() {
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
   const totalBlocks = orderedBlocks.length;
   const flaggedIssuesCount = flagged.length;
+  const reviewProgressPercent =
+    totalBlocks > 0 ? Math.round((completedBlocks / totalBlocks) * 100) : 0;
   const guidanceTitle =
     workflowStatus === "exported"
       ? "Document exported"
@@ -1594,16 +1596,9 @@ export default function TranslationReviewPage() {
 
         {translationProgress && !translationProgress.is_complete && (
           <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
-            <p className="text-sm font-medium text-emerald-900">Translation in progress…</p>
-            <p className="mt-1 text-sm text-slate-700">{translationProgress.stage_label}</p>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-600">
-              {translationProgress.percentage.toFixed(0)}% • {translationProgress.completed_segments}/
+            <p className="text-sm font-medium text-emerald-900">Translation status</p>
+            <p className="mt-1 text-sm text-slate-700">
+              {translationProgress.stage_label} • {translationProgress.completed_segments}/
               {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
             </p>
           </section>
@@ -1616,6 +1611,23 @@ export default function TranslationReviewPage() {
               <p className="mt-1 text-2xl font-semibold text-slate-900">{workflowStatusLabel}</p>
               <p className="mt-2 text-sm font-medium text-slate-800">{guidanceTitle}</p>
               <p className="mt-1 text-sm text-slate-600">{guidanceDetail}</p>
+              <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review progress</p>
+                  <p className="text-xs font-medium text-slate-700">
+                    {completedBlocks} of {totalBlocks} blocks completed
+                  </p>
+                </div>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+                  <div
+                    className="h-full rounded-full bg-indigo-600 transition-all"
+                    style={{ width: `${Math.max(0, Math.min(100, reviewProgressPercent))}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  {reviewProgressPercent}% complete • {unresolvedBlocks} unresolved block{unresolvedBlocks === 1 ? "" : "s"} remaining
+                </p>
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Blocks</p>

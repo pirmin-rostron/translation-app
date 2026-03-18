@@ -287,12 +287,6 @@ export default function ProcessingPage() {
               <p className="mt-1 text-sm text-slate-700">
                 Translating {translationProgress.completed_segments} of {translationProgress.total_segments} segments
               </p>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
-                />
-              </div>
               <p className="mt-1 text-xs text-slate-500">
                 {translationProgress.percentage.toFixed(0)}% • {formatEta(translationProgress.eta_seconds)}
               </p>
