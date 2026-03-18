@@ -208,6 +208,14 @@ function normalizeChoiceText(value: string) {
   return cleanChoiceTranslationText(value).toLocaleLowerCase();
 }
 
+function ambiguityHint(translation: string) {
+  const cleaned = cleanChoiceTranslationText(translation).replace(/[.,;:!?()[\]{}"']/g, " ").trim();
+  if (!cleaned) return null;
+  const firstToken = cleaned.split(/\s+/)[0];
+  if (!firstToken) return null;
+  return `Uses "${firstToken}"`;
+}
+
 function hasSemanticChoiceInBlock(block: DocumentBlock) {
   return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
 }
@@ -1793,7 +1801,9 @@ export default function TranslationReviewPage() {
                                   ? " - Current suggestion"
                                   : ""}
                               </p>
-                              <p className="mt-1 whitespace-pre-wrap text-slate-700">{option.translation}</p>
+                              {ambiguityHint(option.translation) && (
+                                <p className="mt-1 text-xs text-slate-500">{ambiguityHint(option.translation)}</p>
+                              )}
                             </div>
                           </div>
                         </label>
@@ -1941,7 +1951,7 @@ export default function TranslationReviewPage() {
                         }
                         className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                       >
-                        {hasGuidedChoice ? "Use selected translation" : "Approve"}
+                        {hasAmbiguityChoice ? "Use selected meaning" : hasGuidedChoice ? "Use selected translation" : "Approve"}
                       </button>
                       <button
                         type="button"
@@ -1949,7 +1959,7 @@ export default function TranslationReviewPage() {
                         disabled={actionLoading || !canEditSelectedSegment}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                       >
-                        {hasGuidedChoice ? "Edit selected translation" : "Edit"}
+                        {hasAmbiguityChoice ? "Edit" : hasGuidedChoice ? "Edit selected translation" : "Edit"}
                       </button>
                       <button
                         type="button"
