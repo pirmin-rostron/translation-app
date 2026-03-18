@@ -155,11 +155,14 @@ type ExportResult = {
   job_id: number;
   status: string;
   export_format: string;
+  export_mode: "clean_text" | "preserve_formatting";
   filename: string;
   download_url: string;
   generated_at: string;
   version: number;
 };
+
+type ExportMode = "clean_text" | "preserve_formatting";
 
 type ExportFile = {
   filename: string;
@@ -507,6 +510,8 @@ export default function TranslationReviewPage() {
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [exportHistory, setExportHistory] = useState<ExportFile[]>([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportMode, setExportMode] = useState<ExportMode>("clean_text");
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -1273,20 +1278,27 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleExportFinalDocument() {
+  async function handleExportFinalDocument(selectedMode: ExportMode) {
     if (!job) return;
     setActionLoading(true);
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt&export_mode=${selectedMode}`,
+        {
+          method: "POST",
+        }
+      );
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.detail || "Failed to export document");
       setExportResult(payload as ExportResult);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
-      setMessage("Export completed.");
+      setMessage(
+        selectedMode === "preserve_formatting"
+          ? "Export completed with preserved formatting."
+          : "Export completed as clean text."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
     } finally {
@@ -1294,10 +1306,21 @@ export default function TranslationReviewPage() {
     }
   }
 
+  function handleOpenExportModal() {
+    const hasFormattingSignals = blocks.some(
+      (block) =>
+        block.block_type !== "paragraph" || (block.formatting_json && Object.keys(block.formatting_json).length > 0)
+    );
+    setExportMode(hasFormattingSignals ? "preserve_formatting" : "clean_text");
+    setShowExportModal(true);
+  }
+
   async function handleExportDocumentWorkflow() {
     if (!job) return;
+    const selectedMode = exportMode;
+    setShowExportModal(false);
     if (workflowStatus === "ready_for_export") {
-      await handleExportFinalDocument();
+      await handleExportFinalDocument(selectedMode);
       return;
     }
     if (!reviewComplete) {
@@ -1314,14 +1337,17 @@ export default function TranslationReviewPage() {
       const readyPayload = await markReady.json().catch(() => ({}));
       if (!markReady.ok) throw new Error(readyPayload.detail || "Failed to mark ready for export");
 
-      const exportRes = await fetch(`${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt`, {
-        method: "POST",
-      });
-      const exportPayload = await exportRes.json().catch(() => ({}));
-      if (!exportRes.ok) throw new Error(exportPayload.detail || "Failed to export document");
+      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?export_format=txt&export_mode=${selectedMode}`;
+      const exportRes2 = await fetch(exportUrl, { method: "POST" });
+      const exportPayload = await exportRes2.json().catch(() => ({}));
+      if (!exportRes2.ok) throw new Error(exportPayload.detail || "Failed to export document");
       setExportResult(exportPayload as ExportResult);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
-      setMessage("Document finalized and exported.");
+      setMessage(
+        selectedMode === "preserve_formatting"
+          ? "Document finalized and exported with preserved formatting."
+          : "Document finalized and exported as clean text."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export document");
     } finally {
@@ -1580,7 +1606,7 @@ export default function TranslationReviewPage() {
               {showExportAction && (
                 <button
                   type="button"
-                  onClick={handleExportDocumentWorkflow}
+                  onClick={handleOpenExportModal}
                   disabled={actionLoading}
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
                 >
@@ -2137,6 +2163,71 @@ export default function TranslationReviewPage() {
             )}
           </aside>
         </div>
+        {showExportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
+            <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">Export settings</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Choose how formatting should be handled for the exported reviewed document.
+              </p>
+              <div className="mt-4 space-y-3">
+                <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="export-mode"
+                      value="preserve_formatting"
+                      checked={exportMode === "preserve_formatting"}
+                      onChange={() => setExportMode("preserve_formatting")}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">Preserve original formatting</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Keeps headings, spacing, and structure where possible.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+                <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="export-mode"
+                      value="clean_text"
+                      checked={exportMode === "clean_text"}
+                      onChange={() => setExportMode("clean_text")}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">Clean text only</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Removes formatting markers and exports plain reviewed text.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportDocumentWorkflow}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
+                >
+                  Export document
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

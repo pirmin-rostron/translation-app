@@ -262,6 +262,7 @@ class ExportResponse(BaseModel):
     job_id: int
     status: str
     export_format: str
+    export_mode: str
     filename: str
     download_url: str
     generated_at: datetime

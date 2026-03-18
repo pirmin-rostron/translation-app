@@ -57,6 +57,7 @@ SEGMENT_REVIEW_STATES = {"unreviewed", "approved", "edited", "memory_match"}
 _RTF_CONTROL_PATTERN = re.compile(r"\\[a-z]+-?\d* ?", re.IGNORECASE)
 _RTF_HEX_ESCAPE_PATTERN = re.compile(r"\\'[0-9a-fA-F]{2}")
 _EXPORT_FILENAME_PATTERN = re.compile(r"^(?P<prefix>.+)-v(?P<version>\d+)\.txt$")
+SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
 
 
 def _queue_stage_job(
@@ -278,6 +279,25 @@ def _clean_export_translation(text: str | None) -> str:
     cleaned = "\n".join(line.strip() for line in cleaned.splitlines())
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
+
+
+def _preserve_export_translation(text: str | None) -> str:
+    if not text:
+        return ""
+    preserved = text.replace("\\r\\n", "\n").replace("\\n", "\n")
+    preserved = "\n".join(line.rstrip() for line in preserved.splitlines())
+    preserved = re.sub(r"\n{3,}", "\n\n", preserved)
+    return preserved.strip()
+
+
+def _normalize_export_mode(export_mode: str) -> str:
+    normalized = (export_mode or "").strip().lower()
+    if normalized not in SUPPORTED_EXPORT_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"export_mode must be one of: {', '.join(sorted(SUPPORTED_EXPORT_MODES))}",
+        )
+    return normalized
 
 
 def _ambiguity_choice_payload(result: TranslationResult) -> tuple[bool, str | None, list[dict[str, str]]]:
@@ -603,7 +623,7 @@ def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummary
     )
 
 
-def _build_export_text(db: Session, job: TranslationJob) -> str:
+def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> str:
     blocks = (
         db.query(DocumentBlock)
         .filter(DocumentBlock.document_id == job.document_id)
@@ -633,7 +653,11 @@ def _build_export_text(db: Session, job: TranslationJob) -> str:
             result = result_by_segment_id.get(segment.id)
             if not result:
                 continue
-            cleaned_part = _clean_export_translation(result.final_translation)
+            cleaned_part = (
+                _clean_export_translation(result.final_translation)
+                if export_mode == "clean_text"
+                else _preserve_export_translation(result.final_translation)
+            )
             if not cleaned_part:
                 continue
             translated_parts.append(cleaned_part)
@@ -1341,11 +1365,13 @@ def reopen_review(job_id: int, db: Session = Depends(get_db)):
 def export_translation_job(
     job_id: int,
     export_format: str = Query(default="txt"),
+    export_mode: str = Query(default="clean_text"),
     db: Session = Depends(get_db),
 ):
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    normalized_export_mode = _normalize_export_mode(export_mode)
     if export_format.lower() != "txt":
         raise HTTPException(status_code=400, detail="Only txt export is supported currently")
     if job.status != "ready_for_export":
@@ -1360,7 +1386,7 @@ def export_translation_job(
     prefix = _export_filename_prefix(doc, job)
     filename = f"{prefix}-v{version}.txt"
     filepath = EXPORT_DIR / filename
-    filepath.write_text(_build_export_text(db, job), encoding="utf-8")
+    filepath.write_text(_build_export_text(db, job, normalized_export_mode), encoding="utf-8")
 
     exported_at = datetime.utcnow()
     job.status = "exported"
@@ -1371,6 +1397,7 @@ def export_translation_job(
         job_id=job.id,
         status=job.status,
         export_format="txt",
+        export_mode=normalized_export_mode,
         filename=filename,
         download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
         generated_at=exported_at,
