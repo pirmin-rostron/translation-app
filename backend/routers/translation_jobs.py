@@ -40,7 +40,7 @@ from schemas import (
     TranslationResultUpdateRequest,
 )
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
-from services.translation import SegmentContext, get_batch_size, get_translation_provider
+from services.translation import SegmentContext, get_translation_provider
 from services.translation_memory import (
     TranslationMemoryMatch,
     find_exact_memory_match,
@@ -1091,7 +1091,6 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         raise ValueError("Document has no segmented content to translate")
 
     provider, provider_name = get_translation_provider()
-    batch_size = get_batch_size()
     source_lang = doc.source_language or "unknown"
     translation_style = (job.translation_style or TRANSLATION_STYLE_NATURAL).strip().lower()
     if translation_style not in TRANSLATION_STYLES:
@@ -1104,10 +1103,9 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         domain=doc.domain,
     )
     logger.info(
-        "Translation stage start: provider=%s style=%s batch_size=%d segments=%d document_id=%d job_id=%d",
+        "Translation stage start: provider=%s style=%s segments=%d document_id=%d job_id=%d",
         provider_name,
         translation_style,
-        batch_size,
         len(segments),
         doc.id,
         translation_job_id,
@@ -1125,8 +1123,8 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     job.progress_started_at = datetime.utcnow()
     db.commit()
 
-    for i in range(0, len(segments), batch_size):
-        batch = segments[i : i + batch_size]
+    for i in range(0, len(segments), 1):
+        batch = segments[i : i + 1]
         exact_memory_matches: dict[int, TranslationMemoryMatch] = {}
         semantic_suggestions: dict[int, TranslationMemoryMatch] = {}
         missing_segments: list[DocumentSegment] = []
@@ -1274,7 +1272,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
     doc = db.query(Document).filter(Document.id == job.document_id).first()
     job.translation_provider = provider_name
-    job.translation_batch_size = batch_size
+    job.translation_batch_size = 1
     job.status = JOB_STATUS_TRANSLATING
     job.progress_total_segments = total_segments
     job.progress_completed_segments = total_segments

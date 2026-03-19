@@ -3,14 +3,14 @@ import math
 import os
 from dataclasses import dataclass
 
-from openai import OpenAI
+import voyageai
 from sqlalchemy.orm import Session
 
 from models import ApprovedTranslation
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_MODEL = "voyage-3-lite"
 SEMANTIC_MEMORY_THRESHOLD = float(os.getenv("SEMANTIC_MEMORY_THRESHOLD", "0.80"))
 
 
@@ -35,22 +35,21 @@ def _is_valid_api_key(key: str) -> bool:
     return key.lower() not in (p.lower() for p in placeholders)
 
 
-def _get_embedding_client() -> OpenAI | None:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+def _get_embedding_client() -> voyageai.Client | None:
+    api_key = os.getenv("VOYAGE_API_KEY", "").strip()
     if not _is_valid_api_key(api_key):
         return None
-    return OpenAI(api_key=api_key)
+    return voyageai.Client(api_key=api_key)
 
 
 def _embed_text(text: str) -> list[float] | None:
     client = _get_embedding_client()
     if client is None:
-        logger.warning("Semantic memory embedding skipped: OPENAI_API_KEY missing or invalid")
+        logger.warning("Semantic memory embedding skipped: VOYAGE_API_KEY missing or invalid")
         return None
     try:
-        response = client.embeddings.create(model=EMBEDDING_MODEL, input=text)
-        embedding = response.data[0].embedding
-        return [float(value) for value in embedding]
+        response = client.embed([text], model=EMBEDDING_MODEL, input_type="document")
+        return [float(value) for value in response.embeddings[0]]
     except Exception as exc:
         logger.warning("Semantic memory embedding failed: %s", exc)
         return None

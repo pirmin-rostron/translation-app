@@ -1,0 +1,3 @@
+# Add your OpenAI API key below (create a new key at platform.openai.com/api-keys)
+OPENAI_API_KEY=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
+TRANSLATION_PROVIDER=openai

@@ -25,8 +25,8 @@ services:
       DATABASE_URL: postgresql://translation:translation@postgres:5432/translation
       UPLOAD_DIR: /app/uploads
       TRANSLATION_PROVIDER: ${TRANSLATION_PROVIDER:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TRANSLATION_BATCH_SIZE: ${TRANSLATION_BATCH_SIZE:-5}
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
