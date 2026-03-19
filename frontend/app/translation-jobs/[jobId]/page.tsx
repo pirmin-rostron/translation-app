@@ -159,6 +159,19 @@ type ReviewSummary = {
   can_mark_ready_for_export: boolean;
 };
 
+type CanonicalReviewCounts = {
+  total_blocks: number;
+  completed_blocks: number;
+  remaining_blocks: number;
+  ambiguity_count: number;
+  glossary_count: number;
+  memory_count: number;
+  issues_count: number;
+  total_segments: number;
+  unresolved_segments: number;
+  safe_unresolved_segments: number;
+};
+
 type ExportResult = {
   job_id: number;
   status: string;
@@ -422,6 +435,37 @@ function buildDocumentNodes(blocks: DocumentBlock[]) {
     nodes.push({ key: `block-${block.id}`, type: "block", block });
   }
   return nodes;
+}
+
+function deriveCanonicalReviewCounts(
+  orderedBlocks: DocumentBlock[],
+  allSegments: { block: DocumentBlock; segment: ReviewSegment }[],
+  reviewSummary: ReviewSummary | null
+): CanonicalReviewCounts {
+  const unresolvedEntries = allSegments.filter(({ segment }) => !isAcceptableFinalStatus(segment.review_status));
+  const totalBlocks = orderedBlocks.length;
+  const completedBlocks = orderedBlocks.filter((block) => isBlockResolved(block)).length;
+  const remainingBlocks = Math.max(totalBlocks - completedBlocks, 0);
+  const unresolvedAmbiguities =
+    reviewSummary?.unresolved_ambiguities ?? unresolvedEntries.filter(({ segment }) => hasValidAmbiguityChoice(segment)).length;
+  const unresolvedGlossary = unresolvedEntries.filter(({ segment }) => segment.glossary_applied).length;
+  const unresolvedMemory = unresolvedEntries.filter(({ segment }) => hasMemory(segment)).length;
+  const unresolvedIssues = unresolvedEntries.filter(({ segment }) => isFlagged(segment)).length;
+  const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? unresolvedEntries.length;
+  const totalSegments = reviewSummary?.total_segments ?? allSegments.length;
+  const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
+  return {
+    total_blocks: totalBlocks,
+    completed_blocks: completedBlocks,
+    remaining_blocks: remainingBlocks,
+    ambiguity_count: unresolvedAmbiguities,
+    glossary_count: unresolvedGlossary,
+    memory_count: unresolvedMemory,
+    issues_count: unresolvedIssues,
+    total_segments: totalSegments,
+    unresolved_segments: unresolvedSegments,
+    safe_unresolved_segments: safeUnresolvedSegments,
+  };
 }
 
 function getHeadingTag(block: DocumentBlock): "h1" | "h2" | "h3" {
@@ -712,8 +756,10 @@ export default function TranslationReviewPage() {
     () => new Map(orderedBlocks.map((block, idx) => [block.id, idx])),
     [orderedBlocks]
   );
-  const completedBlocks = useMemo(() => orderedBlocks.filter((block) => isBlockResolved(block)).length, [orderedBlocks]);
-  const unresolvedBlocks = Math.max(orderedBlocks.length - completedBlocks, 0);
+  const reviewCounts = useMemo(
+    () => deriveCanonicalReviewCounts(orderedBlocks, allSegments, reviewSummary),
+    [orderedBlocks, allSegments, reviewSummary]
+  );
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedSafeIndex = safeSegments.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
@@ -1371,7 +1417,7 @@ export default function TranslationReviewPage() {
 
   async function handleApproveAllSafeSegments() {
     if (!job) return;
-    const safeCountToApprove = safeUnresolvedSegments;
+    const safeCountToApprove = reviewCounts.safe_unresolved_segments;
     setActionLoading(true);
     setError("");
     setMessage("");
@@ -1513,20 +1559,6 @@ export default function TranslationReviewPage() {
   if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
-  const totalSegments = reviewSummary?.total_segments ?? allSegments.length;
-  const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? allSegments.length;
-  const unresolvedAmbiguities =
-    reviewSummary?.unresolved_ambiguities ?? reviewSummary?.ambiguity_count ?? 0;
-  const unresolvedSemanticReviews =
-    reviewSummary?.unresolved_semantic_reviews ?? reviewSummary?.semantic_memory_review_count ?? 0;
-  const unresolvedGlossaryReviews = allSegments.filter(
-    ({ segment }) => !isAcceptableFinalStatus(segment.review_status) && segment.glossary_applied
-  ).length;
-  const unresolvedMemoryReviews = allSegments.filter(
-    ({ segment }) => !isAcceptableFinalStatus(segment.review_status) && (segment.exact_memory_used || segment.semantic_memory_used)
-  ).length;
-  const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
-  const segmentsRequiringAttention = Math.max(unresolvedSegments - safeUnresolvedSegments, 0);
   const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
   const isReadOnly = workflowStatus === "exported";
@@ -1573,13 +1605,12 @@ export default function TranslationReviewPage() {
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
-  const totalBlocks = orderedBlocks.length;
   const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
-    { key: "all", label: "All Content", count: allSegments.length },
-    { key: "issues", label: "Issues", count: flagged.length },
-    { key: "ambiguities", label: "Ambiguities", count: allSegments.filter(({ segment }) => matchesFilter(segment, "ambiguities")).length },
-    { key: "glossary", label: "Glossary", count: allSegments.filter(({ segment }) => matchesFilter(segment, "glossary")).length },
-    { key: "memory", label: "Memory", count: allSegments.filter(({ segment }) => matchesFilter(segment, "memory")).length },
+    { key: "all", label: "All Content", count: reviewCounts.total_blocks },
+    { key: "issues", label: "Issues", count: reviewCounts.issues_count },
+    { key: "ambiguities", label: "Ambiguities", count: reviewCounts.ambiguity_count },
+    { key: "glossary", label: "Glossary", count: reviewCounts.glossary_count },
+    { key: "memory", label: "Memory", count: reviewCounts.memory_count },
   ];
   const firstUnresolvedAmbiguityBlockId = getFirstUnresolvedAmbiguityBlockId();
   const nextUnresolvedBlockId = getNextUnresolvedBlockId();
@@ -1648,10 +1679,10 @@ export default function TranslationReviewPage() {
         <ReviewGuidancePanel
           reviewGuidanceRef={reviewGuidanceRef}
           statusLabel={guidanceStatusLabel}
-          completedBlocks={completedBlocks}
-          totalBlocks={totalBlocks}
-          unresolvedBlocks={unresolvedBlocks}
-          unresolvedAmbiguities={unresolvedAmbiguities}
+          completedBlocks={reviewCounts.completed_blocks}
+          totalBlocks={reviewCounts.total_blocks}
+          unresolvedBlocks={reviewCounts.remaining_blocks}
+          unresolvedAmbiguities={reviewCounts.ambiguity_count}
           recommendedNextStep={recommendedNextStep}
           translationStyle={job.translation_style === "literal" ? "literal" : "natural"}
           primaryActionLabel={primaryGuidanceLabel}
@@ -1685,13 +1716,13 @@ export default function TranslationReviewPage() {
             reviewComplete={reviewComplete}
             onFocusReviewGuidance={focusReviewGuidance}
             reviewMode={reviewMode}
-            orderedBlocksLength={orderedBlocks.length}
-            completedBlocks={completedBlocks}
+            orderedBlocksLength={reviewCounts.total_blocks}
+            completedBlocks={reviewCounts.completed_blocks}
             selectedBlockPosition={selectedBlockPosition}
             onPreviousBlock={handlePreviousBlock}
             onNextBlock={handleNextBlock}
             isLastBlock={isLastBlock}
-            unresolvedBlocks={unresolvedBlocks}
+            unresolvedBlocks={reviewCounts.remaining_blocks}
             visibleIssuesLength={visibleIssues.length}
             currentIssueIndex={currentIssueIndex}
             onPreviousIssue={() => goToIssue(-1)}
