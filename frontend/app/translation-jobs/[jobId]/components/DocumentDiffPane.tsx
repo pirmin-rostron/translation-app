@@ -79,7 +79,7 @@ export function DocumentDiffPane({
                   : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              {showMarkup ? "Show clean" : "Show markup"}
+              Show markup: {showMarkup ? "Show" : "Hide"}
             </button>
           </div>
         </div>

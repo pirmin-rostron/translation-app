@@ -1023,6 +1023,12 @@ export default function TranslationReviewPage() {
     const translatedDisplay = block.translated_text_display || "";
     const modeText =
       side === "source" ? (showMarkup ? sourceRaw : sourceDisplay) : showMarkup ? translatedRaw : translatedDisplay;
+    const displayText =
+      !showMarkup && !(modeText || "").trim() ? (
+        <span className="text-xs italic text-slate-400">[empty block]</span>
+      ) : (
+        modeText
+      );
     const selected = selectedBlock?.id === block.id;
     return (
       <span
@@ -1034,7 +1040,7 @@ export default function TranslationReviewPage() {
         }}
         className={`cursor-pointer rounded-md transition-colors ${selected ? "bg-slate-100/80" : "hover:bg-slate-100/70"}`}
       >
-        {modeText}
+        {displayText}
       </span>
     );
   }
