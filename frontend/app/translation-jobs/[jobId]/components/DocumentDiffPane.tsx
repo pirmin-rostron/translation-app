@@ -29,7 +29,8 @@ type DocumentDiffPaneProps = {
   filterChips: FilterChip[];
   visibleIssuesLength: number;
   displayedNodes: DocumentNode[];
-  allNodesCount: number;
+  displayedBlocksCount: number;
+  totalBlocksCount: number;
   getNodeSpacing: (node: DocumentNode) => string;
   renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
   segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
@@ -44,7 +45,8 @@ export function DocumentDiffPane({
   filterChips,
   visibleIssuesLength,
   displayedNodes,
-  allNodesCount,
+  displayedBlocksCount,
+  totalBlocksCount,
   getNodeSpacing,
   renderNode,
   segmentRefs,
@@ -87,11 +89,11 @@ export function DocumentDiffPane({
         {reviewMode === "issues" ? (
           <div className="mt-4 border-t border-slate-200 pt-4">
             <p className="text-xs text-slate-500">
-              Issues-only content view ({visibleIssuesLength} items). Use Review Details for issue navigation.
+              Issues-only block view ({visibleIssuesLength} issues). Use Review Details for issue navigation.
             </p>
             {!visibleIssuesLength && (
               <p className="mt-2 text-xs text-slate-500">
-                Try <span className="font-medium">All Content</span> to continue full document review.
+                Try <span className="font-medium">All Blocks</span> to continue full document review.
               </p>
             )}
           </div>
@@ -104,7 +106,7 @@ export function DocumentDiffPane({
       </div>
       {!displayedNodes.length ? (
         <div className="p-8 text-slate-600">
-          No issues found — you&apos;re all good here. Try switching back to All Content for full document context.
+          No issues found — you&apos;re all good here. Try switching back to All Blocks for full document context.
         </div>
       ) : (
         <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
@@ -142,7 +144,7 @@ export function DocumentDiffPane({
         </div>
       )}
       <div className="border-t border-slate-200 px-6 py-3 text-sm text-slate-500">
-        Showing {displayedNodes.length} of {allNodesCount} document sections
+        Showing {displayedBlocksCount} of {totalBlocksCount} blocks
       </div>
     </section>
   );

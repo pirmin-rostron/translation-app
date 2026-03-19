@@ -304,7 +304,7 @@ export default function ProcessingPage() {
     : translationDone
       ? "Your document is ready for review."
       : translationProgress
-        ? `${translationProgress.completed_segments} of ${translationProgress.total_segments} segments translated • ${
+        ? `${translationProgress.completed_segments} of ${translationProgress.total_segments} translation segments translated • ${
             translationProgress.eta_seconds == null
               ? "Calculating remaining time"
               : formatEta(translationProgress.eta_seconds)

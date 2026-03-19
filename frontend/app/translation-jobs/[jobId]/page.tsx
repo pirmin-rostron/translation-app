@@ -231,6 +231,12 @@ function isBlockResolved(block: DocumentBlock) {
   return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
 }
 
+function isSafeBlock(block: DocumentBlock) {
+  const unresolvedSegments = block.segments.filter((segment) => !isAcceptableFinalStatus(segment.review_status));
+  if (!unresolvedSegments.length) return false;
+  return unresolvedSegments.every((segment) => isSafeSegment(segment));
+}
+
 function cleanChoiceTranslationText(value: string) {
   return value
     .replace(/\\n/g, " ")
@@ -442,26 +448,42 @@ function deriveCanonicalReviewCounts(
   allSegments: { block: DocumentBlock; segment: ReviewSegment }[],
   reviewSummary: ReviewSummary | null
 ): CanonicalReviewCounts {
-  const unresolvedEntries = allSegments.filter(({ segment }) => !isAcceptableFinalStatus(segment.review_status));
+  const unresolvedSegmentCount = allSegments.filter(
+    ({ segment }) => !isAcceptableFinalStatus(segment.review_status)
+  ).length;
+  const unresolvedBlocks = orderedBlocks.filter((block) => !isBlockResolved(block));
   const totalBlocks = orderedBlocks.length;
   const completedBlocks = orderedBlocks.filter((block) => isBlockResolved(block)).length;
   const remainingBlocks = Math.max(totalBlocks - completedBlocks, 0);
-  const unresolvedAmbiguities =
-    reviewSummary?.unresolved_ambiguities ?? unresolvedEntries.filter(({ segment }) => hasValidAmbiguityChoice(segment)).length;
-  const unresolvedGlossary = unresolvedEntries.filter(({ segment }) => segment.glossary_applied).length;
-  const unresolvedMemory = unresolvedEntries.filter(({ segment }) => hasMemory(segment)).length;
-  const unresolvedIssues = unresolvedEntries.filter(({ segment }) => isFlagged(segment)).length;
-  const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? unresolvedEntries.length;
+  const unresolvedAmbiguityBlocks =
+    reviewSummary?.unresolved_ambiguities ??
+    unresolvedBlocks.filter((block) =>
+      block.segments.some(
+        (segment) => !isAcceptableFinalStatus(segment.review_status) && hasValidAmbiguityChoice(segment)
+      )
+    ).length;
+  const unresolvedGlossaryBlocks = unresolvedBlocks.filter((block) =>
+    block.segments.some((segment) => !isAcceptableFinalStatus(segment.review_status) && segment.glossary_applied)
+  ).length;
+  const unresolvedMemoryBlocks = unresolvedBlocks.filter((block) =>
+    block.segments.some(
+      (segment) => !isAcceptableFinalStatus(segment.review_status) && (segment.exact_memory_used || segment.semantic_memory_used)
+    )
+  ).length;
+  const unresolvedIssueBlocks = unresolvedBlocks.filter((block) =>
+    block.segments.some((segment) => !isAcceptableFinalStatus(segment.review_status) && isFlagged(segment))
+  ).length;
+  const unresolvedSegments = reviewSummary?.unresolved_count ?? reviewSummary?.unresolved_segments ?? unresolvedSegmentCount;
   const totalSegments = reviewSummary?.total_segments ?? allSegments.length;
   const safeUnresolvedSegments = reviewSummary?.safe_unresolved_segments ?? 0;
   return {
     total_blocks: totalBlocks,
     completed_blocks: completedBlocks,
     remaining_blocks: remainingBlocks,
-    ambiguity_count: unresolvedAmbiguities,
-    glossary_count: unresolvedGlossary,
-    memory_count: unresolvedMemory,
-    issues_count: unresolvedIssues,
+    ambiguity_count: unresolvedAmbiguityBlocks,
+    glossary_count: unresolvedGlossaryBlocks,
+    memory_count: unresolvedMemoryBlocks,
+    issues_count: unresolvedIssueBlocks,
     total_segments: totalSegments,
     unresolved_segments: unresolvedSegments,
     safe_unresolved_segments: safeUnresolvedSegments,
@@ -676,16 +698,8 @@ export default function TranslationReviewPage() {
         .sort((a, b) => a.segment.segment_index - b.segment.segment_index),
     [filteredBlocks]
   );
-  const allNodes = useMemo(() => buildDocumentNodes(blocks), [blocks]);
   const displayedNodes = useMemo(() => buildDocumentNodes(filteredBlocks), [filteredBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
-  const safeSegments = useMemo(
-    () =>
-      allSegments
-        .filter(({ segment }) => isSafeSegment(segment))
-        .sort((a, b) => a.segment.segment_index - b.segment.segment_index),
-    [allSegments]
-  );
   const issues = useMemo(() => {
     const collected: ReviewIssue[] = [];
     for (const { segment } of allSegments) {
@@ -752,6 +766,10 @@ export default function TranslationReviewPage() {
         .sort((a, b) => a.block_index - b.block_index),
     [blocks]
   );
+  const safeBlocks = useMemo(
+    () => orderedBlocks.filter((block) => isSafeBlock(block)),
+    [orderedBlocks]
+  );
   const blockIndexById = useMemo(
     () => new Map(orderedBlocks.map((block, idx) => [block.id, idx])),
     [orderedBlocks]
@@ -761,7 +779,7 @@ export default function TranslationReviewPage() {
     [orderedBlocks, allSegments, reviewSummary]
   );
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
-  const selectedSafeIndex = safeSegments.findIndex(({ segment }) => segment.id === selectedSegment?.id);
+  const selectedSafeBlockIndex = selectedBlock ? safeBlocks.findIndex((block) => block.id === selectedBlock.id) : -1;
   const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
 
   useEffect(() => {
@@ -915,19 +933,21 @@ export default function TranslationReviewPage() {
   function handleReviewSafeSegments() {
     setReviewMode("document");
     setActiveFilter("all");
-    if (!safeSegments.length) return;
+    if (!safeBlocks.length) return;
     setSelectedIssueKey(null);
-    setSelectedId(safeSegments[0].segment.id);
+    setSelectedId(safeBlocks[0].segments[0]?.id ?? null);
     setMessage("");
     setError("");
   }
 
-  function handleNextSafeSegment() {
-    if (!safeSegments.length) return;
-    const start = selectedSafeIndex === -1 ? 0 : selectedSafeIndex;
-    const nextIndex = (start + 1) % safeSegments.length;
+  function handleNextSafeBlock() {
+    if (!safeBlocks.length) return;
+    const start = selectedSafeBlockIndex === -1 ? 0 : selectedSafeBlockIndex;
+    const nextIndex = (start + 1) % safeBlocks.length;
+    const nextBlock = safeBlocks[nextIndex];
+    if (!nextBlock?.id) return;
     setSelectedIssueKey(null);
-    setSelectedId(safeSegments[nextIndex].segment.id);
+    selectBlockById(nextBlock.id);
     setMessage("");
     setError("");
   }
@@ -1417,7 +1437,7 @@ export default function TranslationReviewPage() {
 
   async function handleApproveAllSafeSegments() {
     if (!job) return;
-    const safeCountToApprove = reviewCounts.safe_unresolved_segments;
+    const safeCountToApprove = safeBlocks.length;
     setActionLoading(true);
     setError("");
     setMessage("");
@@ -1426,15 +1446,15 @@ export default function TranslationReviewPage() {
         method: "POST",
       });
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to approve safe segments");
+      if (!res.ok) throw new Error(payload.detail || "Failed to approve safe blocks");
       if (payload && typeof payload === "object") {
         setReviewSummary(payload as ReviewSummary);
       }
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
-      const label = safeCountToApprove === 1 ? "segment" : "segments";
-      setMessage(`✓ ${safeCountToApprove} ${label} approved`);
+      const label = safeCountToApprove === 1 ? "block" : "blocks";
+      setMessage(`✓ ${safeCountToApprove} safe ${label} approved`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve safe segments");
+      setError(err instanceof Error ? err.message : "Failed to approve safe blocks");
     } finally {
       setActionLoading(false);
     }
@@ -1606,7 +1626,7 @@ export default function TranslationReviewPage() {
   const lastExportMode = latestExport?.export_mode ?? exportResult?.export_mode ?? null;
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
   const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
-    { key: "all", label: "All Content", count: reviewCounts.total_blocks },
+    { key: "all", label: "All Blocks", count: reviewCounts.total_blocks },
     { key: "issues", label: "Issues", count: reviewCounts.issues_count },
     { key: "ambiguities", label: "Ambiguities", count: reviewCounts.ambiguity_count },
     { key: "glossary", label: "Glossary", count: reviewCounts.glossary_count },
@@ -1704,7 +1724,8 @@ export default function TranslationReviewPage() {
             filterChips={filterChips}
             visibleIssuesLength={visibleIssues.length}
             displayedNodes={displayedNodes}
-            allNodesCount={allNodes.length}
+            displayedBlocksCount={filteredBlocks.length}
+            totalBlocksCount={reviewCounts.total_blocks}
             getNodeSpacing={getNodeSpacing}
             renderNode={(node, side) => renderNode(node as DocumentNode, side)}
             segmentRefs={segmentRefs}
@@ -1730,8 +1751,8 @@ export default function TranslationReviewPage() {
             selectedIssue={selectedIssue}
             issueTypeLabel={issueTypeLabel}
             selectedSegmentIsSafe={selectedSegmentIsSafe}
-            selectedSafeIndex={selectedSafeIndex}
-            safeSegmentsLength={safeSegments.length}
+            selectedSafeBlockIndex={selectedSafeBlockIndex}
+            safeBlocksLength={safeBlocks.length}
             isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
             issueBadgeClass={issueBadgeClass}
             cleanPanelText={cleanPanelText}
@@ -1764,7 +1785,7 @@ export default function TranslationReviewPage() {
             onSkipBlock={handleSkipBlock}
             hasDraftChanges={hasDraftChanges}
             onSaveSegmentEdit={handleSaveSegmentEdit}
-            onNextSafeSegment={handleNextSafeSegment}
+            onNextSafeBlock={handleNextSafeBlock}
             selectedFlaggedIndex={selectedFlaggedIndex}
             flaggedLength={flagged.length}
           />
