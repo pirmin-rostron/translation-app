@@ -3,7 +3,6 @@
 import type { MutableRefObject, ReactNode } from "react";
 
 type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
-type ReviewMode = "document" | "issues";
 
 type SegmentRef = { id: number };
 type DiffBlock = { block_index: number; segments: SegmentRef[] };
@@ -23,9 +22,7 @@ type FilterChip = {
 type DocumentDiffPaneProps = {
   activeFilter: ReviewFilter;
   onFilterChange: (filter: ReviewFilter) => void;
-  reviewMode: ReviewMode;
   filterChips: FilterChip[];
-  visibleIssuesLength: number;
   displayedNodes: DocumentNode[];
   displayedBlocksCount: number;
   totalBlocksCount: number;
@@ -38,9 +35,7 @@ type DocumentDiffPaneProps = {
 export function DocumentDiffPane({
   activeFilter,
   onFilterChange,
-  reviewMode,
   filterChips,
-  visibleIssuesLength,
   displayedNodes,
   displayedBlocksCount,
   totalBlocksCount,
@@ -69,11 +64,6 @@ export function DocumentDiffPane({
           ))}
         </div>
 
-        {reviewMode === "issues" ? (
-          <div className="mt-4 border-t border-slate-200 pt-4">
-            <p className="text-xs text-slate-500">Issues-only view ({visibleIssuesLength}). Use Review Details to navigate.</p>
-          </div>
-        ) : null}
       </div>
 
       {!displayedNodes.length ? (

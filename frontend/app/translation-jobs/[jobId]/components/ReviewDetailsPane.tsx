@@ -1,13 +1,6 @@
 "use client";
 
-type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
 type SemanticChoiceOption = "current" | "suggested";
-
-type ReviewIssue = {
-  key: string;
-  type: IssueType;
-  title: string;
-};
 
 type SelectedBlock = {
   block_index: number;
@@ -220,12 +213,6 @@ export function ReviewDetailsPane({
                   </label>
                 ))}
               </div>
-            </div>
-          )}
-
-          {!isSafeDecisionOnlyMode && selectedIssue && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-              Review signal detected for this block.
             </div>
           )}
 

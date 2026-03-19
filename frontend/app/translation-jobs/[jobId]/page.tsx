@@ -121,24 +121,6 @@ type DocumentNode =
   | { key: string; type: "bullet_list"; blocks: DocumentBlock[] };
 
 type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
-type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
-
-type HighlightRange = {
-  start: number;
-  end: number;
-  className: string;
-  title: string;
-  issueKey: string;
-};
-
-type ReviewIssue = {
-  key: string;
-  type: IssueType;
-  segmentId: number;
-  segmentIndex: number;
-  blockId: number | null;
-  title: string;
-};
 
 type ReviewSummary = {
   job_id: number;
@@ -272,64 +254,6 @@ function replaceFirstOccurrence(haystack: string, needle: string, replacement: s
 function replaceByRange(text: string, start: number, end: number, replacement: string) {
   if (start < 0 || end <= start || end > text.length) return text;
   return `${text.slice(0, start)}${replacement}${text.slice(end)}`;
-}
-
-function hasMultiSentenceOrLine(text: string) {
-  const normalized = (text || "").trim();
-  if (!normalized) return false;
-  if (normalized.includes("\n")) return true;
-  const sentenceMarkers = normalized.match(/[.!?。！？]/g)?.length ?? 0;
-  return sentenceMarkers >= 2;
-}
-
-function isVeryShortSnippet(text: string) {
-  const normalized = (text || "").trim();
-  if (!normalized) return false;
-  const words = normalized.split(/\s+/).filter(Boolean).length;
-  return normalized.length <= 24 || words <= 3;
-}
-
-function preferFullBlockTranslationWhenCollapsed(
-  block: DocumentBlock,
-  side: "source" | "target",
-  text: string,
-  isSelected: boolean,
-  isEditing: boolean
-) {
-  if (side !== "target") return text;
-  if (isSelected && isEditing) return text;
-  if (block.segments.length !== 1) return text;
-  if (!hasMultiSentenceOrLine(block.text_original || "")) return text;
-  const fallback = (block.text_translated || "").trim();
-  const current = (text || "").trim();
-  if (!fallback || !current) return text;
-  if (!isVeryShortSnippet(current)) return text;
-  if (fallback.length <= current.length + 20) return text;
-  return fallback;
-}
-
-function preferFullSegmentTranslationWhenCollapsed(
-  segment: ReviewSegment,
-  side: "source" | "target",
-  text: string,
-  isSelected: boolean,
-  isEditing: boolean
-) {
-  if (side !== "target") return text;
-  if (isSelected && isEditing) return text;
-  if (!hasMultiSentenceOrLine(segment.source_text || "")) return text;
-  const current = (text || "").trim();
-  if (!current || !isVeryShortSnippet(current)) return text;
-
-  const candidates = [segment.primary_translation, segment.final_translation]
-    .map((value) => (value || "").trim())
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-
-  const longest = candidates[0] ?? "";
-  if (!longest) return text;
-  if (longest.length <= current.length + 20) return text;
-  return longest;
 }
 
 function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
@@ -491,138 +415,6 @@ function getHeadingTag(block: DocumentBlock): "h1" | "h2" | "h3" {
   return "h3";
 }
 
-function buildHighlightRanges(
-  segment: ReviewSegment,
-  side: "source" | "target",
-  selectedIssueKey?: string | null
-) {
-  return segment.annotations.flatMap((annotation) => {
-    const start = side === "source" ? annotation.source_start : annotation.target_start;
-    const end = side === "source" ? annotation.source_end : annotation.target_end;
-    if (start == null || end == null || end <= start) return [];
-    const issueKey = `issue-${annotation.id}`;
-    const selectedClass = selectedIssueKey === issueKey ? " ring-2 ring-offset-1 ring-slate-500" : "";
-
-    if (annotation.annotation_type === "glossary") {
-      const sourceTerm = String(annotation.metadata_json?.source_term ?? annotation.source_span_text);
-      const targetTerm = String(annotation.metadata_json?.target_term ?? annotation.target_span_text ?? "");
-      return [
-        {
-          start,
-          end,
-          issueKey,
-          className: `bg-teal-100/90 text-teal-900${selectedClass}`,
-          title: `Glossary term applied: ${sourceTerm} -> ${targetTerm}`,
-        },
-      ] as HighlightRange[];
-    }
-
-    if (annotation.annotation_type === "ambiguity") {
-      return [
-        {
-          start,
-          end,
-          issueKey,
-          className: `bg-amber-100/90 text-amber-900${selectedClass}`,
-          title: `Ambiguity to review: ${annotation.source_span_text}`,
-        },
-      ] as HighlightRange[];
-    }
-    if (annotation.annotation_type === "exact_memory") {
-      return [
-        {
-          start,
-          end,
-          issueKey,
-          className: `bg-emerald-100/80 text-emerald-900${selectedClass}`,
-          title: "Trusted reuse from exact translation memory",
-        },
-      ] as HighlightRange[];
-    }
-    if (annotation.annotation_type === "semantic_memory") {
-      return [
-        {
-          start,
-          end,
-          issueKey,
-          className: `bg-sky-100/80 text-sky-900${selectedClass}`,
-          title: "Intelligent reuse from semantic translation memory",
-        },
-      ] as HighlightRange[];
-    }
-    return [];
-  });
-}
-
-function renderHighlightedText(
-  text: string,
-  ranges: HighlightRange[],
-  wrapperClassName?: string,
-  wrapperTitle?: string,
-  onIssueSelect?: (issueKey: string) => void
-) {
-  const rendered = (() => {
-    if (!text || !ranges.length) return text;
-    const safe = [...ranges]
-      .filter((r) => r.start >= 0 && r.end <= text.length && r.end > r.start)
-      .sort((a, b) => (a.start === b.start ? b.end - a.end : a.start - b.start));
-    const out: ReactNode[] = [];
-    let cursor = 0;
-    let key = 0;
-    for (const range of safe) {
-      if (range.start < cursor) continue;
-      if (range.start > cursor) out.push(<span key={`plain-${key++}`}>{text.slice(cursor, range.start)}</span>);
-      out.push(
-        <span
-          key={`mark-${key++}`}
-          className={`rounded px-1 py-0.5 ${range.className} ${onIssueSelect ? "cursor-pointer" : ""}`}
-          title={range.title}
-          onClick={(event) => {
-            event.stopPropagation();
-            onIssueSelect?.(range.issueKey);
-          }}
-        >
-          {text.slice(range.start, range.end)}
-        </span>
-      );
-      cursor = range.end;
-    }
-    if (cursor < text.length) out.push(<span key={`plain-${key++}`}>{text.slice(cursor)}</span>);
-    return out;
-  })();
-
-  if (!wrapperClassName) return rendered;
-  return (
-    <span className={wrapperClassName} title={wrapperTitle}>
-      {rendered}
-    </span>
-  );
-}
-
-function getTranslationWrapperProps(segment: ReviewSegment) {
-  const exact = segment.annotations.find((a) => a.annotation_type === "exact_memory");
-  if (exact) {
-    return {
-      className: "rounded-md bg-emerald-50/90 px-2 py-1 ring-1 ring-emerald-200",
-      title: String(exact.metadata_json?.label ?? "Previously approved translation reused"),
-    };
-  }
-
-  const semantic = segment.annotations.find((a) => a.annotation_type === "semantic_memory");
-  if (semantic) {
-    const score = semantic.metadata_json?.confidence_score;
-    return {
-      className: "rounded-md bg-blue-50/90 px-2 py-1 ring-1 ring-blue-200",
-      title:
-        typeof score === "number"
-          ? `Similar approved translation reused (similarity ${score.toFixed(3)})`
-          : String(semantic.metadata_json?.label ?? "Similar approved translation reused"),
-    };
-  }
-
-  return { className: undefined, title: undefined };
-}
-
 export default function TranslationReviewPage() {
   const params = useParams();
   const jobId = Number(params.jobId);
@@ -641,10 +433,8 @@ export default function TranslationReviewPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
-  const reviewMode = "document" as const;
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [draftTranslation, setDraftTranslation] = useState("");
   const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
   const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | null>(null);
@@ -683,56 +473,6 @@ export default function TranslationReviewPage() {
   const displayedNodes = useMemo(() => buildDocumentNodes(visibleBlocks), [visibleBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
   const flaggedSegmentIds = useMemo(() => new Set(flagged.map(({ segment }) => segment.id)), [flagged]);
-  const issues = useMemo(() => {
-    const collected: ReviewIssue[] = [];
-    for (const { segment } of allSegments) {
-      for (const annotation of segment.annotations) {
-        const annotationType = annotation.annotation_type;
-        if (
-          annotationType !== "ambiguity" &&
-          annotationType !== "glossary" &&
-          annotationType !== "exact_memory" &&
-          annotationType !== "semantic_memory"
-        ) {
-          continue;
-        }
-        const issueType = annotationType as IssueType;
-        const issueTitle =
-          annotationType === "ambiguity"
-            ? `Ambiguity: ${annotation.source_span_text}`
-            : annotationType === "glossary"
-              ? `Glossary: ${annotation.source_span_text}`
-              : annotationType === "exact_memory"
-                ? "Trusted exact memory reuse"
-                : "Semantic memory reuse";
-        collected.push({
-          key: `issue-${annotation.id}`,
-          type: issueType,
-          segmentId: segment.id,
-          segmentIndex: segment.segment_index,
-          blockId: segment.block_id,
-          title: issueTitle,
-        });
-      }
-    }
-    return collected.sort((a, b) => (a.segmentIndex === b.segmentIndex ? a.key.localeCompare(b.key) : a.segmentIndex - b.segmentIndex));
-  }, [allSegments]);
-  const issuesBySegmentId = useMemo(() => {
-    const map = new Map<number, ReviewIssue[]>();
-    for (const issue of issues) {
-      const list = map.get(issue.segmentId) ?? [];
-      list.push(issue);
-      map.set(issue.segmentId, list);
-    }
-    return map;
-  }, [issues]);
-  const visibleIssues = useMemo(() => {
-    if (activeFilter === "ambiguities") return issues.filter((issue) => issue.type === "ambiguity");
-    if (activeFilter === "glossary") return issues.filter((issue) => issue.type === "glossary");
-    if (activeFilter === "memory")
-      return issues.filter((issue) => issue.type === "exact_memory" || issue.type === "semantic_memory");
-    return issues;
-  }, [activeFilter, issues]);
   const selectedEntry = useMemo(
     () => allSegments.find(({ segment }) => segment.id === selectedId) ?? filteredSegments[0] ?? null,
     [allSegments, filteredSegments, selectedId]
@@ -761,13 +501,13 @@ export default function TranslationReviewPage() {
       setSelectedId(null);
       return;
     }
-    if (reviewCompleteState && reviewMode === "document" && selectedId == null) {
+    if (reviewCompleteState && selectedId == null) {
       return;
     }
     if (!filteredSegments.some(({ segment }) => segment.id === selectedId)) {
       setSelectedId(filteredSegments[0].segment.id);
     }
-  }, [filteredSegments, selectedId, reviewCompleteState, reviewMode]);
+  }, [filteredSegments, selectedId, reviewCompleteState]);
 
   useEffect(() => {
     if (!selectedSegment) return;
@@ -789,14 +529,12 @@ export default function TranslationReviewPage() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (reviewMode !== "document") return;
     if (!orderedBlocks.length) return;
     if (selectedBlockPosition !== -1) return;
     const firstBlock = orderedBlocks.find((block) => !isBlockResolved(block)) ?? orderedBlocks[0];
-    setSelectedIssueKey(null);
     setSelectedId(firstBlock.segments[0]?.id ?? null);
     blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [reviewMode, orderedBlocks, selectedBlockPosition]);
+  }, [orderedBlocks, selectedBlockPosition]);
 
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
@@ -804,7 +542,6 @@ export default function TranslationReviewPage() {
     const ambiguityChoiceSegment = block.segments.find((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
     const semanticChoiceSegment = block.segments.find((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
     const fallbackSegmentId = preferredSegmentId ?? ambiguityChoiceSegment?.id ?? semanticChoiceSegment?.id ?? block.segments[0].id;
-    setSelectedIssueKey(null);
     setSelectedId(fallbackSegmentId);
     setMessage("");
     setError("");
@@ -850,12 +587,11 @@ export default function TranslationReviewPage() {
     blockRefs.current[blockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
-  function switchToDocumentMode() {
+  function focusDocumentReviewStart() {
     setActiveFilter("all");
     const firstBlockId = getFirstBlockForDocumentReview();
     if (firstBlockId != null) {
       const firstBlock = orderedBlocks.find((block) => block.id === firstBlockId);
-      setSelectedIssueKey(null);
       setSelectedId(firstBlock?.segments[0]?.id ?? null);
       blockRefs.current[firstBlockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
@@ -953,7 +689,6 @@ export default function TranslationReviewPage() {
   }
 
   function focusReviewGuidance() {
-    setSelectedIssueKey(null);
     setSelectedId(null);
     setIsEditing(false);
     setActiveFilter("all");
@@ -1262,8 +997,12 @@ export default function TranslationReviewPage() {
       void handleOpenPreviewDocument();
       return;
     }
-    switchToDocumentMode();
-    moveToBlockById(getRecommendedReviewBlockId());
+    const recommendedBlockId = getRecommendedReviewBlockId();
+    if (recommendedBlockId != null) {
+      moveToBlockById(recommendedBlockId);
+      return;
+    }
+    focusDocumentReviewStart();
   }
 
   async function handleOpenPreviewDocument() {
@@ -1391,14 +1130,11 @@ export default function TranslationReviewPage() {
   const selectedAmbiguityOption = ambiguityChoiceIndex == null ? null : ambiguityOptions[ambiguityChoiceIndex] ?? null;
   const selectedAmbiguityTranslation = selectedAmbiguityOption?.translation ?? "";
   const blockAmbiguityIssues = !selectedBlock
-    ? ([] as ReviewIssue[])
-    : selectedBlock.segments
-        .filter((segment) => !isAcceptableFinalStatus(segment.review_status))
-        .flatMap((segment) =>
-          (issuesBySegmentId.get(segment.id) ?? []).filter((issue) => issue.type === "ambiguity")
-        )
-        .sort((a, b) => (a.segmentIndex === b.segmentIndex ? a.key.localeCompare(b.key) : a.segmentIndex - b.segmentIndex));
-  const activeBlockAmbiguityIndex = blockAmbiguityIssues.findIndex((issue) => issue.key === selectedIssueKey);
+    ? []
+    : selectedBlock.segments.filter(
+        (segment) => !isAcceptableFinalStatus(segment.review_status) && getAmbiguityChoiceDetails(segment).ambiguityChoiceFound
+      );
+  const activeBlockAmbiguityIndex = blockAmbiguityIssues.findIndex((segment) => segment.id === selectedSegment?.id);
   const activeBlockAmbiguityPosition = activeBlockAmbiguityIndex === -1 ? 1 : activeBlockAmbiguityIndex + 1;
   const semanticChoiceDetails = getSemanticChoiceDetails(selectedSegment);
   const hasSemanticChoice = semanticChoiceDetails.semanticMatchFound;
@@ -1488,9 +1224,7 @@ export default function TranslationReviewPage() {
           <DocumentDiffPane
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
-            reviewMode={reviewMode}
             filterChips={filterChips}
-            visibleIssuesLength={visibleIssues.length}
             displayedNodes={displayedNodes}
             displayedBlocksCount={visibleBlocks.length}
             totalBlocksCount={reviewCounts.total_blocks}
