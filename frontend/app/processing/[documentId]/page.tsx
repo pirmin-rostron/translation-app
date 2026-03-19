@@ -48,6 +48,18 @@ function formatEta(seconds: number | null) {
   return `~${Math.ceil(seconds / 60)}m remaining`;
 }
 
+function isTranslationEtaReliable(progress: TranslationProgress | null) {
+  if (!progress || progress.eta_seconds == null) return false;
+  if (progress.eta_seconds <= 0) return false;
+  if (progress.total_segments <= 0) return false;
+  // Gate ETA until translation has enough signal to avoid misleading early estimates.
+  const completionRatio = progress.completed_segments / progress.total_segments;
+  if (progress.completed_segments < 2) return false;
+  if (completionRatio < 0.12) return false;
+  if (progress.percentage < 15) return false;
+  return true;
+}
+
 export default function ProcessingPage() {
   const params = useParams();
   const router = useRouter();
@@ -305,9 +317,9 @@ export default function ProcessingPage() {
       ? "Your document is ready for review."
       : translationProgress
         ? `Translating document… • ${
-            translationProgress.eta_seconds == null
-              ? "Calculating remaining time"
-              : formatEta(translationProgress.eta_seconds)
+            isTranslationEtaReliable(translationProgress)
+              ? formatEta(translationProgress.eta_seconds)
+              : "Calculating remaining time…"
           }`
         : docProgress?.is_active
           ? `${docProgress.stage_label} • ${

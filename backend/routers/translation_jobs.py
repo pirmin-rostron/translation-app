@@ -573,6 +573,15 @@ def _compose_review_block_translation(parts: list[str]) -> str | None:
     return "\n".join(cleaned)
 
 
+def _looks_like_markup_text(text: str | None) -> bool:
+    if not text:
+        return False
+    value = text.strip()
+    if not value:
+        return False
+    return bool(re.search(r"(\\rtf1|\\fonttbl|\\par\\b|\\[a-z]+-?\d*|[{}])", value, re.IGNORECASE))
+
+
 def _refresh_document_block_translation(db: Session, block_id: int, job_id: int):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
@@ -1416,7 +1425,8 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
     review_blocks: list[ReviewBlockResponse] = []
     for block in blocks:
         block_segments = []
-        translated_parts: list[str] = []
+        translated_final_parts: list[str] = []
+        translated_primary_parts: list[str] = []
         for segment in segments_by_block_id.get(block.id, []):
             result = results_by_segment_id.get(segment.id)
             if not result:
@@ -1428,10 +1438,15 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
                     annotations=annotations_by_segment_id.get(segment.id, []),
                 )
             )
-            translated_parts.append((result.final_translation or "").strip())
+            translated_final_parts.append((result.final_translation or "").strip())
+            translated_primary_parts.append((result.primary_translation or "").strip())
 
-        translated_text_raw = _compose_review_block_translation(translated_parts) or (block.text_translated or "").strip()
-        translated_text_display = _clean_review_display_text(translated_text_raw) if translated_text_raw else None
+        translated_text_final = _compose_review_block_translation(translated_final_parts) or (block.text_translated or "").strip()
+        translated_text_primary = _compose_review_block_translation(translated_primary_parts)
+        translated_text_raw = translated_text_final
+        if not _looks_like_markup_text(translated_text_raw) and _looks_like_markup_text(translated_text_primary):
+            translated_text_raw = translated_text_primary
+        translated_text_display = _clean_review_display_text(translated_text_final) if translated_text_final else None
         review_blocks.append(
             ReviewBlockResponse(
                 id=block.id,
@@ -1443,7 +1458,7 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
                 translated_text_raw=translated_text_raw,
                 translated_text_display=translated_text_display,
                 text_original=block.text_original,
-                text_translated=translated_text_raw,
+                text_translated=translated_text_final,
                 formatting_json=block.formatting_json,
                 segments=block_segments,
             )
