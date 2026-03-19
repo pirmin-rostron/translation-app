@@ -1,27 +1,38 @@
----
-description: Architecture, state ownership, review UX, and integrity guardrails for Translation_app
-alwaysApply: true
+# CLAUDE.md — Translation App Project Rules
+
+This file governs all Claude Code behaviour for this project. These rules are strict and always apply.
+
 ---
 
-# Translation App Guardrails (Strict)
-
-## 1) Tech Stack
+## Tech Stack
 
 ### Frontend
-- Framework: Next.js 14 (App Router)
-- Language: TypeScript — strict mode, no `any`
-- UI: React 18 + Tailwind CSS
-- State Management: Zustand
-- Server State / Data Fetching: TanStack Query (React Query v5)
-- Containerisation: Docker
+- **Framework:** Next.js 14 (App Router)
+- **Language:** TypeScript — strict mode, no `any`
+- **UI:** React 18 + Tailwind CSS
+- **State Management:** Zustand
+- **Server State / Data Fetching:** TanStack Query (React Query v5)
+- **Containerisation:** Docker
+
+#### Install commands (if not already installed)
+```bash
+npm install zustand
+npm install @tanstack/react-query
+```
 
 ### Backend
-- Framework: Python + FastAPI
-- ORM: SQLAlchemy + Alembic (migrations)
-- Routers: `documents`, `glossary_terms`, `translation_jobs`
-- CORS: locked to `http://localhost:3000` — do not change without explicit instruction
+- **Framework:** Python + FastAPI
+- **ORM:** SQLAlchemy + Alembic (migrations)
+- **Routers:** `documents`, `glossary_terms`, `translation_jobs`
+- **Database:** initialised via `init_db()` on startup
+- **CORS:** locked to `http://localhost:3000` — do not change without explicit instruction
 
-### Frontend Stack Rules
+#### Install commands (if not already installed)
+```bash
+pip install sqlalchemy alembic
+```
+
+### Stack Rules — Frontend
 - Always use TypeScript. Never use `any` — use proper types or `unknown` with guards.
 - Use Tailwind utility classes for all styling. Do not create custom CSS unless Tailwind cannot handle it.
 - Use Next.js App Router conventions (`app/` directory, server vs client components, layouts).
@@ -31,7 +42,7 @@ alwaysApply: true
 ### Zustand Rules
 - Use Zustand for all client-side UI state (active block, review decisions, panel state).
 - One store per domain — do not create a single monolithic store.
-- Job-scoped state (`translation_job_id`) must be explicitly set and cleared when switching jobs.
+- Job-scoped state (`translation_job_id`) must be explicitly set and cleared when switching jobs — never carry state between jobs.
 - Do not store server data in Zustand — that belongs in React Query.
 
 ### React Query Rules
@@ -41,7 +52,7 @@ alwaysApply: true
 - Set appropriate `staleTime` for glossary terms (infrequently changed) vs job status (frequently polled).
 - Never duplicate server data into Zustand — React Query is the single source of truth for API data.
 
-### Backend Stack Rules
+### Stack Rules — Backend
 - Follow FastAPI conventions — use Pydantic models for all request/response schemas.
 - Keep business logic out of routers — routers handle HTTP only, logic lives in service layers.
 - Never modify CORS config without explicit instruction.
@@ -55,32 +66,47 @@ alwaysApply: true
 - Never auto-apply migrations in application code — migrations are a manual deployment step.
 - Keep models in a dedicated `models/` directory, not inline in routers.
 
-## 2) Architecture Separation (Review Page)
+---
+
+## Architecture Separation (Review Page)
+
 - `ReviewGuidancePanel` = direction/status/next-step only.
 - `DocumentDiffPane` = document content only.
 - `ReviewDetailsPane` = decision controls only.
-- Never duplicate responsibilities across these sections.
+- Never duplicate responsibilities across these three sections.
 
-## 3) API Structure
+---
+
+## State Ownership
+
+- `TranslationJob.status` owns translation/review/export lifecycle.
+- `Document.status` owns ingest/parse only.
+- Do not merge or cross-drive these status domains.
+- Glossary terms are job-agnostic reference data — never treat them as job state.
+
+---
+
+## API Structure
+
 - `documents` router — handles document ingest and parse only.
 - `glossary_terms` router — manages reference terminology, not job-specific decisions.
 - `translation_jobs` router — owns the full translation/review/export lifecycle.
 - Do not cross-call routers in ways that blur these boundaries.
 - Frontend fetches must map to these router boundaries — do not create catch-all API wrappers.
 
-## 4) State Ownership
-- `TranslationJob.status` owns translation/review/export lifecycle.
-- `Document.status` owns ingest/parse only.
-- Do not merge or cross-drive these status domains.
-- Glossary terms are job-agnostic reference data — never treat them as job state.
+---
 
-## 5) Rendering Rules
+## Rendering Rules
+
 - Translated diff must render full reconstructed block content from ordered segment translations.
 - Never use ambiguity/semantic snippet text as the whole block value.
 - Exception: if the original block truly contains only one sentence/snippet, single-segment output is valid.
 - Review Details must not render full document content.
 
-## 6) Translation Quality Guardrails
+---
+
+## Translation Quality Guardrails
+
 - Always preserve source block formatting and markup in translated output.
 - Never silently drop untranslatable content — flag it explicitly in the UI.
 - Glossary terms must be applied consistently across all blocks within a job — surface conflicts, never silently override.
@@ -89,18 +115,69 @@ alwaysApply: true
 - Translation option text always remains in the target language.
 - Explanations and UI language are always English.
 
-## 7) Ambiguity Rules
-- Ambiguity is valid only when there are 2+ distinct options.
-- If fewer than 2 valid options, treat as non-ambiguity.
-- Explanations/meanings must be English (UI language).
-- Translation option text remains in target language.
+---
 
-## 8) UX Rules
+## Ambiguity Rules
+
+- Ambiguity is valid only when there are 2+ distinct translation options.
+- If fewer than 2 valid options exist, treat as non-ambiguity.
+- Explanations/meanings must be in English (UI language).
+- Translation option text remains in the target language.
+
+---
+
+## Visual Hierarchy Standards
+
+### Layout Structure
+- Use a clear page hierarchy: header → primary panel (guidance) → main content → secondary panel (details).
+- Keep panel ownership strict: guidance for direction, main content for document context, details for decisions.
+
+### Block/Card Pattern
+- Render each review unit as one block/card row.
+- Use consistent Tailwind spacing between rows (`gap-*`, `py-*`) and consistent internal padding (`p-*`).
+- Show one block label per unit (`Block X`); avoid duplicate headings inside pane content.
+
+### Highlight States
+Use Tailwind classes consistently for these states:
+- `active`: blue emphasis (highest attention) — e.g. `border-blue-500 bg-blue-50`
+- `issue`: yellow emphasis (secondary attention) — e.g. `border-yellow-400 bg-yellow-50`
+- `default`: neutral surface and border — e.g. `border-gray-200 bg-white`
+- `completed`: muted treatment — e.g. `border-gray-100 bg-gray-50 opacity-60`
+- Prefer row-level highlight over noisy inline emphasis unless required by interaction.
+
+### Button Hierarchy
+- Exactly one primary CTA per screen/state.
+- Secondary actions must be visually de-emphasized (e.g. ghost or text-only buttons).
+- Avoid duplicate actions that produce equivalent outcomes.
+
+### Pane System
+- Use a consistent left/right pane layout where applicable.
+- Keep subtle but clear pane differentiation (e.g. neutral source vs tinted translated pane).
+- Maintain vertical alignment between corresponding panes.
+
+### Typography Roles
+- Section titles: clear and high-signal (`text-sm font-semibold`).
+- Block labels: compact meta markers (`text-xs font-medium text-gray-500`).
+- Body text: readable, content-first (`text-sm text-gray-900`).
+- Meta text: subdued supporting information (`text-xs text-gray-400`).
+
+### Clarity Rules
+- Do not duplicate the same information across guidance, diff, and details panels.
+- Use `Block` as canonical review terminology in all user-facing review UI.
+- Do not mix `content` or `segment` for the same review unit — `Block` only.
+- Prioritise scanability and clarity over density.
+
+---
+
+## UX Rules
+
 - One primary CTA per screen/state; secondary actions must be visually de-emphasized.
 - No duplicate progress indicators.
-- On review completion: hide block controls and guide to export.
+- On review completion: hide block controls and guide user to export.
 
-## 9) Error Handling
+---
+
+## Error Handling
 
 ### Frontend
 - Never show raw error objects or stack traces in the UI.
@@ -113,23 +190,35 @@ alwaysApply: true
 - Never return 500 for predictable failure cases — use 400/404/422 appropriately.
 - Fail safely on malformed or incomplete data — never silently swallow errors.
 
-## 10) Component + Change Discipline
+---
+
+## Component + Change Discipline
+
 - Modify existing components first; avoid creating parallel render paths.
 - Reuse existing utilities/handlers before adding new ones.
-- In responses, always state which files were edited and why.
+- In every response, state which files were edited and why.
 - Do not reorganise file structure unless explicitly asked.
 
-## 11) Data Integrity
+---
+
+## Data Integrity
+
 - Review state is job-scoped (`translation_job_id`) only.
 - Never reuse approvals/decisions across jobs (memory may suggest, never auto-approve).
 - Export must use final reviewed data for the active job only.
 - Glossary terms are shared reference data — changes affect all jobs, flag this when relevant.
 
-## 12) Delivery Discipline
+---
+
+## Delivery Discipline
+
 - Explain what changed, why, and how to test.
 - Call out assumptions and edge cases explicitly.
 - Fail safely on malformed/incomplete data.
 - Keep responses focused — do not refactor unrelated code in the same pass.
 
-## 13) Golden Rule
-- If uncertain, prioritise architecture + UX guardrails over shortcuts.
+---
+
+## Golden Rule
+
+If uncertain, prioritise architecture + UX guardrails over shortcuts.

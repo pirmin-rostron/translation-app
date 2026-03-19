@@ -6,39 +6,40 @@ alwaysApply: true
 # Visual Hierarchy Standards
 
 ## 1) Layout Structure
-- Use a clear page hierarchy: header -> primary panel (guidance) -> main content -> secondary panel (details).
+- Use a clear page hierarchy: header → primary panel (guidance) → main content → secondary panel (details).
 - Keep panel ownership strict: guidance for direction, main content for document context, details for decisions.
 
 ## 2) Block/Card Pattern
 - Render each review unit as one block/card row.
-- Use consistent spacing between rows and consistent internal padding.
+- Use consistent Tailwind spacing between rows (`gap-*`, `py-*`) and consistent internal padding (`p-*`).
 - Show one block label per unit (`Block X`) and avoid duplicate headings inside pane content.
 
 ## 3) Highlight States
-- `active`: blue emphasis (highest attention).
-- `issue`: yellow emphasis (secondary attention).
-- `default`: neutral surface and border.
-- `completed`: muted treatment.
+Use Tailwind classes consistently for these states:
+- `active`: blue emphasis (highest attention) — e.g. `border-blue-500 bg-blue-50`
+- `issue`: yellow emphasis (secondary attention) — e.g. `border-yellow-400 bg-yellow-50`
+- `default`: neutral surface and border — e.g. `border-gray-200 bg-white`
+- `completed`: muted treatment — e.g. `border-gray-100 bg-gray-50 opacity-60`
 - Prefer row-level highlight over noisy inline emphasis unless required by interaction.
 
 ## 4) Button Hierarchy
 - Exactly one primary CTA per screen/state.
-- Secondary actions must be visually de-emphasized.
+- Secondary actions must be visually de-emphasized (e.g. ghost or text-only buttons).
 - Avoid duplicate actions that produce equivalent outcomes.
 
 ## 5) Pane System
 - Use a consistent left/right pane layout where applicable.
-- Keep subtle but clear pane differentiation (for example, neutral source vs tinted translated pane).
+- Keep subtle but clear pane differentiation (e.g. neutral source vs tinted translated pane).
 - Maintain vertical alignment between corresponding panes.
 
 ## 6) Typography Roles
-- Section titles: clear and high-signal.
-- Block labels: compact meta markers.
-- Body text: readable content-first text.
-- Meta text: subdued supporting information.
+- Section titles: clear and high-signal (`text-sm font-semibold`).
+- Block labels: compact meta markers (`text-xs font-medium text-gray-500`).
+- Body text: readable, content-first (`text-sm text-gray-900`).
+- Meta text: subdued supporting information (`text-xs text-gray-400`).
 
 ## 7) Clarity Rules
 - Do not duplicate the same information across guidance, diff, and details panels.
 - Use `Block` as canonical review terminology in user-facing review UI.
-- Do not mix `content` or `segment` for the same review unit.
-- Prioritize scanability and clarity over density.
+- Do not mix `content` or `segment` for the same review unit — `Block` only.
+- Prioritise scanability and clarity over density.

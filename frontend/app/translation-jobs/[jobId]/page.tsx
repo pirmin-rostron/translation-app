@@ -521,7 +521,7 @@ export default function TranslationReviewPage() {
       .map((entry) => entry.idx);
     setAmbiguityChoiceIndex(matchingIndices.length === 1 ? matchingIndices[0] : null);
     setIsEditing(false);
-  }, [selectedSegment?.id, selectedSegment?.final_translation]);
+  }, [selectedSegment?.id]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -915,8 +915,8 @@ export default function TranslationReviewPage() {
     if (currentAmbiguousTarget && currentText.includes(currentAmbiguousTarget)) {
       return replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice);
     }
-    // No reliable in-context span match: keep full segment text to avoid collapsing content.
-    return currentText;
+    // No reliable in-context span: use the chosen option directly as the full segment translation.
+    return selectedChoice;
   }
 
   function handleEditSelectedTranslation() {
