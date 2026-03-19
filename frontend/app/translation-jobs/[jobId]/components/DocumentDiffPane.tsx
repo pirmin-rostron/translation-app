@@ -90,14 +90,7 @@ export function DocumentDiffPane({
 
         {reviewMode === "issues" ? (
           <div className="mt-4 border-t border-slate-200 pt-4">
-            <p className="text-xs text-slate-500">
-              Issues-only block view ({visibleIssuesLength} issues). Use Review Details for issue navigation.
-            </p>
-            {!visibleIssuesLength && (
-              <p className="mt-2 text-xs text-slate-500">
-                Try <span className="font-medium">All Blocks</span> to continue full document review.
-              </p>
-            )}
+            <p className="text-xs text-slate-500">Issues-only view ({visibleIssuesLength}). Use Review Details to navigate.</p>
           </div>
         ) : null}
       </div>
@@ -114,18 +107,10 @@ export function DocumentDiffPane({
           </div>
           <div className="space-y-4 px-6 py-6">
           {displayedNodes.map((node) => {
-            const nodeSegments =
-              node.type === "bullet_list" ? node.blocks?.flatMap((b) => b.segments) ?? [] : node.block?.segments ?? [];
+            const nodeSegments = node.block?.segments ?? [];
             const isActive = selectedSegmentId != null && nodeSegments.some((segment) => segment.id === selectedSegmentId);
             const hasIssue = nodeSegments.some((segment) => flaggedSegmentIds.has(segment.id));
-            const blockLabel =
-              node.type === "bullet_list"
-                ? node.blocks?.length
-                  ? `Blocks ${node.blocks[0].block_index + 1}-${node.blocks[node.blocks.length - 1].block_index + 1}`
-                  : "Blocks"
-                : node.block
-                  ? `Block ${node.block.block_index + 1}`
-                  : "Block";
+            const blockLabel = node.block ? `Block ${node.block.block_index + 1}` : "Block";
             const rowClass = isActive
               ? "border-blue-300 bg-blue-50/70 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]"
               : hasIssue
