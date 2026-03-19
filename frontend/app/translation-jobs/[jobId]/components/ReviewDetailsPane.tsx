@@ -136,6 +136,8 @@ export function ReviewDetailsPane({
   selectedFlaggedIndex,
   flaggedLength,
 }: ReviewDetailsPaneProps) {
+  const prioritizeSaveAction = isEditing && hasDraftChanges;
+
   if (reviewComplete) {
     return (
       <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -144,9 +146,6 @@ export function ReviewDetailsPane({
           <p className="text-sm font-semibold text-emerald-900">Review complete</p>
           <p className="mt-1 text-sm text-slate-700">
             {completedBlocks} of {orderedBlocksLength} blocks reviewed. Block-level decisions are now locked.
-          </p>
-          <p className="mt-1 text-xs text-slate-600">
-            Remaining unresolved blocks: {unresolvedBlocks}
           </p>
         </div>
         <p className="mt-4 text-sm text-slate-600">Continue in Review Guidance to export your final document.</p>
@@ -237,14 +236,11 @@ export function ReviewDetailsPane({
           )}
           {selectedIssue && !isSafeDecisionOnlyMode && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <span
                   className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${issueBadgeClass(selectedIssue.type)}`}
                 >
                   {issueTypeLabel(selectedIssue.type)}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {visibleIssuesLength ? `Issue ${currentIssueIndex + 1} of ${visibleIssuesLength}` : "Issue"}
                 </span>
               </div>
               <p className="mt-2 text-sm text-slate-700">{cleanPanelText(selectedIssue.title)}</p>
@@ -296,7 +292,6 @@ export function ReviewDetailsPane({
           {!isSafeDecisionOnlyMode && (
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-slate-900">Decision status</p>
                 {selectedSegmentStatus === "approved" && (
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                     Approved
@@ -401,7 +396,11 @@ export function ReviewDetailsPane({
                   type="button"
                   onClick={selectedSegmentIsSafe ? onApprove : onApproveCurrentBlock}
                   disabled={primaryActionDisabled}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                  className={`rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60 ${
+                    prioritizeSaveAction
+                      ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                      : "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400"
+                  }`}
                 >
                   Approve
                 </button>
@@ -433,7 +432,11 @@ export function ReviewDetailsPane({
                 type="button"
                 onClick={onApprove}
                 disabled={actionLoading || !draftTranslation.trim()}
-                className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                className={`w-full rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${
+                  prioritizeSaveAction
+                    ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    : "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400"
+                }`}
               >
                 Approve
               </button>
@@ -443,7 +446,11 @@ export function ReviewDetailsPane({
                 type="button"
                 onClick={onSaveSegmentEdit}
                 disabled={actionLoading || !draftTranslation.trim()}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className={`w-full rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${
+                  prioritizeSaveAction
+                    ? "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400"
+                    : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+                }`}
               >
                 Save
               </button>
@@ -453,7 +460,11 @@ export function ReviewDetailsPane({
                 type="button"
                 onClick={onSaveSegmentEdit}
                 disabled={actionLoading || !draftTranslation.trim()}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className={`w-full rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${
+                  prioritizeSaveAction
+                    ? "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400"
+                    : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+                }`}
               >
                 Save
               </button>
@@ -471,7 +482,7 @@ export function ReviewDetailsPane({
                     : `${unresolvedBlocks} blocks still unresolved.`
                   : "Continue reviewing blocks in sequence."
                 : visibleIssuesLength
-                  ? `Issue queue position: ${Math.max(currentIssueIndex + 1, 1)} / ${visibleIssuesLength}`
+                  ? "Continue resolving issues in sequence."
                   : selectedFlaggedIndex === -1
                     ? "No open issues in current filter."
                     : `Flagged queue position: ${selectedFlaggedIndex + 1} / ${flaggedLength}`}
