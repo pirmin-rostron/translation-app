@@ -343,11 +343,7 @@ def _clean_review_display_text(text: str | None) -> str:
             continue
         if _FONT_NAME_FRAGMENT_PATTERN.match(line):
             continue
-        sentence_lines = [part.strip() for part in re.split(r"(?<=[.!?])\s+", line) if part.strip()]
-        if len(sentence_lines) > 1:
-            filtered_lines.extend(sentence_lines)
-        else:
-            filtered_lines.append(line)
+        filtered_lines.append(line)
     if not filtered_lines:
         return ""
     return "\n".join(filtered_lines).strip()
@@ -568,6 +564,14 @@ def _compose_block_translation(block_type: str, parts: list[str]) -> str | None:
     return separator.join(cleaned)
 
 
+def _compose_review_block_translation(parts: list[str]) -> str | None:
+    cleaned = [part.strip() for part in parts if part and part.strip()]
+    if not cleaned:
+        return None
+    # Preserve line-level structure in review payload to avoid collapsing heading/sentence boundaries.
+    return "\n".join(cleaned)
+
+
 def _refresh_document_block_translation(db: Session, block_id: int, job_id: int):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
@@ -587,10 +591,10 @@ def _refresh_document_block_translation(db: Session, block_id: int, job_id: int)
             .first()
         )
         if result:
-            cleaned = _clean_export_translation(result.final_translation)
-            if cleaned:
-                translated_parts.append(cleaned)
-    block.text_translated = _compose_block_translation(block.block_type, translated_parts)
+            raw = (result.final_translation or "").strip()
+            if raw:
+                translated_parts.append(raw)
+    block.text_translated = _compose_review_block_translation(translated_parts)
 
 
 def _serialize_review_segment(
@@ -1412,9 +1416,9 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
                     annotations=annotations_by_segment_id.get(segment.id, []),
                 )
             )
-            translated_parts.append(result.final_translation)
+            translated_parts.append((result.final_translation or "").strip())
 
-        translated_text_raw = _compose_block_translation(block.block_type, translated_parts)
+        translated_text_raw = _compose_review_block_translation(translated_parts) or (block.text_translated or "").strip()
         translated_text_display = _clean_review_display_text(translated_text_raw) if translated_text_raw else None
         review_blocks.append(
             ReviewBlockResponse(

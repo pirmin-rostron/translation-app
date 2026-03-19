@@ -1017,8 +1017,8 @@ export default function TranslationReviewPage() {
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
-    const sourceRaw = block.source_text_raw;
-    const sourceDisplay = block.source_text_display;
+    const sourceRaw = block.source_text_raw || "";
+    const sourceDisplay = block.source_text_display || "";
     const translatedRaw = block.translated_text_raw || "";
     const translatedDisplay = block.translated_text_display || "";
     const modeText =
