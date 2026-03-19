@@ -573,13 +573,37 @@ def _compose_review_block_translation(parts: list[str]) -> str | None:
     return "\n".join(cleaned)
 
 
-def _looks_like_markup_text(text: str | None) -> bool:
-    if not text:
-        return False
-    value = text.strip()
-    if not value:
-        return False
-    return bool(re.search(r"(\\rtf1|\\fonttbl|\\par\\b|\\[a-z]+-?\d*|[{}])", value, re.IGNORECASE))
+def _build_review_block_translated_representations(
+    block: DocumentBlock,
+    block_segments: list[DocumentSegment],
+    result_by_segment_id: dict[int, TranslationResult],
+) -> tuple[str, str | None, str]:
+    """Build canonical translated block representations for review and preview.
+
+    - translated_text_raw: markup-preserving view, intentionally composed from segment
+      primary translations (fallback to final segment text when needed).
+    - translated_text_display: clean readable view from reviewed final translations.
+    - translated_text_final: canonical reviewed text used by review/export logic.
+    """
+    final_parts: list[str] = []
+    raw_parts: list[str] = []
+    for segment in block_segments:
+        result = result_by_segment_id.get(segment.id)
+        if not result:
+            continue
+        final_text = (result.final_translation or "").strip()
+        if final_text:
+            final_parts.append(final_text)
+        raw_text = (result.primary_translation or "").strip()
+        if raw_text:
+            raw_parts.append(raw_text)
+        elif final_text:
+            raw_parts.append(final_text)
+
+    translated_text_final = _compose_review_block_translation(final_parts) or (block.text_translated or "").strip()
+    translated_text_raw = _compose_review_block_translation(raw_parts) or translated_text_final
+    translated_text_display = _clean_review_display_text(translated_text_final) if translated_text_final else None
+    return translated_text_raw, translated_text_display, translated_text_final
 
 
 def _refresh_document_block_translation(db: Session, block_id: int, job_id: int):
@@ -753,6 +777,48 @@ def _collect_export_blocks(db: Session, job: TranslationJob, export_mode: str) -
     return output_blocks
 
 
+def _collect_preview_blocks(db: Session, job: TranslationJob) -> list[tuple[str, str, str]]:
+    blocks = (
+        db.query(DocumentBlock)
+        .filter(DocumentBlock.document_id == job.document_id)
+        .order_by(DocumentBlock.block_index)
+        .all()
+    )
+    segments = (
+        db.query(DocumentSegment)
+        .filter(DocumentSegment.document_id == job.document_id)
+        .order_by(DocumentSegment.segment_index)
+        .all()
+    )
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    result_by_segment_id = {result.segment_id: result for result in results}
+    segments_by_block_id: dict[int | None, list[DocumentSegment]] = defaultdict(list)
+    for segment in segments:
+        segments_by_block_id[segment.block_id].append(segment)
+
+    output_blocks: list[tuple[str, str, str]] = []
+    for block in blocks:
+        block_segments = sorted(
+            segments_by_block_id.get(block.id, []),
+            key=lambda segment: segment.segment_index,
+        )
+        translated_text_raw, translated_text_display, _ = _build_review_block_translated_representations(
+            block=block,
+            block_segments=block_segments,
+            result_by_segment_id=result_by_segment_id,
+        )
+        if not (translated_text_raw or translated_text_display):
+            continue
+        output_blocks.append(
+            (
+                block.block_type or "paragraph",
+                translated_text_raw.strip(),
+                (translated_text_display or "").strip(),
+            )
+        )
+    return output_blocks
+
+
 def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> str:
     output_blocks = _collect_export_blocks(db, job, export_mode)
     output_lines: list[str] = []
@@ -762,11 +828,11 @@ def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> st
     return "\n".join(output_lines).strip() + "\n"
 
 
-def _build_preview_document_text(db: Session, job: TranslationJob, export_mode: str) -> str:
-    output_blocks = _collect_export_blocks(db, job, export_mode)
+def _render_preview_document_text(output_blocks: list[tuple[str, str, str]], view_mode: str) -> str:
     sections: list[str] = []
-    for block_type, translated_text in output_blocks:
-        text_value = translated_text.strip()
+    for block_type, translated_raw, translated_display in output_blocks:
+        text_value = translated_raw if view_mode == "raw" else translated_display
+        text_value = text_value.strip()
         if not text_value:
             continue
         sections.append(f"- {text_value}" if block_type == "bullet_item" else text_value)
@@ -1425,12 +1491,12 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
     review_blocks: list[ReviewBlockResponse] = []
     for block in blocks:
         block_segments = []
-        translated_final_parts: list[str] = []
-        translated_primary_parts: list[str] = []
+        resolved_block_segments: list[DocumentSegment] = []
         for segment in segments_by_block_id.get(block.id, []):
             result = results_by_segment_id.get(segment.id)
             if not result:
                 continue
+            resolved_block_segments.append(segment)
             block_segments.append(
                 _serialize_review_segment(
                     segment=segment,
@@ -1438,15 +1504,11 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
                     annotations=annotations_by_segment_id.get(segment.id, []),
                 )
             )
-            translated_final_parts.append((result.final_translation or "").strip())
-            translated_primary_parts.append((result.primary_translation or "").strip())
-
-        translated_text_final = _compose_review_block_translation(translated_final_parts) or (block.text_translated or "").strip()
-        translated_text_primary = _compose_review_block_translation(translated_primary_parts)
-        translated_text_raw = translated_text_final
-        if not _looks_like_markup_text(translated_text_raw) and _looks_like_markup_text(translated_text_primary):
-            translated_text_raw = translated_text_primary
-        translated_text_display = _clean_review_display_text(translated_text_final) if translated_text_final else None
+        translated_text_raw, translated_text_display, translated_text_final = _build_review_block_translated_representations(
+            block=block,
+            block_segments=resolved_block_segments,
+            result_by_segment_id=results_by_segment_id,
+        )
         review_blocks.append(
             ReviewBlockResponse(
                 id=block.id,
@@ -1630,8 +1692,9 @@ def preview_translation_job(job_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    content_raw = _build_preview_document_text(db, job, "preserve_formatting")
-    content_display = _build_preview_document_text(db, job, "clean_text")
+    preview_blocks = _collect_preview_blocks(db, job)
+    content_raw = _render_preview_document_text(preview_blocks, "raw")
+    content_display = _render_preview_document_text(preview_blocks, "display")
     return PreviewResponse(
         job_id=job.id,
         document_name=doc.filename,
