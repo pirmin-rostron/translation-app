@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { glossaryTermsApi, type GlossaryTermCreate } from "../services/api";
 
 type GlossaryTerm = {
   id: number;
@@ -43,13 +43,9 @@ export default function GlossaryPage() {
   const [error, setError] = useState("");
 
   function loadTerms() {
-    fetch(`${API_URL}/api/glossary-terms`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load glossary (${res.status})`);
-        return res.json();
-      })
+    glossaryTermsApi.list<GlossaryTerm[]>()
       .then(setTerms)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load glossary"))
       .finally(() => setLoading(false));
   }
 
@@ -64,20 +60,15 @@ export default function GlossaryPage() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/glossary-terms`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_term: form.source_term,
-          target_term: form.target_term,
-          source_language: form.source_language,
-          target_language: form.target_language,
-          industry: form.industry || null,
-          domain: form.domain || null,
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.detail || "Failed to create glossary term");
+      const termData: GlossaryTermCreate = {
+        source_term: form.source_term,
+        target_term: form.target_term,
+        source_language: form.source_language,
+        target_language: form.target_language,
+        industry: form.industry || null,
+        domain: form.domain || null,
+      };
+      const payload = await glossaryTermsApi.create<GlossaryTerm>(termData);
       setTerms((current) => [payload, ...current]);
       setForm(INITIAL_FORM);
       setMessage("Glossary term saved.");
@@ -92,11 +83,7 @@ export default function GlossaryPage() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/glossary-terms/${termId}`, {
-        method: "DELETE",
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to delete glossary term");
+      await glossaryTermsApi.delete<unknown>(termId);
       setTerms((current) => current.filter((term) => term.id !== termId));
       setMessage("Glossary term deleted.");
     } catch (err) {

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getLanguageDisplayName, SOURCE_LANGUAGE_OVERRIDE_OPTIONS } from "../../utils/language";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { documentsApi, translationJobsApi } from "../../services/api";
 
 type Document = {
   id: number;
@@ -110,59 +110,43 @@ export default function DocumentDetailPage() {
   const [translationStyle, setTranslationStyle] = useState<"natural" | "literal">("natural");
 
   const fetchDoc = () => {
-    fetch(`${API_URL}/api/documents/${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
-        return res.json();
-      })
+    documentsApi.getById<Document>(id)
       .then(setDoc)
-      .catch((err) => setError(err.message));
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load"));
   };
 
   const fetchSegments = () => {
-    fetch(`${API_URL}/api/documents/${id}/segments`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load segments (${res.status})`);
-        return res.json();
-      })
+    documentsApi.getSegments<Segment[]>(id)
       .then(setSegments)
-      .catch((err) => setError(err.message));
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load segments"));
   };
 
   const fetchBlocks = () => {
-    fetch(`${API_URL}/api/documents/${id}/blocks`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load blocks (${res.status})`);
-        return res.json();
-      })
+    documentsApi.getBlocks<DocumentBlock[]>(id)
       .then(setBlocks)
-      .catch((err) => setError(err.message));
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load blocks"));
   };
 
   const fetchJobs = () => {
-    fetch(`${API_URL}/api/documents/${id}/translation-jobs`)
-      .then((r) => (r.ok ? r.json() : []))
+    documentsApi.getTranslationJobs<TranslationJob[]>(id)
       .then(setJobs)
       .catch(() => setJobs([]));
   };
 
   const fetchDocStages = () => {
-    fetch(`${API_URL}/api/documents/${id}/stages`)
-      .then((r) => (r.ok ? r.json() : []))
+    documentsApi.getStages<ProcessingStageJob[]>(id)
       .then(setDocStages)
       .catch(() => setDocStages([]));
   };
 
   const fetchDocProgress = () => {
-    fetch(`${API_URL}/api/documents/${id}/progress`)
-      .then((r) => (r.ok ? r.json() : null))
+    documentsApi.getProgress<DocumentProgress>(id)
       .then(setDocProgress)
       .catch(() => setDocProgress(null));
   };
 
   const fetchTranslationProgress = (jobId: number) => {
-    fetch(`${API_URL}/api/translation-jobs/${jobId}/progress`)
-      .then((r) => (r.ok ? r.json() : null))
+    translationJobsApi.getProgress<TranslationProgress>(jobId)
       .then(setTranslationProgress)
       .catch(() => setTranslationProgress(null));
   };
@@ -174,23 +158,12 @@ export default function DocumentDetailPage() {
       return;
     }
     Promise.all([
-      fetch(`${API_URL}/api/documents/${id}`).then((r) => {
-        if (!r.ok) throw new Error(`Failed to load (${r.status})`);
-        return r.json();
-      }),
-      fetch(`${API_URL}/api/documents/${id}/blocks`).then((r) => {
-        if (!r.ok) return [];
-        return r.json();
-      }),
-      fetch(`${API_URL}/api/documents/${id}/segments`).then((r) => {
-        if (!r.ok) return [];
-        return r.json();
-      }),
-      fetch(`${API_URL}/api/documents/${id}/translation-jobs`).then((r) =>
-        r.ok ? r.json() : []
-      ),
-      fetch(`${API_URL}/api/documents/${id}/stages`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_URL}/api/documents/${id}/progress`).then((r) => (r.ok ? r.json() : null)),
+      documentsApi.getById<Document>(id),
+      documentsApi.getBlocks<DocumentBlock[]>(id).catch(() => [] as DocumentBlock[]),
+      documentsApi.getSegments<Segment[]>(id).catch(() => [] as Segment[]),
+      documentsApi.getTranslationJobs<TranslationJob[]>(id).catch(() => [] as TranslationJob[]),
+      documentsApi.getStages<ProcessingStageJob[]>(id).catch(() => [] as ProcessingStageJob[]),
+      documentsApi.getProgress<DocumentProgress>(id).catch(() => null),
     ])
       .then(([d, b, s, j, ds, dp]) => {
         setDoc(d);
@@ -229,16 +202,7 @@ export default function DocumentDetailPage() {
   const handleCreateJob = async () => {
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/documents/${id}/translation-jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ translation_style: translationStyle }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Failed (${res.status})`);
-      }
-      const job = await res.json();
+      const job = await documentsApi.createTranslationJob<TranslationJob>(id, translationStyle);
       fetchJobs();
       window.location.href = `/translation-jobs/${job.id}`;
     } catch (err) {
@@ -250,16 +214,7 @@ export default function DocumentDetailPage() {
     setError("");
     setSourceLanguageSuccess("");
     try {
-      const res = await fetch(`${API_URL}/api/documents/${id}/source-language`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_language: sourceLanguageEdit }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Failed (${res.status})`);
-      }
-      const updated = await res.json();
+      const updated = await documentsApi.updateSourceLanguage<Document>(id, sourceLanguageEdit);
       setDoc(updated);
       setEditingSourceLanguage(false);
       setSourceLanguageSuccess("Source language updated.");
@@ -272,14 +227,7 @@ export default function DocumentDetailPage() {
     setError("");
     setDoc((prev) => (prev ? { ...prev, status: "parsing", error_message: null } : prev));
     try {
-      const res = await fetch(`${API_URL}/api/documents/${id}/parse`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Parse failed (${res.status})`);
-      }
-      const updated = await res.json();
+      const updated = await documentsApi.parse<Document>(id);
       setDoc(updated);
       fetchBlocks();
       fetchSegments();
@@ -292,12 +240,7 @@ export default function DocumentDetailPage() {
   const handleRetryDoc = async () => {
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/documents/${id}/retry`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Retry failed (${res.status})`);
-      }
-      const updated = await res.json();
+      const updated = await documentsApi.retry<Document>(id);
       setDoc(updated);
       fetchDocStages();
     } catch (err) {

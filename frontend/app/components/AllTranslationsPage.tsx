@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getLanguageDisplayName } from "../utils/language";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { documentsApi } from "../services/api";
 
 type Document = {
   id: number;
@@ -45,16 +45,12 @@ export default function AllTranslationsPage() {
   const [openingDocId, setOpeningDocId] = useState<number | null>(null);
 
   const fetchDocs = async () => {
-    const res = await fetch(`${API_URL}/api/documents`);
-    if (!res.ok) throw new Error(`Failed to load (${res.status})`);
-    const payload = (await res.json()) as Document[];
+    const payload = await documentsApi.list<Document[]>();
     setDocs(payload);
     const jobsByDocEntries = await Promise.all(
       payload.map(async (doc) => {
         try {
-          const jobsRes = await fetch(`${API_URL}/api/documents/${doc.id}/translation-jobs`);
-          if (!jobsRes.ok) return [doc.id, null] as const;
-          const jobs = (await jobsRes.json()) as TranslationJobOverview[];
+          const jobs = await documentsApi.getTranslationJobs<TranslationJobOverview[]>(doc.id);
           return [doc.id, jobs[0] ?? null] as const;
         } catch {
           return [doc.id, null] as const;
@@ -68,13 +64,7 @@ export default function AllTranslationsPage() {
     setError("");
     setParsingId(docId);
     try {
-      const res = await fetch(`${API_URL}/api/documents/${docId}/parse`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Parse failed (${res.status})`);
-      }
+      await documentsApi.parse<unknown>(docId);
       await fetchDocs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Parse failed");

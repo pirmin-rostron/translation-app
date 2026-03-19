@@ -8,7 +8,7 @@ import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
 import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
 import { getLanguageDisplayName } from "../../utils/language";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL, documentsApi, translationJobsApi, translationResultsApi } from "../../services/api";
 
 type TranslationJob = {
   id: number;
@@ -598,47 +598,32 @@ export default function TranslationReviewPage() {
   }
 
   async function loadReviewBlocks() {
-    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/review-blocks`).then(async (res) => {
-      if (!res.ok) throw new Error("Failed to load review blocks");
-      return res.json();
-    });
+    const payload = await translationJobsApi.getReviewBlocks<DocumentBlock[]>(jobId);
     setBlocks(payload);
   }
 
   async function loadJobMeta() {
-    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}`).then(async (res) => {
-      if (!res.ok) throw new Error("Job not found");
-      return res.json();
-    });
+    const payload = await translationJobsApi.getById<TranslationJob>(jobId);
     setJob(payload);
-    return payload as TranslationJob;
+    return payload;
   }
 
   async function loadReviewSummary() {
-    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/review-summary`).then(async (res) => {
-      if (!res.ok) throw new Error("Failed to load review summary");
-      return res.json();
-    });
+    const payload = await translationJobsApi.getReviewSummary<ReviewSummary>(jobId);
     setReviewSummary(payload);
-    return payload as ReviewSummary;
+    return payload;
   }
 
   async function loadTranslationProgress() {
-    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/progress`).then(async (res) => {
-      if (!res.ok) throw new Error("Failed to load translation progress");
-      return res.json();
-    });
+    const payload = await translationJobsApi.getProgress<TranslationProgress>(jobId);
     setTranslationProgress(payload);
-    return payload as TranslationProgress;
+    return payload;
   }
 
   async function loadExportHistory() {
-    const payload = await fetch(`${API_URL}/api/translation-jobs/${jobId}/exports`).then(async (res) => {
-      if (!res.ok) throw new Error("Failed to load export history");
-      return res.json();
-    });
-    setExportHistory(payload as ExportFile[]);
-    return payload as ExportFile[];
+    const payload = await translationJobsApi.getExports<ExportFile[]>(jobId);
+    setExportHistory(payload);
+    return payload;
   }
 
   useEffect(() => {
@@ -650,9 +635,7 @@ export default function TranslationReviewPage() {
 
     Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()])
       .then(async ([loadedJob]) => {
-        const docRes = await fetch(`${API_URL}/api/documents/${loadedJob.document_id}`);
-        if (!docRes.ok) return null;
-        return docRes.json();
+        return documentsApi.getById<DocumentMeta>(loadedJob.document_id).catch(() => null);
       })
       .then(setDoc)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load review"))
@@ -673,13 +656,7 @@ export default function TranslationReviewPage() {
   }, [job?.status]);
 
   async function persistResult(resultId: number, finalTranslation: string, reviewStatus: string) {
-    const res = await fetch(`${API_URL}/api/translation-results/${resultId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ final_translation: finalTranslation, review_status: reviewStatus }),
-    });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(payload.detail || "Failed to save translation result");
+    await translationResultsApi.update<unknown>(resultId, finalTranslation, reviewStatus);
   }
 
   async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
@@ -947,14 +924,7 @@ export default function TranslationReviewPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/retry`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.detail || `Retry failed (${res.status})`);
-      }
-      const updated = await res.json();
+      const updated = await translationJobsApi.retry<TranslationJob>(job.id);
       setJob(updated);
       setMessage("Retry queued.");
     } catch (err) {
@@ -1011,11 +981,7 @@ export default function TranslationReviewPage() {
     setPreviewLoading(true);
     setPreviewError("");
     try {
-      const payload = await fetch(`${API_URL}/api/translation-jobs/${job.id}/preview`).then(async (res) => {
-        if (!res.ok) throw new Error("Failed to load preview");
-        return res.json();
-      });
-      const preview = payload as PreviewPayload;
+      const preview = await translationJobsApi.getPreview<PreviewPayload>(job.id);
       setPreviewDocumentName(preview.document_name || doc?.filename || "");
       setPreviewContentDisplay(preview.content_display || "");
     } catch (err) {
@@ -1038,15 +1004,7 @@ export default function TranslationReviewPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch(
-        `${API_URL}/api/translation-jobs/${job.id}/export?file_type=${selectedFormat}&formatting_mode=${selectedMode}`,
-        {
-          method: "POST",
-        }
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to export document");
-      const exportPayload = payload as ExportResult;
+      const exportPayload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(exportPayload);
       triggerExportDownload(exportPayload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
@@ -1081,17 +1039,8 @@ export default function TranslationReviewPage() {
     setError("");
     setMessage("");
     try {
-      const markReady = await fetch(`${API_URL}/api/translation-jobs/${job.id}/mark-ready`, {
-        method: "POST",
-      });
-      const readyPayload = await markReady.json().catch(() => ({}));
-      if (!markReady.ok) throw new Error(readyPayload.detail || "Failed to mark ready for export");
-
-      const exportUrl = `${API_URL}/api/translation-jobs/${job.id}/export?file_type=${selectedFormat}&formatting_mode=${selectedMode}`;
-      const exportRes2 = await fetch(exportUrl, { method: "POST" });
-      const exportPayload = await exportRes2.json().catch(() => ({}));
-      if (!exportRes2.ok) throw new Error(exportPayload.detail || "Failed to export document");
-      const payload = exportPayload as ExportResult;
+      await translationJobsApi.markReady<unknown>(job.id);
+      const payload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(payload);
       triggerExportDownload(payload);
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);

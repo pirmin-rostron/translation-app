@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { documentsApi, translationJobsApi } from "../../services/api";
 const INTRO_UPLOAD_MS = 1500;
 const INTRO_PARSE_MS = 1500;
 const INTRO_TOTAL_MS = INTRO_UPLOAD_MS + INTRO_PARSE_MS;
@@ -87,24 +87,19 @@ export default function ProcessingPage() {
     }
 
     try {
-      const [docRes, jobsRes, docProgressRes] = await Promise.all([
-        fetch(`${API_URL}/api/documents/${documentId}`),
-        fetch(`${API_URL}/api/documents/${documentId}/translation-jobs`),
-        fetch(`${API_URL}/api/documents/${documentId}/progress`),
+      const [nextDoc, nextJobs, nextDocProgress] = await Promise.all([
+        documentsApi.getById<DocumentRecord>(documentId),
+        documentsApi.getTranslationJobs<TranslationJob[]>(documentId).catch(() => [] as TranslationJob[]),
+        documentsApi.getProgress<DocumentProgress>(documentId).catch(() => null),
       ]);
-
-      if (!docRes.ok) throw new Error(`Failed to load document (${docRes.status})`);
-      const nextDoc = (await docRes.json()) as DocumentRecord;
-      const nextJobs = jobsRes.ok ? ((await jobsRes.json()) as TranslationJob[]) : [];
-      const nextDocProgress = docProgressRes.ok ? ((await docProgressRes.json()) as DocumentProgress) : null;
 
       setDoc(nextDoc);
       setJobs(nextJobs);
       setDocProgress(nextDocProgress);
 
       if (nextJobs.length > 0) {
-        const progressRes = await fetch(`${API_URL}/api/translation-jobs/${nextJobs[0].id}/progress`);
-        setTranslationProgress(progressRes.ok ? ((await progressRes.json()) as TranslationProgress) : null);
+        const progress = await translationJobsApi.getProgress<TranslationProgress>(nextJobs[0].id).catch(() => null);
+        setTranslationProgress(progress);
       } else {
         setTranslationProgress(null);
       }
@@ -140,9 +135,7 @@ export default function ProcessingPage() {
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/documents/${documentId}/retry`, { method: "POST" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to retry document processing");
+      await documentsApi.retry<unknown>(documentId);
       await loadState();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to retry document processing");
@@ -156,9 +149,7 @@ export default function ProcessingPage() {
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${latestJob.id}/retry`, { method: "POST" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to retry translation");
+      await translationJobsApi.retry<unknown>(latestJob.id);
       await loadState();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to retry translation");

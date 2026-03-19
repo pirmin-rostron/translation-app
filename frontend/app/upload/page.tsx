@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { documentsApi } from "../services/api";
 
 const INDUSTRY_OPTIONS = [
   { value: "", label: "Not specified" },
@@ -77,16 +76,7 @@ export default function UploadPage() {
       if (domain.trim()) formData.append("domain", domain.trim());
       formData.append("translation_style", translationStyle);
 
-      const res = await fetch(`${API_URL}/api/documents/upload-and-translate`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Upload failed (${res.status})`);
-      }
-      const created = await res.json();
+      const created = await documentsApi.uploadAndTranslate<{ id: number }>(formData);
       router.push(`/processing/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
