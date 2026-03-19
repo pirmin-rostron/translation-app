@@ -8,6 +8,7 @@ from striprtf.striprtf import rtf_to_text
 BULLET_PREFIX_RE = re.compile(r"^\s*([*\-•])\s+(.*)$")
 HEADING_STYLE_RE = re.compile(r"^heading\s*(\d+)?$", re.IGNORECASE)
 RTF_CONTROL_RE = re.compile(r"\\[a-zA-Z]+-?\d*\s?")
+_RTF_CONTROL_STRIP_RE = re.compile(r"\\[a-zA-Z]+-?\d*")
 
 
 @dataclass
@@ -99,6 +100,31 @@ def parse_docx(filepath: Path) -> list[ParsedDocumentBlock]:
     return blocks
 
 
+def _is_rtf_header_noise(text: str) -> bool:
+    """Return True if the text block is RTF header/control noise with no real content.
+
+    After rtf_to_text decodes the outer RTF wrapper, escaped inner RTF preamble
+    (e.g. {\\rtf1\\ansi\\deff0, {\\fonttbl...}, \\fs24) can leak through as the
+    first few text blocks.  These contain no translatable content and must be skipped.
+    """
+    # Strip all RTF control words (e.g. \rtf1, \ansi, \fonttbl, \fs24, \par)
+    remainder = _RTF_CONTROL_STRIP_RE.sub("", text)
+    # Strip structural characters: braces, digits, semicolons
+    remainder = re.sub(r"[{}\d;]", "", remainder)
+    remainder = re.sub(r"\s+", " ", remainder).strip()
+
+    # Case 1: nothing meaningful remains at all
+    if not remainder:
+        return True
+
+    # Case 2: block opens with a brace group — these are RTF structural groups
+    # (e.g. {\fonttbl ...}) whose only text remnants are font names, not prose.
+    if text.lstrip().startswith("{"):
+        return True
+
+    return False
+
+
 def parse_rtf(filepath: Path) -> list[ParsedDocumentBlock]:
     """Parse RTF into simple text blocks using plain-text heuristics."""
     raw = filepath.read_text(encoding="utf-8", errors="replace")
@@ -106,7 +132,7 @@ def parse_rtf(filepath: Path) -> list[ParsedDocumentBlock]:
     blocks = []
     for raw_block in re.split(r"\n\s*\n", text):
         cleaned = _normalize_text(raw_block)
-        if cleaned:
+        if cleaned and not _is_rtf_header_noise(cleaned):
             blocks.append(_classify_plain_text_block(cleaned))
     return blocks
 
