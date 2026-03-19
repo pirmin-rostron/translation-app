@@ -278,6 +278,13 @@ class ExportResponse(BaseModel):
     version: int
 
 
+class PreviewResponse(BaseModel):
+    job_id: int
+    document_name: str
+    content_raw: str
+    content_display: str
+
+
 class ExportFileResponse(BaseModel):
     filename: str
     download_url: str

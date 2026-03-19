@@ -17,6 +17,7 @@ type ReviewGuidancePanelProps = {
   isPrimaryActionDisabled: boolean;
   actionLoading: boolean;
   onPrimaryAction: () => void;
+  onPreviewDocument: () => void;
 };
 
 export function ReviewGuidancePanel({
@@ -32,6 +33,7 @@ export function ReviewGuidancePanel({
   isPrimaryActionDisabled,
   actionLoading,
   onPrimaryAction,
+  onPreviewDocument,
 }: ReviewGuidancePanelProps) {
   const showAmbiguityRow = unresolvedAmbiguities > 0;
 
@@ -69,14 +71,23 @@ export function ReviewGuidancePanel({
         Style: <span className="font-medium text-slate-900">{translationStyle === "literal" ? "Literal" : "Natural"}</span>
       </p>
 
-      <button
-        type="button"
-        onClick={onPrimaryAction}
-        disabled={actionLoading || isPrimaryActionDisabled}
-        className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-      >
-        {primaryActionLabel}
-      </button>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onPrimaryAction}
+          disabled={actionLoading || isPrimaryActionDisabled}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+        >
+          {primaryActionLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onPreviewDocument}
+          className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+        >
+          Preview Document
+        </button>
+      </div>
     </section>
   );
 }

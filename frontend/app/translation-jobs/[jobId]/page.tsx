@@ -196,6 +196,13 @@ type ExportFile = {
   latest: boolean;
 };
 
+type PreviewPayload = {
+  job_id: number;
+  document_name: string;
+  content_raw: string;
+  content_display: string;
+};
+
 type TranslationProgress = {
   job_id: number;
   stage_label: string;
@@ -647,6 +654,13 @@ export default function TranslationReviewPage() {
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [exportHistory, setExportHistory] = useState<ExportFile[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [previewDocumentName, setPreviewDocumentName] = useState("");
+  const [previewContentRaw, setPreviewContentRaw] = useState("");
+  const [previewContentDisplay, setPreviewContentDisplay] = useState("");
+  const [previewShowMarkup, setPreviewShowMarkup] = useState(true);
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
   const [showMarkup, setShowMarkup] = useState(true);
@@ -1419,6 +1433,30 @@ export default function TranslationReviewPage() {
     moveToBlockById(getRecommendedReviewBlockId());
   }
 
+  async function handleOpenPreviewDocument() {
+    if (!job) return;
+    setShowPreviewModal(true);
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreviewShowMarkup(showMarkup);
+    try {
+      const payload = await fetch(`${API_URL}/api/translation-jobs/${job.id}/preview`).then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load preview");
+        return res.json();
+      });
+      const preview = payload as PreviewPayload;
+      setPreviewDocumentName(preview.document_name || doc?.filename || "");
+      setPreviewContentRaw(preview.content_raw || "");
+      setPreviewContentDisplay(preview.content_display || "");
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "Failed to load preview");
+      setPreviewContentRaw("");
+      setPreviewContentDisplay("");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   function triggerExportDownload(payload: ExportResult) {
     if (!payload.download_url) return;
     const url = `${API_URL}${payload.download_url}`;
@@ -1631,6 +1669,7 @@ export default function TranslationReviewPage() {
           isPrimaryActionDisabled={isPrimaryGuidanceDisabled}
           actionLoading={actionLoading}
           onPrimaryAction={handlePrimaryGuidanceAction}
+          onPreviewDocument={handleOpenPreviewDocument}
         />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
@@ -1836,6 +1875,49 @@ export default function TranslationReviewPage() {
                 >
                   Export document
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showPreviewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
+            <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Preview</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">{previewDocumentName || doc?.filename || "Document"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewShowMarkup((current) => !current)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                      previewShowMarkup
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    Markup {previewShowMarkup ? "ON" : "OFF"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviewModal(false)}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+                {previewLoading ? (
+                  <p className="text-sm text-slate-600">Loading preview…</p>
+                ) : previewError ? (
+                  <p className="text-sm text-red-600">{previewError}</p>
+                ) : (
+                  <article className="whitespace-pre-wrap text-[15px] leading-7 text-slate-900">
+                    {previewShowMarkup ? previewContentRaw : previewContentDisplay}
+                  </article>
+                )}
               </div>
             </div>
           </div>

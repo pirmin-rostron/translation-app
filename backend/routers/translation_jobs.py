@@ -25,6 +25,7 @@ from models import (
 )
 from schemas import (
     ExportResponse,
+    PreviewResponse,
     ExportFileResponse,
     ProcessingStageJobResponse,
     ReviewSummaryResponse,
@@ -750,6 +751,17 @@ def _build_export_text(db: Session, job: TranslationJob, export_mode: str) -> st
         output_lines.append(f"- {translated_text}" if block_type == "bullet_item" else translated_text)
         output_lines.append("")
     return "\n".join(output_lines).strip() + "\n"
+
+
+def _build_preview_document_text(db: Session, job: TranslationJob, export_mode: str) -> str:
+    output_blocks = _collect_export_blocks(db, job, export_mode)
+    sections: list[str] = []
+    for block_type, translated_text in output_blocks:
+        text_value = translated_text.strip()
+        if not text_value:
+            continue
+        sections.append(f"- {text_value}" if block_type == "bullet_item" else text_value)
+    return "\n\n".join(sections).strip()
 
 
 def _build_export_rtf(db: Session, job: TranslationJob, export_mode: str) -> str:
@@ -1590,6 +1602,26 @@ def export_translation_job(
         download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
         generated_at=exported_at,
         version=version,
+    )
+
+
+@router.get("/translation-jobs/{job_id}/preview", response_model=PreviewResponse)
+def preview_translation_job(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    content_raw = _build_preview_document_text(db, job, "preserve_formatting")
+    content_display = _build_preview_document_text(db, job, "clean_text")
+    return PreviewResponse(
+        job_id=job.id,
+        document_name=doc.filename,
+        content_raw=content_raw,
+        content_display=content_display,
     )
 
 
