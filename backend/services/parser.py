@@ -9,10 +9,6 @@ BULLET_PREFIX_RE = re.compile(r"^\s*([*\-•])\s+(.*)$")
 HEADING_STYLE_RE = re.compile(r"^heading\s*(\d+)?$", re.IGNORECASE)
 RTF_CONTROL_RE = re.compile(r"\\[a-zA-Z]+-?\d*\s?")
 _RTF_CONTROL_STRIP_RE = re.compile(r"\\[a-zA-Z]+-?\d*")
-# Matches \b0\par\n not already followed by \n — used to split bold headings
-# from their following paragraph content.  Built with re.escape to avoid the
-# invalid \p escape in Python 3.9's re module.
-_RTF_BOLD_END_RE = re.compile(re.escape("\\b0\\par") + "\n(?!\n)")
 
 
 @dataclass
@@ -133,10 +129,6 @@ def parse_rtf(filepath: Path) -> list[ParsedDocumentBlock]:
     """Parse RTF into simple text blocks using plain-text heuristics."""
     raw = filepath.read_text(encoding="utf-8", errors="replace")
     text = rtf_to_text(raw)
-    # rtf_to_text outputs \b heading\b0\par followed immediately by content on
-    # the next line with only a single \n.  Insert an extra \n so the double-
-    # newline block splitter below treats the heading as its own block.
-    text = _RTF_BOLD_END_RE.sub(lambda m: m.group(0) + "\n", text)
     blocks = []
     for raw_block in re.split(r"\n\s*\n", text):
         cleaned = _normalize_text(raw_block)
