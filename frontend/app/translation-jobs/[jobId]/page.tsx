@@ -460,7 +460,7 @@ export default function TranslationReviewPage() {
     return blocks.filter((block) => block.segments.some((segment) => matchesFilter(segment, activeFilter)));
   }, [activeFilter, blocks]);
   const visibleBlocks = useMemo(
-    () => filteredBlocks.filter((block) => hasMeaningfulCleanBlockContent(block)),
+    () => filteredBlocks.filter((block) => block.segments.length > 0 || hasMeaningfulCleanBlockContent(block)),
     [filteredBlocks]
   );
   const filteredSegments = useMemo(
