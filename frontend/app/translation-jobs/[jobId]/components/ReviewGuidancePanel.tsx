@@ -17,7 +17,8 @@ type ReviewGuidancePanelProps = {
   isPrimaryActionDisabled: boolean;
   actionLoading: boolean;
   onPrimaryAction: () => void;
-  onPreviewDocument: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
 };
 
 export function ReviewGuidancePanel({
@@ -33,7 +34,8 @@ export function ReviewGuidancePanel({
   isPrimaryActionDisabled,
   actionLoading,
   onPrimaryAction,
-  onPreviewDocument,
+  secondaryActionLabel,
+  onSecondaryAction,
 }: ReviewGuidancePanelProps) {
   const showAmbiguityRow = unresolvedAmbiguities > 0;
 
@@ -80,13 +82,15 @@ export function ReviewGuidancePanel({
         >
           {primaryActionLabel}
         </button>
-        <button
-          type="button"
-          onClick={onPreviewDocument}
-          className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-        >
-          Preview Document
-        </button>
+        {secondaryActionLabel && onSecondaryAction ? (
+          <button
+            type="button"
+            onClick={onSecondaryAction}
+            className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+          >
+            {secondaryActionLabel}
+          </button>
+        ) : null}
       </div>
     </section>
   );

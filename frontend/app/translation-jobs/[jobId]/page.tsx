@@ -122,7 +122,6 @@ type DocumentNode =
 
 type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
 type IssueType = "ambiguity" | "glossary" | "exact_memory" | "semantic_memory";
-type ReviewMode = "document" | "issues";
 
 type HighlightRange = {
   start: number;
@@ -236,12 +235,6 @@ function isSafeSegment(segment: ReviewSegment) {
 function isBlockResolved(block: DocumentBlock) {
   if (!block.segments.length) return false;
   return block.segments.every((segment) => isAcceptableFinalStatus(segment.review_status));
-}
-
-function isSafeBlock(block: DocumentBlock) {
-  const unresolvedSegments = block.segments.filter((segment) => !isAcceptableFinalStatus(segment.review_status));
-  if (!unresolvedSegments.length) return false;
-  return unresolvedSegments.every((segment) => isSafeSegment(segment));
 }
 
 function cleanChoiceTranslationText(value: string) {
@@ -630,20 +623,6 @@ function getTranslationWrapperProps(segment: ReviewSegment) {
   return { className: undefined, title: undefined };
 }
 
-function issueTypeLabel(issueType: IssueType) {
-  if (issueType === "ambiguity") return "Ambiguity";
-  if (issueType === "glossary") return "Glossary";
-  if (issueType === "exact_memory") return "Exact memory";
-  return "Semantic memory";
-}
-
-function issueBadgeClass(issueType: IssueType) {
-  if (issueType === "ambiguity") return "bg-amber-100 text-amber-900 border-amber-200";
-  if (issueType === "glossary") return "bg-teal-100 text-teal-900 border-teal-200";
-  if (issueType === "exact_memory") return "bg-emerald-100 text-emerald-900 border-emerald-200";
-  return "bg-sky-100 text-sky-900 border-sky-200";
-}
-
 export default function TranslationReviewPage() {
   const params = useParams();
   const jobId = Number(params.jobId);
@@ -662,7 +641,7 @@ export default function TranslationReviewPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
-  const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
+  const reviewMode = "document" as const;
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
@@ -747,7 +726,6 @@ export default function TranslationReviewPage() {
     }
     return map;
   }, [issues]);
-  const issuesByKey = useMemo(() => new Map(issues.map((issue) => [issue.key, issue])), [issues]);
   const visibleIssues = useMemo(() => {
     if (activeFilter === "ambiguities") return issues.filter((issue) => issue.type === "ambiguity");
     if (activeFilter === "glossary") return issues.filter((issue) => issue.type === "glossary");
@@ -755,8 +733,6 @@ export default function TranslationReviewPage() {
       return issues.filter((issue) => issue.type === "exact_memory" || issue.type === "semantic_memory");
     return issues;
   }, [activeFilter, issues]);
-  const currentIssueIndex = visibleIssues.findIndex((issue) => issue.key === selectedIssueKey);
-  const selectedIssue = selectedIssueKey ? issuesByKey.get(selectedIssueKey) ?? null : null;
   const selectedEntry = useMemo(
     () => allSegments.find(({ segment }) => segment.id === selectedId) ?? filteredSegments[0] ?? null,
     [allSegments, filteredSegments, selectedId]
@@ -770,10 +746,6 @@ export default function TranslationReviewPage() {
         .sort((a, b) => a.block_index - b.block_index),
     [blocks]
   );
-  const safeBlocks = useMemo(
-    () => orderedBlocks.filter((block) => isSafeBlock(block)),
-    [orderedBlocks]
-  );
   const blockIndexById = useMemo(
     () => new Map(orderedBlocks.map((block, idx) => [block.id, idx])),
     [orderedBlocks]
@@ -782,7 +754,6 @@ export default function TranslationReviewPage() {
     () => deriveCanonicalReviewCounts(orderedBlocks, allSegments, reviewSummary),
     [orderedBlocks, allSegments, reviewSummary]
   );
-  const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
   const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
 
   useEffect(() => {
@@ -827,58 +798,13 @@ export default function TranslationReviewPage() {
     blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [reviewMode, orderedBlocks, selectedBlockPosition]);
 
-  useEffect(() => {
-    if (reviewMode !== "issues") return;
-    if (!visibleIssues.length) {
-      setSelectedIssueKey(null);
-      return;
-    }
-    if (!selectedIssueKey || !visibleIssues.some((issue) => issue.key === selectedIssueKey)) {
-      setSelectedIssueKey(visibleIssues[0].key);
-    }
-  }, [reviewMode, visibleIssues, selectedIssueKey]);
-
-  useEffect(() => {
-    if (reviewMode !== "issues") return;
-    if (!selectedIssueKey) return;
-    const issue = issuesByKey.get(selectedIssueKey);
-    if (!issue) return;
-    if (selectedId !== issue.segmentId) {
-      setSelectedId(issue.segmentId);
-    }
-  }, [reviewMode, selectedIssueKey, issuesByKey, selectedId]);
-
-  function selectIssue(issueKey: string) {
-    const issue = issuesByKey.get(issueKey);
-    if (!issue) return;
-    setReviewMode("issues");
-    setSelectedIssueKey(issueKey);
-    setSelectedId(issue.segmentId);
-    setMessage("");
-    setError("");
-  }
-
-  function goToIssue(step: 1 | -1) {
-    if (!visibleIssues.length) return;
-    const start = currentIssueIndex === -1 ? 0 : currentIssueIndex;
-    const nextIndex = (start + step + visibleIssues.length) % visibleIssues.length;
-    selectIssue(visibleIssues[nextIndex].key);
-  }
-
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
     if (!block || !block.segments.length) return;
     const ambiguityChoiceSegment = block.segments.find((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
     const semanticChoiceSegment = block.segments.find((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
     const fallbackSegmentId = preferredSegmentId ?? ambiguityChoiceSegment?.id ?? semanticChoiceSegment?.id ?? block.segments[0].id;
-    if (reviewMode === "issues") {
-      const firstIssue = block.segments
-        .flatMap((segment) => issuesBySegmentId.get(segment.id) ?? [])
-        .sort((a, b) => a.segmentIndex - b.segmentIndex)[0];
-      setSelectedIssueKey(firstIssue?.key ?? null);
-    } else {
-      setSelectedIssueKey(null);
-    }
+    setSelectedIssueKey(null);
     setSelectedId(fallbackSegmentId);
     setMessage("");
     setError("");
@@ -924,27 +850,7 @@ export default function TranslationReviewPage() {
     blockRefs.current[blockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
-  function handleReviewAmbiguities() {
-    setReviewMode("issues");
-    setActiveFilter("ambiguities");
-    const firstAmbiguity = issues.find((issue) => issue.type === "ambiguity");
-    if (firstAmbiguity) {
-      selectIssue(firstAmbiguity.key);
-    }
-  }
-
-  function handleReviewSafeSegments() {
-    setReviewMode("document");
-    setActiveFilter("all");
-    if (!safeBlocks.length) return;
-    setSelectedIssueKey(null);
-    setSelectedId(safeBlocks[0].segments[0]?.id ?? null);
-    setMessage("");
-    setError("");
-  }
-
   function switchToDocumentMode() {
-    setReviewMode("document");
     setActiveFilter("all");
     const firstBlockId = getFirstBlockForDocumentReview();
     if (firstBlockId != null) {
@@ -952,16 +858,6 @@ export default function TranslationReviewPage() {
       setSelectedIssueKey(null);
       setSelectedId(firstBlock?.segments[0]?.id ?? null);
       blockRefs.current[firstBlockId]?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
-  }
-
-  function switchToIssuesMode() {
-    setReviewMode("issues");
-    if (activeFilter === "all") {
-      setActiveFilter("issues");
-    }
-    if (!selectedIssueKey && visibleIssues.length > 0) {
-      selectIssue(visibleIssues[0].key);
     }
   }
 
@@ -1060,7 +956,6 @@ export default function TranslationReviewPage() {
     setSelectedIssueKey(null);
     setSelectedId(null);
     setIsEditing(false);
-    setReviewMode("document");
     setActiveFilter("all");
     reviewGuidanceRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -1068,7 +963,7 @@ export default function TranslationReviewPage() {
   function transitionToReviewCompleteState(summary: ReviewSummary | null | undefined) {
     if (!summary?.review_complete) return false;
     focusReviewGuidance();
-    setMessage("Review complete. Continue in Review Guidance to export.");
+    setMessage("Review complete. Preview your document, then export when ready.");
     setError("");
     return true;
   }
@@ -1191,7 +1086,7 @@ export default function TranslationReviewPage() {
 
   async function handleSaveSegmentEdit() {
     if (!selectedSegment) return;
-    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
+    const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     const finalTranslation = getSelectedDecisionTranslation();
     const reviewStatus = getSelectedDecisionStatus();
     setActionLoading(true);
@@ -1200,44 +1095,13 @@ export default function TranslationReviewPage() {
     try {
       const summary = await saveResult(selectedSegment.id, finalTranslation, reviewStatus);
       setIsEditing(false);
-      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
+      if (transitionToReviewCompleteState(summary)) {
         return;
       }
-      if (reviewMode === "document") {
-        moveToBlockById(nextBlockId);
-        setMessage("Saved and approved. Moved to next block.");
-      } else {
-        setMessage("Saved and approved.");
-      }
+      moveToBlockById(nextBlockId);
+      setMessage("Saved and approved. Moved to next block.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save changes");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleApprove() {
-    if (!selectedSegment) return;
-    const nextBlockId = reviewMode === "document" ? getNextUnresolvedBlockIdFromCurrent() : null;
-    const finalTranslation = getSelectedDecisionTranslation();
-    const reviewStatus = getSelectedDecisionStatus();
-    setActionLoading(true);
-    setMessage("");
-    setError("");
-    try {
-      const summary = await saveResult(selectedSegment.id, finalTranslation, reviewStatus);
-      setIsEditing(false);
-      if (reviewMode === "document" && transitionToReviewCompleteState(summary)) {
-        return;
-      }
-      if (reviewMode === "document") {
-        moveToBlockById(nextBlockId);
-        setMessage("Block approved. Moved to next block.");
-      } else {
-        setMessage("Item approved.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve");
     } finally {
       setActionLoading(false);
     }
@@ -1365,31 +1229,6 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function handleApproveAllSafeSegments() {
-    if (!job) return;
-    const safeCountToApprove = safeBlocks.length;
-    setActionLoading(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await fetch(`${API_URL}/api/translation-jobs/${job.id}/approve-safe-segments`, {
-        method: "POST",
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.detail || "Failed to approve safe blocks");
-      if (payload && typeof payload === "object") {
-        setReviewSummary(payload as ReviewSummary);
-      }
-      await Promise.all([loadJobMeta(), loadReviewSummary(), loadReviewBlocks(), loadTranslationProgress()]);
-      const label = safeCountToApprove === 1 ? "block" : "blocks";
-      setMessage(`✓ ${safeCountToApprove} safe ${label} approved`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve safe blocks");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   function getFirstUnresolvedAmbiguityBlockId() {
     const firstAmbiguity = orderedBlocks.find((block) =>
       block.segments.some(
@@ -1420,7 +1259,7 @@ export default function TranslationReviewPage() {
       return;
     }
     if (guidanceStatusLabel === "Review Complete") {
-      handleOpenExportModal();
+      void handleOpenPreviewDocument();
       return;
     }
     switchToDocumentMode();
@@ -1533,7 +1372,6 @@ export default function TranslationReviewPage() {
   const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
   const isReadOnly = workflowStatus === "exported";
-  const selectedSegmentStatus = normalizeSegmentStatus(selectedSegment?.review_status ?? "unreviewed");
   const selectedSegmentIsSafe = Boolean(selectedSegment && isSafeSegment(selectedSegment));
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
@@ -1568,7 +1406,6 @@ export default function TranslationReviewPage() {
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
-  const isDocumentMode = reviewMode === "document";
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
   const guidanceStatusLabel = workflowStatus === "exported" ? "Exported" : reviewComplete ? "Review Complete" : "In Review";
@@ -1589,18 +1426,22 @@ export default function TranslationReviewPage() {
     guidanceStatusLabel === "Exported"
       ? "Download the latest exported file."
       : guidanceStatusLabel === "Review Complete"
-        ? "Review complete — ready to export."
+        ? "Review complete. Preview your document, then export."
         : firstUnresolvedAmbiguityBlockId != null
           ? `Resolve ambiguity in Block ${((orderedBlocks.find((b) => b.id === firstUnresolvedAmbiguityBlockId)?.block_index ?? 0) + 1).toString()} next.`
           : nextUnresolvedBlockId != null
             ? `Continue with Block ${((orderedBlocks.find((b) => b.id === nextUnresolvedBlockId)?.block_index ?? 0) + 1).toString()}.`
             : "Review complete — ready to export.";
+  const hasReviewProgress = reviewCounts.completed_blocks > 0;
   const primaryGuidanceLabel =
     guidanceStatusLabel === "Exported"
       ? "Download Latest Export"
       : guidanceStatusLabel === "Review Complete"
-        ? "Export Document"
-        : "Continue Review";
+        ? "Preview Document"
+        : hasReviewProgress
+          ? "Continue reviewing"
+          : "Start reviewing";
+  const secondaryGuidanceLabel = guidanceStatusLabel === "Review Complete" ? "Export document" : undefined;
   const isPrimaryGuidanceDisabled = guidanceStatusLabel === "Exported" && !latestExport?.download_url;
 
   return (
@@ -1621,30 +1462,6 @@ export default function TranslationReviewPage() {
           </p>
           <p className="mt-2 text-sm text-slate-600">Follow the workflow below to review and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
-          <div className="mt-4 inline-flex rounded-lg border border-slate-300 bg-white p-1">
-            <button
-              type="button"
-              onClick={switchToDocumentMode}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                reviewMode === "document"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              Full Document
-            </button>
-            <button
-              type="button"
-              onClick={switchToIssuesMode}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                reviewMode === "issues"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              Issues Only
-            </button>
-          </div>
         </div>
 
         <ReviewGuidancePanel
@@ -1660,7 +1477,8 @@ export default function TranslationReviewPage() {
           isPrimaryActionDisabled={isPrimaryGuidanceDisabled}
           actionLoading={actionLoading}
           onPrimaryAction={handlePrimaryGuidanceAction}
-          onPreviewDocument={handleOpenPreviewDocument}
+          secondaryActionLabel={secondaryGuidanceLabel}
+          onSecondaryAction={secondaryGuidanceLabel ? handleOpenExportModal : undefined}
         />
 
         {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
@@ -1687,7 +1505,6 @@ export default function TranslationReviewPage() {
             selectedBlock={selectedBlock}
             reviewComplete={reviewComplete}
             onFocusReviewGuidance={focusReviewGuidance}
-            reviewMode={reviewMode}
             orderedBlocksLength={reviewCounts.total_blocks}
             completedBlocks={reviewCounts.completed_blocks}
             selectedBlockPosition={selectedBlockPosition}
@@ -1695,15 +1512,8 @@ export default function TranslationReviewPage() {
             onNextBlock={handleNextBlock}
             isLastBlock={isLastBlock}
             unresolvedBlocks={reviewCounts.remaining_blocks}
-            visibleIssuesLength={visibleIssues.length}
-            currentIssueIndex={currentIssueIndex}
-            onPreviousIssue={() => goToIssue(-1)}
-            onNextIssue={() => goToIssue(1)}
-            selectedIssue={selectedIssue}
-            issueTypeLabel={issueTypeLabel}
             selectedSegmentIsSafe={selectedSegmentIsSafe}
             isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
-            issueBadgeClass={issueBadgeClass}
             cleanPanelText={cleanPanelText}
             hasAmbiguityChoice={hasAmbiguityChoice}
             ambiguityExplanation={ambiguityChoiceDetails.explanation}
@@ -1714,7 +1524,6 @@ export default function TranslationReviewPage() {
             currentSuggestionIndex={currentSuggestionIndex}
             onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
             isReadOnly={isReadOnly}
-            selectedSegmentStatus={selectedSegmentStatus as "approved" | "edited" | "memory_match" | "unreviewed"}
             isEditing={isEditing}
             canEditSelectedSegment={canEditSelectedSegment}
             draftTranslation={draftTranslation}
@@ -1724,9 +1533,7 @@ export default function TranslationReviewPage() {
             semanticSimilarityScore={semanticSimilarityScore}
             semanticChoice={semanticChoice}
             onSemanticChoiceChange={handleSemanticChoiceChange}
-            isDocumentMode={isDocumentMode}
             currentBlockResolved={currentBlockResolved}
-            onApprove={handleApprove}
             onApproveCurrentBlock={handleApproveCurrentBlock}
             primaryActionDisabled={primaryActionDisabled}
             onToggleEdit={handleToggleEdit}
@@ -1734,8 +1541,6 @@ export default function TranslationReviewPage() {
             onSkipBlock={handleSkipBlock}
             hasDraftChanges={hasDraftChanges}
             onSaveSegmentEdit={handleSaveSegmentEdit}
-            selectedFlaggedIndex={selectedFlaggedIndex}
-            flaggedLength={flagged.length}
           />
         </div>
         {showExportModal && (
