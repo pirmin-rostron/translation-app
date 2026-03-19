@@ -216,6 +216,7 @@ Use Tailwind classes consistently for these states:
 - Call out assumptions and edge cases explicitly.
 - Fail safely on malformed/incomplete data.
 - Keep responses focused — do not refactor unrelated code in the same pass.
+- After any backend parser change, always run the parser against all three test RTF files (`basic_test.rtf`, `legal_test.rtf`, `messy_test.rtf`) and verify block output before finishing.
 
 ---
 
