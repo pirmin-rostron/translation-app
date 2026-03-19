@@ -658,12 +658,9 @@ export default function TranslationReviewPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [previewDocumentName, setPreviewDocumentName] = useState("");
-  const [previewContentRaw, setPreviewContentRaw] = useState("");
   const [previewContentDisplay, setPreviewContentDisplay] = useState("");
-  const [previewShowMarkup, setPreviewShowMarkup] = useState(true);
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
-  const [showMarkup, setShowMarkup] = useState(true);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -694,8 +691,8 @@ export default function TranslationReviewPage() {
     return blocks.filter((block) => block.segments.some((segment) => matchesFilter(segment, activeFilter)));
   }, [activeFilter, blocks]);
   const visibleBlocks = useMemo(
-    () => (showMarkup ? filteredBlocks : filteredBlocks.filter((block) => hasMeaningfulCleanBlockContent(block))),
-    [filteredBlocks, showMarkup]
+    () => filteredBlocks.filter((block) => hasMeaningfulCleanBlockContent(block)),
+    [filteredBlocks]
   );
   const filteredSegments = useMemo(
     () =>
@@ -1077,12 +1074,9 @@ export default function TranslationReviewPage() {
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
-    const sourceRaw = block.source_text_raw || "";
     const sourceDisplay = block.source_text_display || "";
-    const translatedRaw = block.translated_text_raw || "";
     const translatedDisplay = block.translated_text_display || "";
-    const modeText =
-      side === "source" ? (showMarkup ? sourceRaw : sourceDisplay) : showMarkup ? translatedRaw : translatedDisplay;
+    const modeText = side === "source" ? sourceDisplay : translatedDisplay;
     return (
       <span
         onClick={() => {
@@ -1438,7 +1432,6 @@ export default function TranslationReviewPage() {
     setShowPreviewModal(true);
     setPreviewLoading(true);
     setPreviewError("");
-    setPreviewShowMarkup(showMarkup);
     try {
       const payload = await fetch(`${API_URL}/api/translation-jobs/${job.id}/preview`).then(async (res) => {
         if (!res.ok) throw new Error("Failed to load preview");
@@ -1446,11 +1439,9 @@ export default function TranslationReviewPage() {
       });
       const preview = payload as PreviewPayload;
       setPreviewDocumentName(preview.document_name || doc?.filename || "");
-      setPreviewContentRaw(preview.content_raw || "");
       setPreviewContentDisplay(preview.content_display || "");
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : "Failed to load preview");
-      setPreviewContentRaw("");
       setPreviewContentDisplay("");
     } finally {
       setPreviewLoading(false);
@@ -1679,8 +1670,6 @@ export default function TranslationReviewPage() {
           <DocumentDiffPane
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
-            showMarkup={showMarkup}
-            onToggleMarkup={() => setShowMarkup((current) => !current)}
             reviewMode={reviewMode}
             filterChips={filterChips}
             visibleIssuesLength={visibleIssues.length}
@@ -1890,17 +1879,6 @@ export default function TranslationReviewPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setPreviewShowMarkup((current) => !current)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                      previewShowMarkup
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    Markup {previewShowMarkup ? "ON" : "OFF"}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setShowPreviewModal(false)}
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
@@ -1914,9 +1892,7 @@ export default function TranslationReviewPage() {
                 ) : previewError ? (
                   <p className="text-sm text-red-600">{previewError}</p>
                 ) : (
-                  <article className="whitespace-pre-wrap text-[15px] leading-7 text-slate-900">
-                    {previewShowMarkup ? previewContentRaw : previewContentDisplay}
-                  </article>
+                  <article className="whitespace-pre-wrap text-[15px] leading-7 text-slate-900">{previewContentDisplay}</article>
                 )}
               </div>
             </div>

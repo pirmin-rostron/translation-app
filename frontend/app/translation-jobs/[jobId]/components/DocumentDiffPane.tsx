@@ -23,8 +23,6 @@ type FilterChip = {
 type DocumentDiffPaneProps = {
   activeFilter: ReviewFilter;
   onFilterChange: (filter: ReviewFilter) => void;
-  showMarkup: boolean;
-  onToggleMarkup: () => void;
   reviewMode: ReviewMode;
   filterChips: FilterChip[];
   visibleIssuesLength: number;
@@ -40,8 +38,6 @@ type DocumentDiffPaneProps = {
 export function DocumentDiffPane({
   activeFilter,
   onFilterChange,
-  showMarkup,
-  onToggleMarkup,
   reviewMode,
   filterChips,
   visibleIssuesLength,
@@ -56,36 +52,21 @@ export function DocumentDiffPane({
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="rounded-t-2xl border-b border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {filterChips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => onFilterChange(chip.key)}
-                className={`rounded-full px-3 py-1.5 text-sm ${
-                  activeFilter === chip.key
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {chip.label} ({chip.count})
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {filterChips.map((chip) => (
             <button
+              key={chip.key}
               type="button"
-              onClick={onToggleMarkup}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                showMarkup
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              onClick={() => onFilterChange(chip.key)}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                activeFilter === chip.key
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              Markup {showMarkup ? "ON" : "OFF"}
+              {chip.label} ({chip.count})
             </button>
-          </div>
+          ))}
         </div>
 
         {reviewMode === "issues" ? (
