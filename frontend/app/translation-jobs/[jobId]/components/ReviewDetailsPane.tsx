@@ -45,8 +45,6 @@ type ReviewDetailsPaneProps = {
   selectedIssue: ReviewIssue | null;
   issueTypeLabel: (issueType: IssueType) => string;
   selectedSegmentIsSafe: boolean;
-  selectedSafeBlockIndex: number;
-  safeBlocksLength: number;
   isSafeDecisionOnlyMode: boolean;
   issueBadgeClass: (issueType: IssueType) => string;
   cleanPanelText: (value: string | null | undefined) => string;
@@ -79,7 +77,6 @@ type ReviewDetailsPaneProps = {
   onSkipBlock: () => void;
   hasDraftChanges: boolean;
   onSaveSegmentEdit: () => void;
-  onNextSafeBlock: () => void;
   selectedFlaggedIndex: number;
   flaggedLength: number;
 };
@@ -104,8 +101,6 @@ export function ReviewDetailsPane({
   selectedIssue,
   issueTypeLabel,
   selectedSegmentIsSafe,
-  selectedSafeBlockIndex,
-  safeBlocksLength,
   isSafeDecisionOnlyMode,
   issueBadgeClass,
   cleanPanelText,
@@ -138,7 +133,6 @@ export function ReviewDetailsPane({
   onSkipBlock,
   hasDraftChanges,
   onSaveSegmentEdit,
-  onNextSafeBlock,
   selectedFlaggedIndex,
   flaggedLength,
 }: ReviewDetailsPaneProps) {
@@ -238,15 +232,7 @@ export function ReviewDetailsPane({
           )}
           {selectedSegmentIsSafe && (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-              <span className="inline-flex rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-medium text-emerald-800">
-                Safe block
-              </span>
-              <p className="mt-2 text-sm text-slate-700">No ambiguity or conflicts detected.</p>
-              {selectedSafeBlockIndex !== -1 && safeBlocksLength > 0 && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Safe block queue: {selectedSafeBlockIndex + 1} / {safeBlocksLength}
-                </p>
-              )}
+              <p className="text-sm text-slate-700">No issues detected.</p>
             </div>
           )}
           {selectedIssue && !isSafeDecisionOnlyMode && (
@@ -332,9 +318,6 @@ export function ReviewDetailsPane({
                   </span>
                 )}
               </div>
-              <p className="mt-2 text-xs text-slate-600">
-                Full source and translated context stays in the side-by-side document view.
-              </p>
             </div>
           )}
 
@@ -473,16 +456,6 @@ export function ReviewDetailsPane({
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
                 Save
-              </button>
-            )}
-            {!isReadOnly && selectedSegmentIsSafe && safeBlocksLength > 1 && (
-              <button
-                type="button"
-                onClick={onNextSafeBlock}
-                disabled={actionLoading}
-                className="w-full rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-              >
-                Next safe block
               </button>
             )}
             {isReadOnly && (

@@ -443,6 +443,21 @@ function buildDocumentNodes(blocks: DocumentBlock[]) {
   return nodes;
 }
 
+function _stripDisplayArtifacts(value: string | null | undefined) {
+  return (value || "")
+    .replace(/\\[a-z]+-?\d*\s?/gi, " ")
+    .replace(/\b(fonttbl|colortbl|stylesheet|pard|plain|rtf1|ansi|deff\d+)\b/gi, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasMeaningfulCleanBlockContent(block: DocumentBlock) {
+  const source = _stripDisplayArtifacts(block.source_text_display);
+  const translated = _stripDisplayArtifacts(block.translated_text_display);
+  return Boolean(source || translated);
+}
+
 function deriveCanonicalReviewCounts(
   orderedBlocks: DocumentBlock[],
   allSegments: { block: DocumentBlock; segment: ReviewSegment }[],
@@ -661,7 +676,7 @@ export default function TranslationReviewPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>("preserve_formatting");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("docx");
-  const [showMarkup, setShowMarkup] = useState(false);
+  const [showMarkup, setShowMarkup] = useState(true);
   const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("document");
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
@@ -691,14 +706,18 @@ export default function TranslationReviewPage() {
     if (activeFilter === "all") return blocks;
     return blocks.filter((block) => block.segments.some((segment) => matchesFilter(segment, activeFilter)));
   }, [activeFilter, blocks]);
+  const visibleBlocks = useMemo(
+    () => (showMarkup ? filteredBlocks : filteredBlocks.filter((block) => hasMeaningfulCleanBlockContent(block))),
+    [filteredBlocks, showMarkup]
+  );
   const filteredSegments = useMemo(
     () =>
-      filteredBlocks
+      visibleBlocks
         .flatMap((block) => block.segments.map((segment) => ({ block, segment })))
         .sort((a, b) => a.segment.segment_index - b.segment.segment_index),
-    [filteredBlocks]
+    [visibleBlocks]
   );
-  const displayedNodes = useMemo(() => buildDocumentNodes(filteredBlocks), [filteredBlocks]);
+  const displayedNodes = useMemo(() => buildDocumentNodes(visibleBlocks), [visibleBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
   const issues = useMemo(() => {
     const collected: ReviewIssue[] = [];
@@ -779,7 +798,6 @@ export default function TranslationReviewPage() {
     [orderedBlocks, allSegments, reviewSummary]
   );
   const selectedFlaggedIndex = flagged.findIndex(({ segment }) => segment.id === selectedSegment?.id);
-  const selectedSafeBlockIndex = selectedBlock ? safeBlocks.findIndex((block) => block.id === selectedBlock.id) : -1;
   const selectedBlockPosition = selectedBlock ? (blockIndexById.get(selectedBlock.id) ?? -1) : -1;
 
   useEffect(() => {
@@ -940,18 +958,6 @@ export default function TranslationReviewPage() {
     setError("");
   }
 
-  function handleNextSafeBlock() {
-    if (!safeBlocks.length) return;
-    const start = selectedSafeBlockIndex === -1 ? 0 : selectedSafeBlockIndex;
-    const nextIndex = (start + 1) % safeBlocks.length;
-    const nextBlock = safeBlocks[nextIndex];
-    if (!nextBlock?.id) return;
-    setSelectedIssueKey(null);
-    selectBlockById(nextBlock.id);
-    setMessage("");
-    setError("");
-  }
-
   function switchToDocumentMode() {
     setReviewMode("document");
     setActiveFilter("all");
@@ -1089,12 +1095,6 @@ export default function TranslationReviewPage() {
     const translatedDisplay = block.translated_text_display || "";
     const modeText =
       side === "source" ? (showMarkup ? sourceRaw : sourceDisplay) : showMarkup ? translatedRaw : translatedDisplay;
-    const displayText =
-      !showMarkup && !(modeText || "").trim() ? (
-        <span className="text-xs italic text-slate-400">[empty block]</span>
-      ) : (
-        modeText
-      );
     const selected = selectedBlock?.id === block.id;
     return (
       <span
@@ -1106,7 +1106,7 @@ export default function TranslationReviewPage() {
         }}
         className={`cursor-pointer rounded-md transition-colors ${selected ? "bg-slate-100/80" : "hover:bg-slate-100/70"}`}
       >
-        {displayText}
+        {modeText}
       </span>
     );
   }
@@ -1724,7 +1724,7 @@ export default function TranslationReviewPage() {
             filterChips={filterChips}
             visibleIssuesLength={visibleIssues.length}
             displayedNodes={displayedNodes}
-            displayedBlocksCount={filteredBlocks.length}
+            displayedBlocksCount={visibleBlocks.length}
             totalBlocksCount={reviewCounts.total_blocks}
             getNodeSpacing={getNodeSpacing}
             renderNode={(node, side) => renderNode(node as DocumentNode, side)}
@@ -1751,8 +1751,6 @@ export default function TranslationReviewPage() {
             selectedIssue={selectedIssue}
             issueTypeLabel={issueTypeLabel}
             selectedSegmentIsSafe={selectedSegmentIsSafe}
-            selectedSafeBlockIndex={selectedSafeBlockIndex}
-            safeBlocksLength={safeBlocks.length}
             isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
             issueBadgeClass={issueBadgeClass}
             cleanPanelText={cleanPanelText}
@@ -1785,7 +1783,6 @@ export default function TranslationReviewPage() {
             onSkipBlock={handleSkipBlock}
             hasDraftChanges={hasDraftChanges}
             onSaveSegmentEdit={handleSaveSegmentEdit}
-            onNextSafeBlock={handleNextSafeBlock}
             selectedFlaggedIndex={selectedFlaggedIndex}
             flaggedLength={flagged.length}
           />
