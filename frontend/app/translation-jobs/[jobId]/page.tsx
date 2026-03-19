@@ -332,10 +332,6 @@ function preferFullSegmentTranslationWhenCollapsed(
   return longest;
 }
 
-function hasSemanticChoiceInBlock(block: DocumentBlock) {
-  return block.segments.some((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
-}
-
 function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
   if (!segment) {
     return {
@@ -369,10 +365,6 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
 
 function hasValidAmbiguityChoice(segment: ReviewSegment) {
   return getAmbiguityChoiceDetails(segment).ambiguityChoiceFound;
-}
-
-function hasAmbiguityChoiceInBlock(block: DocumentBlock) {
-  return block.segments.some((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
 }
 
 function getSemanticChoiceDetails(segment: ReviewSegment | null) {
@@ -427,20 +419,7 @@ function matchesFilter(segment: ReviewSegment, filter: ReviewFilter) {
 }
 
 function buildDocumentNodes(blocks: DocumentBlock[]) {
-  const nodes: DocumentNode[] = [];
-  for (const block of blocks) {
-    if (block.block_type === "bullet_item") {
-      const previous = nodes[nodes.length - 1];
-      if (previous?.type === "bullet_list") {
-        previous.blocks.push(block);
-      } else {
-        nodes.push({ key: `bullets-${block.id}`, type: "bullet_list", blocks: [block] });
-      }
-      continue;
-    }
-    nodes.push({ key: `block-${block.id}`, type: "block", block });
-  }
-  return nodes;
+  return blocks.map((block) => ({ key: `block-${block.id}`, type: "block" as const, block }));
 }
 
 function _stripDisplayArtifacts(value: string | null | undefined) {
@@ -510,12 +489,6 @@ function getHeadingTag(block: DocumentBlock): "h1" | "h2" | "h3" {
   if (style.includes("heading 1")) return "h1";
   if (style.includes("heading 2")) return "h2";
   return "h3";
-}
-
-function getNodeSpacing(node: DocumentNode) {
-  if (node.type === "bullet_list") return "mt-4 first:mt-0";
-  if (node.block.block_type === "heading") return "mt-10 first:mt-0";
-  return "mt-7 first:mt-0";
 }
 
 function buildHighlightRanges(
@@ -719,6 +692,7 @@ export default function TranslationReviewPage() {
   );
   const displayedNodes = useMemo(() => buildDocumentNodes(visibleBlocks), [visibleBlocks]);
   const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
+  const flaggedSegmentIds = useMemo(() => new Set(flagged.map(({ segment }) => segment.id)), [flagged]);
   const issues = useMemo(() => {
     const collected: ReviewIssue[] = [];
     for (const { segment } of allSegments) {
@@ -1095,7 +1069,6 @@ export default function TranslationReviewPage() {
     const translatedDisplay = block.translated_text_display || "";
     const modeText =
       side === "source" ? (showMarkup ? sourceRaw : sourceDisplay) : showMarkup ? translatedRaw : translatedDisplay;
-    const selected = selectedBlock?.id === block.id;
     return (
       <span
         onClick={() => {
@@ -1104,7 +1077,7 @@ export default function TranslationReviewPage() {
             selectBlockById(block.id, defaultSegmentId);
           }
         }}
-        className={`cursor-pointer rounded-md transition-colors ${selected ? "bg-slate-100/80" : "hover:bg-slate-100/70"}`}
+        className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60"
       >
         {modeText}
       </span>
@@ -1116,32 +1089,14 @@ export default function TranslationReviewPage() {
       return (
         <ul className="list-disc space-y-3 pl-6 marker:text-slate-400">
           {node.blocks.map((block) => {
-            const isActiveBlock = selectedBlock?.id === block.id;
-            const hasSemanticChoice = hasSemanticChoiceInBlock(block);
-            const hasAmbiguityChoice = hasAmbiguityChoiceInBlock(block);
             return (
               <li
                 key={block.id}
-                className={`rounded-md pl-1 transition-colors ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+                className="pl-1"
                 ref={(el) => {
                   blockRefs.current[block.id] = el;
                 }}
               >
-                <div className="mb-1 flex flex-wrap items-center gap-1">
-                  <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    Block {block.block_index + 1}
-                  </span>
-                  {hasSemanticChoice && (
-                    <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
-                      Semantic choice available
-                    </span>
-                  )}
-                  {hasAmbiguityChoice && (
-                    <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                      Ambiguity
-                    </span>
-                  )}
-                </div>
                 <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
                   {renderInlineSegments(block, side)}
                 </p>
@@ -1154,9 +1109,6 @@ export default function TranslationReviewPage() {
 
     const block = node.block;
     const body = renderInlineSegments(block, side);
-    const isActiveBlock = selectedBlock?.id === block.id;
-    const hasSemanticChoice = hasSemanticChoiceInBlock(block);
-    const hasAmbiguityChoice = hasAmbiguityChoiceInBlock(block);
     if (block.block_type === "heading") {
       const H = getHeadingTag(block);
       return (
@@ -1164,23 +1116,8 @@ export default function TranslationReviewPage() {
           ref={(el) => {
             blockRefs.current[block.id] = el;
           }}
-          className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+          className="p-1"
         >
-          <div className="mb-1 flex flex-wrap items-center gap-1">
-            <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Block {block.block_index + 1}
-            </span>
-            {hasSemanticChoice && (
-              <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
-                Semantic choice available
-              </span>
-            )}
-            {hasAmbiguityChoice && (
-              <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                Ambiguity
-              </span>
-            )}
-          </div>
           <H className="text-xl font-semibold leading-8 text-slate-900">{body}</H>
         </div>
       );
@@ -1190,23 +1127,8 @@ export default function TranslationReviewPage() {
         ref={(el) => {
           blockRefs.current[block.id] = el;
         }}
-        className={`rounded-md p-1 ${isActiveBlock ? "bg-slate-100/70 ring-1 ring-slate-300" : ""}`}
+        className="p-1"
       >
-        <div className="mb-1 flex flex-wrap items-center gap-1">
-          <span className="inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Block {block.block_index + 1}
-          </span>
-          {hasSemanticChoice && (
-            <span className="inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
-              Semantic choice available
-            </span>
-          )}
-          {hasAmbiguityChoice && (
-            <span className="inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-              Ambiguity
-            </span>
-          )}
-        </div>
         <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>
       </div>
     );
@@ -1726,7 +1648,8 @@ export default function TranslationReviewPage() {
             displayedNodes={displayedNodes}
             displayedBlocksCount={visibleBlocks.length}
             totalBlocksCount={reviewCounts.total_blocks}
-            getNodeSpacing={getNodeSpacing}
+            selectedSegmentId={selectedSegment?.id ?? null}
+            flaggedSegmentIds={flaggedSegmentIds}
             renderNode={(node, side) => renderNode(node as DocumentNode, side)}
             segmentRefs={segmentRefs}
           />

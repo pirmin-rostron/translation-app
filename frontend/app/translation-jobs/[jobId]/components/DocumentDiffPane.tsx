@@ -31,7 +31,8 @@ type DocumentDiffPaneProps = {
   displayedNodes: DocumentNode[];
   displayedBlocksCount: number;
   totalBlocksCount: number;
-  getNodeSpacing: (node: DocumentNode) => string;
+  selectedSegmentId: number | null;
+  flaggedSegmentIds: Set<number>;
   renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
   segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
 };
@@ -47,7 +48,8 @@ export function DocumentDiffPane({
   displayedNodes,
   displayedBlocksCount,
   totalBlocksCount,
-  getNodeSpacing,
+  selectedSegmentId,
+  flaggedSegmentIds,
   renderNode,
   segmentRefs,
 }: DocumentDiffPaneProps) {
@@ -100,19 +102,22 @@ export function DocumentDiffPane({
         ) : null}
       </div>
 
-      <div className="grid border-b border-slate-200 bg-slate-50 px-8 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="pr-6">Source</div>
-        <div className="pl-6">Translated</div>
-      </div>
       {!displayedNodes.length ? (
         <div className="p-8 text-slate-600">
           No issues found — you&apos;re all good here. Try switching back to All Blocks for full document context.
         </div>
       ) : (
-        <div className="h-[74vh] overflow-y-auto bg-slate-50/40 px-8 py-9">
+        <div className="h-[74vh] overflow-y-auto bg-slate-50/30">
+          <div className="sticky top-0 z-20 grid border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-600 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="bg-slate-100/90 px-6 py-3">SOURCE</div>
+            <div className="border-l border-slate-200 bg-blue-50/90 px-6 py-3">TRANSLATED</div>
+          </div>
+          <div className="space-y-4 px-6 py-6">
           {displayedNodes.map((node) => {
             const nodeSegments =
               node.type === "bullet_list" ? node.blocks?.flatMap((b) => b.segments) ?? [] : node.block?.segments ?? [];
+            const isActive = selectedSegmentId != null && nodeSegments.some((segment) => segment.id === selectedSegmentId);
+            const hasIssue = nodeSegments.some((segment) => flaggedSegmentIds.has(segment.id));
             const blockLabel =
               node.type === "bullet_list"
                 ? node.blocks?.length
@@ -121,26 +126,34 @@ export function DocumentDiffPane({
                 : node.block
                   ? `Block ${node.block.block_index + 1}`
                   : "Block";
+            const rowClass = isActive
+              ? "border-blue-300 bg-blue-50/70 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]"
+              : hasIssue
+                ? "border-amber-200 bg-amber-50/50"
+                : "border-slate-200 bg-white";
             return (
               <div
                 key={node.key}
-                className={getNodeSpacing(node)}
+                className={`overflow-hidden rounded-xl border ${rowClass}`}
                 ref={(el) => {
                   nodeSegments.forEach((s) => {
                     segmentRefs.current[s.id] = el;
                   });
                 }}
               >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{blockLabel}</p>
-                <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="min-w-0 rounded-lg bg-white/80 p-2 pr-3">{renderNode(node, "source")}</div>
-                  <div className="min-w-0 rounded-lg bg-white p-2 pl-3 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.14)]">
+                <div className="border-b border-slate-200/80 bg-white px-4 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{blockLabel}</p>
+                </div>
+                <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="min-w-0 bg-slate-100/45 px-4 py-4">{renderNode(node, "source")}</div>
+                  <div className="min-w-0 border-l border-slate-200 bg-blue-50/45 px-4 py-4">
                     {renderNode(node, "target")}
                   </div>
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
       )}
       <div className="border-t border-slate-200 px-6 py-3 text-sm text-slate-500">
