@@ -285,7 +285,7 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
     (segment.ambiguity_source_phrase || "").trim() || (segment.ambiguity_details?.source_span || "").trim();
   const explanation = (segment.ambiguity_details?.explanation || "").trim();
   const currentTranslation = cleanChoiceTranslationText(segment.current_translation || segment.final_translation || "");
-  const ambiguityChoiceFound = Boolean(segment.ambiguity_choice_found ?? (segment.ambiguity_detected && options.length > 1));
+  const ambiguityChoiceFound = (segment.ambiguity_detected && options.length > 1) || Boolean(segment.ambiguity_choice_found);
   return { ambiguityChoiceFound, sourcePhrase, explanation, options, currentTranslation };
 }
 
@@ -562,10 +562,15 @@ export default function TranslationReviewPage() {
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
     if (!block || !block.segments.length) return;
-    const ambiguityChoiceSegment = block.segments.find((segment) => getAmbiguityChoiceDetails(segment).ambiguityChoiceFound);
+    const ambiguityChoiceSegment = block.segments.find(
+      (segment) =>
+        !isAcceptableFinalStatus(segment.review_status) &&
+        (getAmbiguityChoiceDetails(segment).ambiguityChoiceFound || segment.ambiguity_detected)
+    );
     const semanticChoiceSegment = block.segments.find((segment) => getSemanticChoiceDetails(segment).semanticMatchFound);
     const fallbackSegmentId = preferredSegmentId ?? ambiguityChoiceSegment?.id ?? semanticChoiceSegment?.id ?? block.segments[0].id;
     setSelectedId(fallbackSegmentId);
+    setPrevAmbiguityChoiceIndex(null);
     setMessage("");
     setError("");
   }
@@ -691,7 +696,13 @@ export default function TranslationReviewPage() {
   function focusReviewGuidance() {
     setIsEditing(false);
     setActiveFilter("all");
-    reviewGuidanceRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setTimeout(() => {
+      if (reviewGuidanceRef.current) {
+        reviewGuidanceRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }, 0);
   }
 
   function transitionToReviewCompleteState(summary: ReviewSummary | null | undefined) {
@@ -722,12 +733,10 @@ export default function TranslationReviewPage() {
     return (
       <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
         {block.segments.map((segment) => {
-          const isActive = segment.id === selectedSegment?.id;
           const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
-          // Amber for active unresolved ambiguity — show in both State 1 and State 2.
-          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
-          const shouldHighlight = isUnresolvedActiveAmbiguity || isResolvedAmbiguity;
-          const highlightClass = isUnresolvedActiveAmbiguity
+          const isUnresolvedAmbiguity = segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
+          const shouldHighlight = isUnresolvedAmbiguity || isResolvedAmbiguity;
+          const highlightClass = isUnresolvedAmbiguity
             ? "bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5"
             : "bg-purple-100 border-b-2 border-purple-300 rounded-sm px-0.5";
 
@@ -1338,6 +1347,10 @@ export default function TranslationReviewPage() {
             onSemanticChoiceChange={handleSemanticChoiceChange}
             currentBlockResolved={currentBlockResolved}
             resolvedAmbiguity={resolvedAmbiguity}
+            onGoToNextUnresolved={() => {
+              const nextId = getNextUnresolvedBlockIdFromCurrent() ?? getNextUnresolvedBlockId();
+              if (nextId != null) moveToBlockById(nextId);
+            }}
             onApproveCurrentBlock={handleApproveCurrentBlock}
             primaryActionDisabled={primaryActionDisabled}
             onToggleEdit={handleToggleEdit}

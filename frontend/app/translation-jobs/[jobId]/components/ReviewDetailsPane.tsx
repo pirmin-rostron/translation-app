@@ -54,6 +54,7 @@ type ReviewDetailsPaneProps = {
   onSemanticChoiceChange: (value: SemanticChoiceOption) => void;
   currentBlockResolved: boolean;
   resolvedAmbiguity: boolean;
+  onGoToNextUnresolved: () => void;
   onApproveCurrentBlock: () => void;
   primaryActionDisabled: boolean;
   onToggleEdit: () => void;
@@ -101,6 +102,7 @@ export function ReviewDetailsPane({
   onSemanticChoiceChange,
   currentBlockResolved,
   resolvedAmbiguity,
+  onGoToNextUnresolved,
   onApproveCurrentBlock,
   primaryActionDisabled,
   onToggleEdit,
@@ -141,10 +143,10 @@ export function ReviewDetailsPane({
         <>
           <h2 className="text-lg font-semibold text-slate-900">Review details</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocksLength}
+            Reviewing Block {selectedBlockPosition + 1} of {orderedBlocksLength}
           </p>
 
-          {isLastBlock && (
+          {isLastBlock && (unresolvedBlocks === 0 || !currentBlockResolved) && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
               {unresolvedBlocks === 0 ? (
                 <span>Review complete. Continue in Review Guidance.</span>
@@ -374,6 +376,16 @@ export function ReviewDetailsPane({
                 }`}>
                   Translation approved.
                 </div>
+                {unresolvedBlocks > 0 && (
+                  <button
+                    type="button"
+                    onClick={onGoToNextUnresolved}
+                    disabled={actionLoading}
+                    className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    Go to next unresolved block
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onToggleEdit}
