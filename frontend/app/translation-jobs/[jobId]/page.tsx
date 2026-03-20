@@ -517,7 +517,7 @@ export default function TranslationReviewPage() {
     const currentTranslationNormalized = normalizeChoiceText(ambiguityDetails.currentTranslation);
     const matchingIndices = ambiguityDetails.options
       .map((option, idx) => ({ idx, normalized: normalizeChoiceText(option.translation) }))
-      .filter((entry) => entry.normalized.length > 0 && entry.normalized === currentTranslationNormalized)
+      .filter((entry) => entry.normalized.length > 0 && currentTranslationNormalized.includes(entry.normalized))
       .map((entry) => entry.idx);
     setAmbiguityChoiceIndex(matchingIndices.length === 1 ? matchingIndices[0] : null);
     setIsEditing(false);
@@ -753,7 +753,8 @@ export default function TranslationReviewPage() {
     if (!selectedSegment) return "";
     const current = selectedSegment.final_translation || "";
     if (hasAmbiguityChoice && selectedAmbiguityTranslation.trim()) {
-      return applyAmbiguityChoiceToSegment(selectedSegment, selectedAmbiguityTranslation);
+      const [translation] = applyAmbiguityChoiceToSegment(selectedSegment, selectedAmbiguityTranslation);
+      return translation;
     }
     if (!hasAmbiguityChoice && hasSemanticChoice && semanticChoice === "suggested" && semanticSuggestionText.trim()) {
       return semanticSuggestionText.trim();
@@ -774,7 +775,12 @@ export default function TranslationReviewPage() {
     if (!selectedSegment) return;
     const option = ambiguityOptions[idx];
     if (!option) return;
-    const updatedTranslation = applyAmbiguityChoiceToSegment(selectedSegment, option.translation);
+    const [updatedTranslation, fallbackTriggered] = applyAmbiguityChoiceToSegment(selectedSegment, option.translation);
+    if (fallbackTriggered) {
+      setError("Could not apply this choice automatically — please edit the translation manually.");
+      return;
+    }
+    setError("");
     setDraftTranslation(updatedTranslation);
     setBlocks((currentBlocks) =>
       currentBlocks.map((block) => ({
@@ -866,34 +872,37 @@ export default function TranslationReviewPage() {
     setError("");
   }
 
-  function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string) {
+  function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string): [string, boolean] {
     const selectedChoice = (choiceTranslation || "").trim();
-    if (!selectedChoice) return segment.final_translation || "";
+    if (!selectedChoice) return [segment.final_translation || "", false];
     const currentText = segment.final_translation || "";
-    if (!currentText.trim()) return selectedChoice;
+    if (!currentText.trim()) return [selectedChoice, false];
     const ambiguityAnnotation = segment.annotations.find((annotation) => annotation.annotation_type === "ambiguity");
     const hasTargetRange =
       ambiguityAnnotation?.target_start != null &&
       ambiguityAnnotation?.target_end != null &&
       ambiguityAnnotation.target_end > ambiguityAnnotation.target_start;
     if (hasTargetRange) {
-      return replaceByRange(
-        currentText,
-        ambiguityAnnotation.target_start as number,
-        ambiguityAnnotation.target_end as number,
-        selectedChoice
-      );
+      return [
+        replaceByRange(
+          currentText,
+          ambiguityAnnotation.target_start as number,
+          ambiguityAnnotation.target_end as number,
+          selectedChoice
+        ),
+        false,
+      ];
     }
     const rawAmbiguousTarget = (ambiguityAnnotation?.target_span_text || "").trim();
     const currentAmbiguousTarget = cleanChoiceTranslationText(ambiguityAnnotation?.target_span_text || "");
     if (rawAmbiguousTarget && currentText.includes(rawAmbiguousTarget)) {
-      return replaceFirstOccurrence(currentText, rawAmbiguousTarget, selectedChoice);
+      return [replaceFirstOccurrence(currentText, rawAmbiguousTarget, selectedChoice), false];
     }
     if (currentAmbiguousTarget && currentText.includes(currentAmbiguousTarget)) {
-      return replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice);
+      return [replaceFirstOccurrence(currentText, currentAmbiguousTarget, selectedChoice), false];
     }
-    // No reliable in-context span: use the chosen option directly as the full segment translation.
-    return selectedChoice;
+    // No reliable in-context span found: leave translation unchanged and signal failure.
+    return [currentText, true];
   }
 
   function handleEditSelectedTranslation() {
