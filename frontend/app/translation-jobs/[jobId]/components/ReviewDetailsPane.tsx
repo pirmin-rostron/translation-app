@@ -39,6 +39,7 @@ type ReviewDetailsPaneProps = {
   ambiguityOptions: AmbiguityOption[];
   currentSuggestionIndex: number | null;
   onAmbiguityChoiceChange: (idx: number) => void;
+  onClearAmbiguityChoice: () => void;
   isReadOnly: boolean;
   isEditing: boolean;
   canEditSelectedSegment: boolean;
@@ -82,6 +83,7 @@ export function ReviewDetailsPane({
   ambiguityOptions,
   currentSuggestionIndex,
   onAmbiguityChoiceChange,
+  onClearAmbiguityChoice,
   isReadOnly,
   isEditing,
   canEditSelectedSegment,
@@ -173,7 +175,7 @@ export function ReviewDetailsPane({
               <p className="text-sm text-slate-700">No issues detected.</p>
             </div>
           )}
-          {hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
+          {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex === null && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
               <p className="font-medium text-amber-900">Choose a Translation</p>
               {ambiguityExplanation && (
@@ -205,6 +207,13 @@ export function ReviewDetailsPane({
                   </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex !== null && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
+              <p className="font-medium text-amber-900">Accepted Translation</p>
+              <p className="mt-2 text-slate-800">{ambiguityOptions[ambiguityChoiceIndex]?.translation ?? ""}</p>
             </div>
           )}
 
@@ -283,34 +292,46 @@ export function ReviewDetailsPane({
 
           <div className="mt-6 space-y-3">
             {!isReadOnly && !currentBlockResolved && !isEditing && (
-              <div className={`grid gap-2 ${hasAmbiguityChoice ? "grid-cols-2" : "grid-cols-3"}`}>
-                {!hasAmbiguityChoice && (
+              <>
+                {hasAmbiguityChoice && ambiguityChoiceIndex !== null && (
                   <button
                     type="button"
                     onClick={onApproveCurrentBlock}
-                    disabled={primaryActionDisabled || (isEditing && hasDraftChanges)}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                    disabled={primaryActionDisabled}
+                    className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                   >
                     {primaryDecisionLabel}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={onToggleEdit}
-                  disabled={actionLoading || !canEditSelectedSegment}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  {isEditing ? "Cancel edit" : "Edit"}
-                </button>
-                <button
-                  type="button"
-                  onClick={onSkipBlock}
-                  disabled={actionLoading}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Skip
-                </button>
-              </div>
+                <div className={`grid gap-2 ${!hasAmbiguityChoice ? "grid-cols-3" : "grid-cols-2"}`}>
+                  {!hasAmbiguityChoice && (
+                    <button
+                      type="button"
+                      onClick={onApproveCurrentBlock}
+                      disabled={primaryActionDisabled}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                    >
+                      {primaryDecisionLabel}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={hasAmbiguityChoice && ambiguityChoiceIndex !== null ? onClearAmbiguityChoice : onToggleEdit}
+                    disabled={actionLoading || (!hasAmbiguityChoice && !canEditSelectedSegment)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    {hasAmbiguityChoice && ambiguityChoiceIndex !== null ? "Change choice" : isEditing ? "Cancel edit" : "Edit"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSkipBlock}
+                    disabled={actionLoading}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </>
             )}
             {!isReadOnly && currentBlockResolved && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
