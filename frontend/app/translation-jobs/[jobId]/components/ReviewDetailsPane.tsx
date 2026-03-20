@@ -261,9 +261,9 @@ export function ReviewDetailsPane({
           )}
 
           {hasSemanticChoice && !hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
-            <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
-              <p className="font-medium text-sky-900">Semantic translation choice available</p>
-              <p className="mt-1 text-xs text-sky-700">
+            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-sm">
+              <p className="font-medium text-blue-900">Semantic translation choice available</p>
+              <p className="mt-1 text-xs text-blue-700">
                 Suggested from similar previous translation
                 {typeof semanticSimilarityScore === "number" ? ` (${Math.round(semanticSimilarityScore * 100)}%)` : ""}
               </p>
@@ -286,7 +286,7 @@ export function ReviewDetailsPane({
                     </div>
                   </div>
                 </label>
-                <label className="block cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2">
+                <label className="block cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2">
                   <div className="flex items-start gap-2">
                     <input
                       type="radio"
@@ -298,7 +298,7 @@ export function ReviewDetailsPane({
                       className="mt-0.5"
                     />
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                         Use previous similar approved translation
                       </p>
                     </div>
@@ -414,7 +414,7 @@ export function ReviewDetailsPane({
                 type="button"
                 onClick={onPreviousBlock}
                 disabled={selectedBlockPosition <= 0}
-                className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
                 Previous block
               </button>
@@ -422,7 +422,7 @@ export function ReviewDetailsPane({
                 type="button"
                 onClick={onNextBlock}
                 disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocksLength - 1}
-                className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
                 Next block
               </button>

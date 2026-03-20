@@ -2,7 +2,7 @@
 
 import type { MutableRefObject, ReactNode } from "react";
 
-type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
+type ReviewFilter = "all" | "ambiguities" | "glossary" | "memory";
 
 type SegmentRef = { id: number };
 type DiffBlock = { block_index: number; segments: SegmentRef[] };
@@ -27,10 +27,26 @@ type DocumentDiffPaneProps = {
   displayedBlocksCount: number;
   totalBlocksCount: number;
   selectedSegmentId: number | null;
-  flaggedSegmentIds: Set<number>;
+  segmentColorStates: Map<number, string>;
   renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
   segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
 };
+
+const COLOR_PRIORITY = ["unresolved-ambiguity", "approved-ambiguity", "approved", "memory-match"];
+
+function getBlockColorState(segments: SegmentRef[], segmentColorStates: Map<number, string>): string {
+  let best = "pending";
+  let bestPriority = -1;
+  for (const s of segments) {
+    const state = segmentColorStates.get(s.id) ?? "pending";
+    const priority = COLOR_PRIORITY.indexOf(state);
+    if (priority !== -1 && (bestPriority === -1 || priority < bestPriority)) {
+      best = state;
+      bestPriority = priority;
+    }
+  }
+  return best;
+}
 
 export function DocumentDiffPane({
   activeFilter,
@@ -40,7 +56,7 @@ export function DocumentDiffPane({
   displayedBlocksCount,
   totalBlocksCount,
   selectedSegmentId,
-  flaggedSegmentIds,
+  segmentColorStates,
   renderNode,
   segmentRefs,
 }: DocumentDiffPaneProps) {
@@ -68,7 +84,7 @@ export function DocumentDiffPane({
 
       {!displayedNodes.length ? (
         <div className="p-8 text-slate-600">
-          No issues found — you&apos;re all good here. Try switching back to All Blocks for full document context.
+          No blocks match this filter. Switch to All Blocks for full document context.
         </div>
       ) : (
         <div className="h-[74vh] overflow-y-auto bg-slate-50/30">
@@ -80,13 +96,20 @@ export function DocumentDiffPane({
           {displayedNodes.map((node) => {
             const nodeSegments = node.block?.segments ?? [];
             const isActive = selectedSegmentId != null && nodeSegments.some((segment) => segment.id === selectedSegmentId);
-            const hasIssue = nodeSegments.some((segment) => flaggedSegmentIds.has(segment.id));
             const blockLabel = node.block ? `Block ${node.block.block_index + 1}` : "Block";
-            const rowClass = isActive
-              ? "border-blue-300 bg-blue-50/70 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]"
-              : hasIssue
-                ? "border-amber-200 bg-amber-50/50"
-                : "border-slate-200 bg-white";
+            const blockColorState = getBlockColorState(nodeSegments, segmentColorStates);
+            const rowClass =
+              blockColorState === "unresolved-ambiguity"
+                ? "border-amber-200 bg-amber-50"
+                : blockColorState === "approved-ambiguity"
+                  ? "border-purple-200 bg-purple-50"
+                  : blockColorState === "approved"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : blockColorState === "memory-match"
+                      ? "border-blue-200 bg-blue-50"
+                      : isActive
+                        ? "border-slate-300 bg-slate-100"
+                        : "border-slate-200 bg-white";
             return (
               <div
                 key={node.key}

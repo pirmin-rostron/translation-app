@@ -19,6 +19,8 @@ type ReviewGuidancePanelProps = {
   onPrimaryAction: () => void;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  message?: string;
+  error?: string;
 };
 
 export function ReviewGuidancePanel({
@@ -36,6 +38,8 @@ export function ReviewGuidancePanel({
   onPrimaryAction,
   secondaryActionLabel,
   onSecondaryAction,
+  message,
+  error,
 }: ReviewGuidancePanelProps) {
   const showAmbiguityRow = unresolvedAmbiguities > 0;
 
@@ -92,6 +96,8 @@ export function ReviewGuidancePanel({
           </button>
         ) : null}
       </div>
+      {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
   );
 }

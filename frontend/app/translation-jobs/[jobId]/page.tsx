@@ -120,7 +120,7 @@ type DocumentNode =
   | { key: string; type: "block"; block: DocumentBlock }
   | { key: string; type: "bullet_list"; blocks: DocumentBlock[] };
 
-type ReviewFilter = "all" | "issues" | "ambiguities" | "glossary" | "memory";
+type ReviewFilter = "all" | "ambiguities" | "glossary" | "memory";
 
 type ReviewSummary = {
   job_id: number;
@@ -338,7 +338,6 @@ function isFlagged(segment: ReviewSegment) {
 
 function matchesFilter(segment: ReviewSegment, filter: ReviewFilter) {
   if (filter === "all") return true;
-  if (filter === "issues") return isFlagged(segment);
   if (filter === "ambiguities") return hasValidAmbiguityChoice(segment);
   if (filter === "glossary") return segment.glossary_applied;
   return hasMemory(segment);
@@ -474,8 +473,26 @@ export default function TranslationReviewPage() {
     [visibleBlocks]
   );
   const displayedNodes = useMemo(() => buildDocumentNodes(visibleBlocks), [visibleBlocks]);
-  const flagged = useMemo(() => allSegments.filter(({ segment }) => isFlagged(segment)), [allSegments]);
-  const flaggedSegmentIds = useMemo(() => new Set(flagged.map(({ segment }) => segment.id)), [flagged]);
+  const segmentColorStates = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const { segment } of allSegments) {
+      const hasAmbiguity = segment.ambiguity_detected && hasValidAmbiguityChoice(segment);
+      const normalized = normalizeSegmentStatus(segment.review_status);
+      const isApproved = isAcceptableFinalStatus(normalized);
+      if (hasAmbiguity && !isApproved) {
+        map.set(segment.id, "unresolved-ambiguity");
+      } else if (hasAmbiguity && isApproved) {
+        map.set(segment.id, "approved-ambiguity");
+      } else if (normalized === "memory_match") {
+        map.set(segment.id, "memory-match");
+      } else if (isApproved) {
+        map.set(segment.id, "approved");
+      } else {
+        map.set(segment.id, "pending");
+      }
+    }
+    return map;
+  }, [allSegments]);
   const selectedEntry = useMemo(
     () => allSegments.find(({ segment }) => segment.id === selectedId) ?? filteredSegments[0] ?? null,
     [allSegments, filteredSegments, selectedId]
@@ -514,7 +531,7 @@ export default function TranslationReviewPage() {
 
   useEffect(() => {
     if (!selectedSegment) return;
-    setDraftTranslation(selectedSegment.final_translation);
+    setDraftTranslation((selectedSegment.final_translation || "").replace(/\0/g, ""));
     setSemanticChoice("current");
     const ambiguityDetails = getAmbiguityChoiceDetails(selectedSegment);
     const currentTranslationNormalized = normalizeChoiceText(ambiguityDetails.currentTranslation);
@@ -670,7 +687,6 @@ export default function TranslationReviewPage() {
   }
 
   function focusReviewGuidance() {
-    setSelectedId(null);
     setIsEditing(false);
     setActiveFilter("all");
     reviewGuidanceRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -971,7 +987,7 @@ export default function TranslationReviewPage() {
 
   function handleEditSelectedTranslation() {
     if (selectedSegment) {
-      setDraftTranslation(selectedSegment.final_translation || "");
+      setDraftTranslation((selectedSegment.final_translation || "").replace(/\0/g, ""));
     }
     setIsEditing(true);
     setMessage("");
@@ -1172,7 +1188,6 @@ export default function TranslationReviewPage() {
   const lastExportFormat = latestExport?.export_format ?? exportResult?.export_format ?? "txt";
   const filterChips: { key: ReviewFilter; label: string; count: number }[] = [
     { key: "all", label: "All Blocks", count: reviewCounts.total_blocks },
-    { key: "issues", label: "Issues", count: reviewCounts.issues_count },
     { key: "ambiguities", label: "Ambiguities", count: reviewCounts.ambiguity_count },
     { key: "glossary", label: "Glossary", count: reviewCounts.glossary_count },
     { key: "memory", label: "Memory", count: reviewCounts.memory_count },
@@ -1236,10 +1251,9 @@ export default function TranslationReviewPage() {
           onPrimaryAction={handlePrimaryGuidanceAction}
           secondaryActionLabel={secondaryGuidanceLabel}
           onSecondaryAction={secondaryGuidanceLabel ? handleOpenExportModal : undefined}
+          message={message || undefined}
+          error={error || undefined}
         />
-
-        {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <DocumentDiffPane
@@ -1250,7 +1264,7 @@ export default function TranslationReviewPage() {
             displayedBlocksCount={visibleBlocks.length}
             totalBlocksCount={reviewCounts.total_blocks}
             selectedSegmentId={selectedSegment?.id ?? null}
-            flaggedSegmentIds={flaggedSegmentIds}
+            segmentColorStates={segmentColorStates}
             renderNode={(node, side) => renderNode(node as DocumentNode, side)}
             segmentRefs={segmentRefs}
           />
@@ -1443,6 +1457,14 @@ export default function TranslationReviewPage() {
                   <p className="mt-0.5 text-xs text-slate-500">{previewDocumentName || doc?.filename || "Document"}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { void navigator.clipboard.writeText(previewContentDisplay); }}
+                    disabled={previewLoading || Boolean(previewError) || !previewContentDisplay}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Copy to clipboard
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowPreviewModal(false)}
