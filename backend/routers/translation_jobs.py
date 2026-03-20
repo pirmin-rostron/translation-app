@@ -39,6 +39,7 @@ from schemas import (
     TranslationResultResponse,
     TranslationResultUpdateRequest,
 )
+from services.auth import get_current_active_user
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
 from services.translation import SegmentContext, get_translation_provider
 from services.translation_memory import (
@@ -49,7 +50,11 @@ from services.translation_memory import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["translation-jobs"])
+router = APIRouter(
+    prefix="/api",
+    tags=["translation-jobs"],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 TRANSLATION_STAGE = "translation"
 AMBIGUITY_STAGE = "ambiguity_detection"

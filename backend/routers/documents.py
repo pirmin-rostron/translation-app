@@ -17,11 +17,16 @@ from schemas import (
     ProcessingStageJobResponse,
     SegmentResponse,
 )
+from services.auth import get_current_active_user
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 
 
-router = APIRouter(prefix="/api/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/api/documents",
+    tags=["documents"],
+    dependencies=[Depends(get_current_active_user)],
+)
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf"}

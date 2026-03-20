@@ -9,3 +9,6 @@ langdetect==1.0.9
 anthropic>=0.40.0
 voyageai
 httpx>=0.24.0,<0.28.0
+passlib[argon2]==1.7.4
+python-jose[cryptography]==3.3.0
+alembic==1.13.1

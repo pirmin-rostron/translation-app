@@ -1,7 +1,25 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+function getAuthHeaders(): Record<string, string> {
+  try {
+    // Avoid a circular import: import lazily at call time.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useAuthStore } = require("../stores/authStore") as typeof import("../stores/authStore");
+    const token = useAuthStore.getState().token;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // Store not available (e.g. SSR context without hydration) — skip header.
+  }
+  return {};
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const authHeaders = getAuthHeaders();
+  const mergedHeaders: Record<string, string> = {
+    ...authHeaders,
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  const res = await fetch(url, { ...init, headers: mergedHeaders });
   if (!res.ok) {
     const payload = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(payload.detail ?? `Request failed (${res.status})`);

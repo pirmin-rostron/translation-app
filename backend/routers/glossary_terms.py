@@ -4,9 +4,14 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import GlossaryTerm
 from schemas import GlossaryTermCreateRequest, GlossaryTermResponse
+from services.auth import get_current_active_user
 from services.glossary import normalize_optional
 
-router = APIRouter(prefix="/api/glossary-terms", tags=["glossary-terms"])
+router = APIRouter(
+    prefix="/api/glossary-terms",
+    tags=["glossary-terms"],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @router.post("", response_model=GlossaryTermResponse)
