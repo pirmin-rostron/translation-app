@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
+from models import Organisation, OrgMembership, User
 
 # Fail hard at startup if SECRET_KEY is not configured.
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -85,3 +85,35 @@ def get_current_active_user(
             detail="Inactive user account",
         )
     return current_user
+
+
+def get_current_membership(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> OrgMembership:
+    """FastAPI dependency: return the OrgMembership for the current user. Raises 403 if none."""
+    membership = (
+        db.query(OrgMembership)
+        .filter(OrgMembership.user_id == current_user.id)
+        .first()
+    )
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not belong to any organisation",
+        )
+    return membership
+
+
+def get_current_org(
+    membership: OrgMembership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+) -> Organisation:
+    """FastAPI dependency: return the Organisation the current user belongs to. Raises 403 if none."""
+    org = db.query(Organisation).filter(Organisation.id == membership.org_id).first()
+    if not org or not org.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organisation not found or inactive",
+        )
+    return org

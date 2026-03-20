@@ -18,6 +18,7 @@ from models import (
     DocumentBlock,
     DocumentSegment,
     GlossaryTerm,
+    Organisation,
     ProcessingStageJob,
     SegmentAnnotation,
     TranslationJob,
@@ -39,7 +40,7 @@ from schemas import (
     TranslationResultResponse,
     TranslationResultUpdateRequest,
 )
-from services.auth import get_current_active_user
+from services.auth import get_current_active_user, get_current_org
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
 from services.usage import JOB_CREATED, JOB_EXPORTED, WORDS_TRANSLATED, record_event
 from services.translation import SegmentContext, get_translation_provider
@@ -221,10 +222,11 @@ def _get_glossary_candidates(
     target_language: str,
     industry: str | None,
     domain: str | None,
+    org_id: int | None = None,
 ) -> list[GlossaryTerm]:
     normalized_industry = normalize_optional(industry)
     normalized_domain = normalize_optional(domain)
-    return (
+    q = (
         db.query(GlossaryTerm)
         .filter(
             GlossaryTerm.source_language == source_language,
@@ -232,9 +234,10 @@ def _get_glossary_candidates(
             GlossaryTerm.industry == normalized_industry,
             GlossaryTerm.domain == normalized_domain,
         )
-        .order_by(GlossaryTerm.created_at.desc())
-        .all()
     )
+    if org_id is not None:
+        q = q.filter(GlossaryTerm.org_id == org_id)
+    return q.order_by(GlossaryTerm.created_at.desc()).all()
 
 
 def _match_glossary_terms_for_segment(source_text: str, glossary_terms: list[GlossaryTerm]) -> list[dict]:
@@ -1125,6 +1128,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         target_language=doc.target_language,
         industry=doc.industry,
         domain=doc.domain,
+        org_id=job.org_id,
     )
     logger.info(
         "Translation stage start: provider=%s style=%s segments=%d document_id=%d job_id=%d",
@@ -1350,9 +1354,10 @@ def create_translation_job(
     payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Create a translation job and queue staged background processing."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     if doc.status != "parsed":
@@ -1391,6 +1396,7 @@ def create_translation_job(
         progress_total_segments=None,
         progress_completed_segments=0,
         progress_started_at=None,
+        org_id=current_org.id if current_org is not None else None,
     )
     db.add(job)
     db.flush()
@@ -1408,17 +1414,25 @@ def create_translation_job(
 
 
 @router.get("/translation-jobs/{job_id}", response_model=TranslationJobResponse)
-def get_translation_job(job_id: int, db: Session = Depends(get_db)):
+def get_translation_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """Get a translation job by id."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return job
 
 
 @router.get("/translation-jobs/{job_id}/progress", response_model=TranslationProgressResponse)
-def get_translation_progress(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def get_translation_progress(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return _calculate_translation_progress(db, job)
@@ -1429,9 +1443,10 @@ def list_translation_results(
     job_id: int,
     filter: str = Query(default="all"),
     db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """List translation results for a job."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if filter not in {"all", "ambiguities", "semantic-memory", "glossary", "memory", "flagged"}:
@@ -1470,9 +1485,13 @@ def list_translation_results(
 
 
 @router.get("/translation-jobs/{job_id}/review-blocks", response_model=list[ReviewBlockResponse])
-def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
+def list_review_blocks(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """Return translated document blocks with nested segment results and annotations."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1555,16 +1574,24 @@ def list_review_blocks(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/translation-jobs/{job_id}/review-summary", response_model=ReviewSummaryResponse)
-def get_review_summary(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def get_review_summary(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return _calculate_review_summary(db, job)
 
 
 @router.post("/translation-jobs/{job_id}/save-draft", response_model=ReviewSummaryResponse)
-def save_review_draft(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def save_review_draft(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1578,8 +1605,12 @@ def save_review_draft(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/translation-jobs/{job_id}/approve-safe-segments", response_model=ReviewSummaryResponse)
-def approve_safe_segments(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def approve_safe_segments(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1609,8 +1640,12 @@ def approve_safe_segments(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/translation-jobs/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
-def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def mark_ready_for_export(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1630,13 +1665,21 @@ def mark_ready_for_export(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/translation-jobs/{job_id}/mark-ready", response_model=ReviewSummaryResponse)
-def mark_ready_for_export_alias(job_id: int, db: Session = Depends(get_db)):
-    return mark_ready_for_export(job_id=job_id, db=db)
+def mark_ready_for_export_alias(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    return mark_ready_for_export(job_id=job_id, db=db, current_org=current_org)
 
 
 @router.post("/translation-jobs/{job_id}/reopen-review", response_model=ReviewSummaryResponse)
-def reopen_review(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def reopen_review(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
@@ -1656,8 +1699,9 @@ def export_translation_job(
     export_mode: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
+    current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     raw_mode = formatting_mode if formatting_mode is not None else export_mode
@@ -1711,8 +1755,12 @@ def export_translation_job(
 
 
 @router.get("/translation-jobs/{job_id}/preview", response_model=PreviewResponse)
-def preview_translation_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def preview_translation_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1732,8 +1780,12 @@ def preview_translation_job(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/translation-jobs/{job_id}/exports", response_model=list[ExportFileResponse])
-def list_exports(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def list_exports(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     doc = db.query(Document).filter(Document.id == job.document_id).first()
@@ -1744,8 +1796,13 @@ def list_exports(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/translation-jobs/{job_id}/exports/{filename}")
-def download_export(job_id: int, filename: str, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def download_export(
+    job_id: int,
+    filename: str,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1772,13 +1829,14 @@ def update_translation_result(
     result_id: int,
     body: TranslationResultUpdateRequest,
     db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Save a reviewed translation result and record approved choices only."""
     result = db.query(TranslationResult).filter(TranslationResult.id == result_id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Translation result not found")
 
-    job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1869,8 +1927,12 @@ def update_translation_result(
 
 
 @router.get("/translation-jobs/{job_id}/stages", response_model=list[ProcessingStageJobResponse])
-def list_translation_stage_jobs(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def list_translation_stage_jobs(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return (
@@ -1882,8 +1944,13 @@ def list_translation_stage_jobs(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/translation-jobs/{job_id}/retry", response_model=TranslationJobResponse)
-def retry_translation_job(job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+def retry_translation_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1918,14 +1985,18 @@ def retry_translation_job(job_id: int, background_tasks: BackgroundTasks, db: Se
 
 
 @router.get("/documents/{document_id}/translation-jobs", response_model=list[TranslationJobResponse])
-def list_document_translation_jobs(document_id: int, db: Session = Depends(get_db)):
+def list_document_translation_jobs(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """List translation jobs for a document."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     jobs = (
         db.query(TranslationJob)
-        .filter(TranslationJob.document_id == document_id)
+        .filter(TranslationJob.document_id == document_id, TranslationJob.org_id == current_org.id)
         .order_by(TranslationJob.created_at.desc())
         .all()
     )

@@ -5,6 +5,15 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
+class Organisation(Base):
+    __tablename__ = "organisations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+
 class UsageEvent(Base):
     __tablename__ = "usage_events"
 
@@ -29,6 +38,16 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class OrgMembership(Base):
+    __tablename__ = "org_memberships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String, nullable=False, default="member")  # owner, admin, translator, reviewer
+    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class TranslationJob(Base):
     __tablename__ = "translation_jobs"
 
@@ -49,6 +68,7 @@ class TranslationJob(Base):
     translation_provider = Column(String(50), nullable=True)  # "mock" | "openai"
     translation_batch_size = Column(Integer, nullable=True)  # batch size used
     created_at = Column(DateTime, default=datetime.utcnow)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
 
     document = relationship("Document", backref="translation_jobs")
     results = relationship("TranslationResult", back_populates="job")
@@ -103,6 +123,7 @@ class GlossaryTerm(Base):
     target_language = Column(String(50), nullable=False)
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -118,6 +139,7 @@ class Document(Base):
     customer_id = Column(String(100), nullable=False, default="default")
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
     status = Column(String(50), nullable=False, default="uploaded")
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

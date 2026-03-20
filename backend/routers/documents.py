@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import Document, DocumentBlock, DocumentSegment, ProcessingStageJob, SegmentAnnotation, TranslationJob
+from models import Document, DocumentBlock, DocumentSegment, Organisation, ProcessingStageJob, SegmentAnnotation, TranslationJob
 from schemas import (
     DocumentProgressResponse,
     DocumentBlockResponse,
@@ -18,7 +18,7 @@ from schemas import (
     ProcessingStageJobResponse,
     SegmentResponse,
 )
-from services.auth import get_current_active_user
+from services.auth import get_current_active_user, get_current_org
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 from services.usage import DOCUMENT_INGESTED, record_event
@@ -137,7 +137,7 @@ def _run_document_pipeline(document_id: int, user_id: int | None = None):
         db.close()
 
 
-def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None):
+def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None, org_id: int | None = None):
     """Happy-path orchestration: parse document, then create and execute translation job."""
     db = SessionLocal()
     try:
@@ -147,8 +147,9 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
 
         immediate_tasks = _ImmediateBackgroundTasks()
         _mock_user = types.SimpleNamespace(id=user_id) if user_id is not None else None
+        _mock_org = types.SimpleNamespace(id=org_id) if org_id is not None else None
         if doc.status in {"uploaded", PARSE_FAILED_STATUS}:
-            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db, current_user=_mock_user)
+            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db, current_user=_mock_user, current_org=_mock_org)
             db.expire_all()
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
@@ -191,6 +192,7 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
                 payload=TranslationJobCreateRequest(translation_style=style_value),
                 db=db,
                 current_user=_mock_user,
+                current_org=_mock_org,
             )
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
@@ -421,6 +423,7 @@ def upload_document(
     domain: str | None = Form(None, max_length=100),
     customer_id: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Upload a DOCX, TXT, or RTF document. Source language is auto-detected."""
     filename, file_type = validate_file(file)
@@ -450,6 +453,7 @@ def upload_document(
         customer_id=customer_id_val,
         industry=industry_val,
         domain=domain_val,
+        org_id=current_org.id,
         status="uploaded",
     )
     db.add(doc)
@@ -469,6 +473,7 @@ def upload_and_translate_document(
     customer_id: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Upload document and automatically run parse + translation for the default flow."""
     style_value = translation_style.strip().lower()
@@ -481,22 +486,35 @@ def upload_and_translate_document(
         domain=domain,
         customer_id=customer_id,
         db=db,
+        current_org=current_org,
     )
     uid = current_user.id if current_user is not None else None
-    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value, uid)
+    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value, uid, current_org.id)
     return doc
 
 
 @router.get("", response_model=list[DocumentResponse])
-def list_documents(db: Session = Depends(get_db)):
-    """List all uploaded documents."""
-    return db.query(Document).order_by(Document.created_at.desc()).all()
+def list_documents(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """List all documents belonging to the current user's organisation."""
+    return (
+        db.query(Document)
+        .filter(Document.org_id == current_org.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: int, db: Session = Depends(get_db)):
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """Get a single document by id."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -507,9 +525,10 @@ def update_document_source_language(
     document_id: int,
     body: DocumentSourceLanguageUpdate,
     db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Update a document's source language (manual override)."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     value = body.source_language.strip().lower()
@@ -530,9 +549,10 @@ def parse_document_by_id(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
+    current_org: Organisation = Depends(get_current_org),
 ):
     """Queue parse + segment background stages for a document."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -563,9 +583,13 @@ def parse_document_by_id(
 
 
 @router.get("/{document_id}/segments", response_model=list[SegmentResponse])
-def list_document_segments(document_id: int, db: Session = Depends(get_db)):
+def list_document_segments(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """List segments for a document."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     segments = (
@@ -578,9 +602,13 @@ def list_document_segments(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/blocks", response_model=list[DocumentBlockResponse])
-def list_document_blocks(document_id: int, db: Session = Depends(get_db)):
+def list_document_blocks(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
     """List parsed document blocks for a document."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     blocks = (
@@ -593,8 +621,12 @@ def list_document_blocks(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/stages", response_model=list[ProcessingStageJobResponse])
-def list_document_stage_jobs(document_id: int, db: Session = Depends(get_db)):
-    doc = db.query(Document).filter(Document.id == document_id).first()
+def list_document_stage_jobs(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return (
@@ -609,8 +641,12 @@ def list_document_stage_jobs(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/progress", response_model=DocumentProgressResponse)
-def get_document_progress(document_id: int, db: Session = Depends(get_db)):
-    doc = db.query(Document).filter(Document.id == document_id).first()
+def get_document_progress(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     stage_jobs = (
@@ -630,8 +666,9 @@ def retry_document_pipeline(
     document_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
 ):
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 

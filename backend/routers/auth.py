@@ -8,10 +8,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import UsageEvent, User
+from models import Organisation, OrgMembership, UsageEvent, User
 from services.auth import (
     create_access_token,
     get_current_active_user,
+    get_current_membership,
+    get_current_org,
     hash_password,
     verify_password,
 )
@@ -86,6 +88,20 @@ class UsageResponse(BaseModel):
     recent: list[UsageEventOut]
 
 
+class OrgOut(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OrgResponse(BaseModel):
+    org: OrgOut
+    role: str
+
+
 # --- Endpoints ---
 
 
@@ -150,6 +166,15 @@ def login(
 def me(current_user: User = Depends(get_current_active_user)):
     """Return the profile of the currently authenticated user."""
     return current_user
+
+
+@router.get("/org", response_model=OrgResponse)
+def get_org(
+    current_org: Organisation = Depends(get_current_org),
+    membership: OrgMembership = Depends(get_current_membership),
+):
+    """Return the current user's organisation and their role within it."""
+    return OrgResponse(org=current_org, role=membership.role)
 
 
 @router.get("/usage", response_model=UsageResponse)
