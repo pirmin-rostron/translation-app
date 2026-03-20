@@ -267,7 +267,9 @@ function getAmbiguityChoiceDetails(segment: ReviewSegment | null) {
     };
   }
 
-  const rawOptions = Array.isArray(segment.ambiguity_options) ? segment.ambiguity_options : [];
+  const rawFromOptions = Array.isArray(segment.ambiguity_options) ? segment.ambiguity_options : [];
+  const rawFromDetails = Array.isArray(segment.ambiguity_details?.alternatives) ? segment.ambiguity_details.alternatives : [];
+  const rawOptions = rawFromOptions.length > 0 ? rawFromOptions : rawFromDetails;
   const seen = new Set<string>();
   const options = rawOptions.reduce<AmbiguityChoiceOption[]>((acc, option, idx) => {
     const translation = cleanChoiceTranslationText(option?.translation || "");
@@ -688,19 +690,11 @@ export default function TranslationReviewPage() {
       }
     };
 
-    if (side === "target") {
-      return (
-        <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
-          {block.translated_text_display || ""}
-        </span>
-      );
-    }
-
-    // Source side: render per-segment so the active ambiguous phrase can be highlighted inline.
     if (!block.segments.length) {
+      const fallbackText = side === "source" ? (block.source_text_display || "") : (block.translated_text_display || "");
       return (
         <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
-          {block.source_text_display || ""}
+          {fallbackText}
         </span>
       );
     }
@@ -709,30 +703,53 @@ export default function TranslationReviewPage() {
       <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
         {block.segments.map((segment) => {
           const isActive = segment.id === selectedSegment?.id;
-          const ambiguityAnnotation = isActive
+          const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
+          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
+          const shouldHighlight = isUnresolvedActiveAmbiguity || isResolvedAmbiguity;
+          const highlightClass = isUnresolvedActiveAmbiguity
+            ? "bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5"
+            : "bg-purple-100 border-b-2 border-purple-300 rounded-sm px-0.5";
+
+          const text = side === "source" ? segment.source_text : (segment.final_translation || "");
+          const ambiguityAnnotation = shouldHighlight
             ? segment.annotations.find((a) => a.annotation_type === "ambiguity")
             : undefined;
-          const hasValidSpan =
-            ambiguityAnnotation != null &&
-            ambiguityAnnotation.source_end > ambiguityAnnotation.source_start &&
-            ambiguityAnnotation.source_start >= 0 &&
-            ambiguityAnnotation.source_end <= segment.source_text.length;
 
-          if (!hasValidSpan) {
-            return <span key={segment.id}>{segment.source_text}</span>;
+          if (!ambiguityAnnotation) {
+            return <span key={segment.id}>{text}</span>;
           }
 
-          const before = segment.source_text.slice(0, ambiguityAnnotation.source_start);
-          const phrase = segment.source_text.slice(ambiguityAnnotation.source_start, ambiguityAnnotation.source_end);
-          const after = segment.source_text.slice(ambiguityAnnotation.source_end);
+          const start = side === "source" ? ambiguityAnnotation.source_start : (ambiguityAnnotation.target_start ?? null);
+          const end = side === "source" ? ambiguityAnnotation.source_end : (ambiguityAnnotation.target_end ?? null);
+          const hasValidRange = start != null && end != null && end > start && start >= 0 && end <= text.length;
 
-          return (
-            <span key={segment.id}>
-              {before}
-              <span className="bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5">{phrase}</span>
-              {after}
-            </span>
-          );
+          if (hasValidRange) {
+            return (
+              <span key={segment.id}>
+                {text.slice(0, start)}
+                <span className={highlightClass}>{text.slice(start, end)}</span>
+                {text.slice(end)}
+              </span>
+            );
+          }
+
+          // Fallback: search for the span text directly
+          const spanText = (side === "source"
+            ? ambiguityAnnotation.source_span_text
+            : ambiguityAnnotation.target_span_text
+          )?.trim() ?? "";
+          const spanIdx = spanText ? text.indexOf(spanText) : -1;
+          if (spanIdx !== -1) {
+            return (
+              <span key={segment.id}>
+                {text.slice(0, spanIdx)}
+                <span className={highlightClass}>{spanText}</span>
+                {text.slice(spanIdx + spanText.length)}
+              </span>
+            );
+          }
+
+          return <span key={segment.id}>{text}</span>;
         })}
       </span>
     );
@@ -843,20 +860,25 @@ export default function TranslationReviewPage() {
 
   async function handleSaveSegmentEdit() {
     if (!selectedSegment) return;
-    const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
+    const wasApproved = isAcceptableFinalStatus(selectedSegment.review_status);
+    const nextBlockId = wasApproved ? null : getNextUnresolvedBlockIdFromCurrent();
     const finalTranslation = getSelectedDecisionTranslation();
-    const reviewStatus = getSelectedDecisionStatus();
+    const reviewStatus = wasApproved ? "pending" : getSelectedDecisionStatus();
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
       const summary = await saveResult(selectedSegment.id, finalTranslation, reviewStatus);
       setIsEditing(false);
-      if (transitionToReviewCompleteState(summary)) {
+      if (!wasApproved && transitionToReviewCompleteState(summary)) {
         return;
       }
-      moveToBlockById(nextBlockId);
-      setMessage("Saved and approved. Moved to next block.");
+      if (nextBlockId != null) {
+        moveToBlockById(nextBlockId);
+        setMessage("Saved and approved. Moved to next block.");
+      } else {
+        setMessage(wasApproved ? "Changes saved. Re-approve to confirm." : "Saved.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
