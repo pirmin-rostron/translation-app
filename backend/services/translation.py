@@ -152,19 +152,106 @@ def _strip_markdown_code_fences(raw_text: str) -> str:
     return text
 
 
+def _fix_trailing_commas(text: str) -> str:
+    """Remove trailing commas before closing braces or brackets."""
+    return re.sub(r",(\s*[}\]])", r"\1", text)
+
+
+def _fix_unescaped_newlines_in_strings(text: str) -> str:
+    """Replace literal newline/carriage-return characters inside JSON string values with their escape sequences."""
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    for char in text:
+        if escaped:
+            result.append(char)
+            escaped = False
+        elif char == "\\" and in_string:
+            result.append(char)
+            escaped = True
+        elif char == '"':
+            result.append(char)
+            in_string = not in_string
+        elif char == "\n" and in_string:
+            result.append("\\n")
+        elif char == "\r" and in_string:
+            result.append("\\r")
+        else:
+            result.append(char)
+    return "".join(result)
+
+
+_TYPOGRAPHIC_QUOTES = ("\u201e", "\u201c", "\u201d")  # „  "  "
+
+
+def _fix_typographic_quotes(text: str) -> str:
+    """Replace Unicode typographic double-quote characters inside JSON string values with \\".
+
+    Characters handled (all replaced with escaped double-quote):
+      U+201E „  LEFT DOUBLE QUOTATION MARK (German opening)
+      U+201C "  LEFT DOUBLE QUOTATION MARK
+      U+201D "  RIGHT DOUBLE QUOTATION MARK
+
+    Only characters that appear inside an already-open JSON string are touched;
+    structural ASCII double-quotes that delimit the string are left unchanged.
+    """
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    for char in text:
+        if escaped:
+            result.append(char)
+            escaped = False
+        elif char == "\\" and in_string:
+            result.append(char)
+            escaped = True
+        elif char == '"':
+            result.append(char)
+            in_string = not in_string
+        elif in_string and char in _TYPOGRAPHIC_QUOTES:
+            result.append('\\"')
+        else:
+            result.append(char)
+    return "".join(result)
+
+
 def _parse_json_safely(raw_text: str, segment_id: int | None = None) -> object:
-    """Strip wrappers and parse JSON, raising a structured error on failure."""
+    """Strip wrappers, apply corruption fixes, and parse JSON.
+
+    Attempts three passes in order:
+    1. Parse after standard fence stripping + corruption fixes.
+    2. Extract the outermost {...} block with a regex and parse that.
+    Raises StructuredResponseParseError if all passes fail.
+    """
     cleaned = _strip_markdown_code_fences(raw_text)
     if not cleaned:
         raise StructuredResponseParseError(
             "Empty model response", raw_response=raw_text, segment_id=segment_id
         )
+
+    # Apply common corruption fixes before the first parse attempt.
+    cleaned = _fix_trailing_commas(cleaned)
+    cleaned = _fix_unescaped_newlines_in_strings(cleaned)
+    cleaned = _fix_typographic_quotes(cleaned)
+
+    first_exc: json.JSONDecodeError | None = None
+
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        raise StructuredResponseParseError(
-            str(exc), raw_response=raw_text, segment_id=segment_id
-        ) from exc
+        first_exc = exc
+
+    # Fallback: extract the outermost {...} block and try again.
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    raise StructuredResponseParseError(
+        str(first_exc), raw_response=raw_text, segment_id=segment_id
+    ) from first_exc
 
 
 def _coerce_translation_text(obj: object) -> str | None:
@@ -352,14 +439,16 @@ Segment:
             segment.segment_id,
         )
 
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=self._max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
+        def _call_api() -> str:
+            resp = self._client.messages.create(
+                model=self._model,
+                max_tokens=self._max_tokens,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            return resp.content[0].text
 
-        raw_text = response.content[0].text
+        raw_text = _call_api()
         logger.info(
             "Translation provider=%s segment_id=%d raw response=%r",
             self.name,
@@ -367,7 +456,32 @@ Segment:
             raw_text,
         )
 
-        parsed = _parse_json_safely(raw_text, segment_id=segment.segment_id)
+        try:
+            parsed = _parse_json_safely(raw_text, segment_id=segment.segment_id)
+        except StructuredResponseParseError:
+            logger.warning(
+                "Translation provider=%s segment_id=%d JSON parse failed; retrying once. raw_response=%r",
+                self.name,
+                segment.segment_id,
+                raw_text,
+            )
+            raw_text = _call_api()
+            logger.info(
+                "Translation provider=%s segment_id=%d retry raw response=%r",
+                self.name,
+                segment.segment_id,
+                raw_text,
+            )
+            try:
+                parsed = _parse_json_safely(raw_text, segment_id=segment.segment_id)
+            except StructuredResponseParseError:
+                logger.warning(
+                    "Translation provider=%s segment_id=%d JSON parse failed after retry. raw_response=%r",
+                    self.name,
+                    segment.segment_id,
+                    raw_text,
+                )
+                raise
 
         if not isinstance(parsed, dict):
             raise StructuredResponseParseError(
