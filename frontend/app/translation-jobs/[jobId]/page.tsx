@@ -681,20 +681,59 @@ export default function TranslationReviewPage() {
   }
 
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
-    const sourceDisplay = block.source_text_display || "";
-    const translatedDisplay = block.translated_text_display || "";
-    const modeText = side === "source" ? sourceDisplay : translatedDisplay;
+    const handleClick = () => {
+      const defaultSegmentId = block.segments[0]?.id;
+      if (defaultSegmentId != null) {
+        selectBlockById(block.id, defaultSegmentId);
+      }
+    };
+
+    if (side === "target") {
+      return (
+        <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
+          {block.translated_text_display || ""}
+        </span>
+      );
+    }
+
+    // Source side: render per-segment so the active ambiguous phrase can be highlighted inline.
+    if (!block.segments.length) {
+      return (
+        <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
+          {block.source_text_display || ""}
+        </span>
+      );
+    }
+
     return (
-      <span
-        onClick={() => {
-          const defaultSegmentId = block.segments[0]?.id;
-          if (defaultSegmentId != null) {
-            selectBlockById(block.id, defaultSegmentId);
+      <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
+        {block.segments.map((segment) => {
+          const isActive = segment.id === selectedSegment?.id;
+          const ambiguityAnnotation = isActive
+            ? segment.annotations.find((a) => a.annotation_type === "ambiguity")
+            : undefined;
+          const hasValidSpan =
+            ambiguityAnnotation != null &&
+            ambiguityAnnotation.source_end > ambiguityAnnotation.source_start &&
+            ambiguityAnnotation.source_start >= 0 &&
+            ambiguityAnnotation.source_end <= segment.source_text.length;
+
+          if (!hasValidSpan) {
+            return <span key={segment.id}>{segment.source_text}</span>;
           }
-        }}
-        className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60"
-      >
-        {modeText}
+
+          const before = segment.source_text.slice(0, ambiguityAnnotation.source_start);
+          const phrase = segment.source_text.slice(ambiguityAnnotation.source_start, ambiguityAnnotation.source_end);
+          const after = segment.source_text.slice(ambiguityAnnotation.source_end);
+
+          return (
+            <span key={segment.id}>
+              {before}
+              <span className="bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5">{phrase}</span>
+              {after}
+            </span>
+          );
+        })}
       </span>
     );
   }
