@@ -1075,10 +1075,31 @@ export default function TranslationReviewPage() {
     return getFirstUnresolvedAmbiguityBlockId() ?? getNextUnresolvedBlockId();
   }
 
+  async function downloadAuthenticatedFile(downloadUrl: string, fallbackFilename: string) {
+    const { useAuthStore } = await import("../../stores/authStore");
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(downloadUrl, { headers });
+    if (!res.ok) throw new Error(`Download failed (${res.status})`);
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    const filenameMatch = /filename[^;=\n]*=["']?([^"';\n]+)["']?/i.exec(disposition);
+    const filename = filenameMatch?.[1]?.trim() || fallbackFilename;
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  }
+
   function handleDownloadLatestExport() {
     if (!latestExport?.download_url) return;
     const url = `${API_URL}${latestExport.download_url}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    const filename = latestExport.filename ?? "export";
+    void downloadAuthenticatedFile(url, filename).catch((err) =>
+      setError(err instanceof Error ? err.message : "Download failed")
+    );
   }
 
   function handlePrimaryGuidanceAction() {
@@ -1118,7 +1139,10 @@ export default function TranslationReviewPage() {
   function triggerExportDownload(payload: ExportResult) {
     if (!payload.download_url) return;
     const url = `${API_URL}${payload.download_url}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    const filename = payload.filename ?? "export";
+    void downloadAuthenticatedFile(url, filename).catch((err) =>
+      setError(err instanceof Error ? err.message : "Download failed")
+    );
   }
 
   async function handleExportFinalDocument(selectedMode: ExportMode, selectedFormat: ExportFormat) {

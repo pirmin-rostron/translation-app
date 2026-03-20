@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuthStore } from "../stores/authStore";
 
 type NavItem = {
   label: string;
@@ -43,6 +44,14 @@ const navItems: NavItem[] = [
 
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  function handleLogout() {
+    clearAuth();
+    router.push("/login");
+  }
 
   return (
     <nav className="border-b border-slate-200 bg-white">
@@ -70,6 +79,21 @@ export default function Nav() {
               </Link>
             );
           })}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {user && (
+            <span className="text-sm text-slate-500">
+              {user.full_name ?? user.email}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-sm text-slate-500 hover:text-slate-900"
+          >
+            Logout
+          </button>
         </div>
       </div>
     </nav>
