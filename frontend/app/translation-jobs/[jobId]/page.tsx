@@ -440,6 +440,7 @@ export default function TranslationReviewPage() {
   const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
   const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | null>(null);
   const [prevAmbiguityChoiceIndex, setPrevAmbiguityChoiceIndex] = useState<number | null>(null);
+  const [isAmbiguityChoiceUserSelected, setIsAmbiguityChoiceUserSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -540,6 +541,7 @@ export default function TranslationReviewPage() {
       .filter((entry) => entry.normalized.length > 0 && currentTranslationNormalized.includes(entry.normalized))
       .map((entry) => entry.idx);
     setAmbiguityChoiceIndex(matchingIndices.length === 1 ? matchingIndices[0] : null);
+    setIsAmbiguityChoiceUserSelected(false);
     setPrevAmbiguityChoiceIndex(null);
     setIsEditing(false);
   }, [selectedSegment?.id]);
@@ -722,8 +724,8 @@ export default function TranslationReviewPage() {
         {block.segments.map((segment) => {
           const isActive = segment.id === selectedSegment?.id;
           const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
-          // Amber only when active, unresolved, AND no choice made yet (State 1). State 2 shows no highlight.
-          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status) && ambiguityChoiceIndex === null;
+          // Amber for active unresolved ambiguity — show in both State 1 and State 2.
+          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
           const shouldHighlight = isUnresolvedActiveAmbiguity || isResolvedAmbiguity;
           const highlightClass = isUnresolvedActiveAmbiguity
             ? "bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5"
@@ -847,6 +849,7 @@ export default function TranslationReviewPage() {
 
   function handleAmbiguityChoiceChange(idx: number) {
     setAmbiguityChoiceIndex(idx);
+    setIsAmbiguityChoiceUserSelected(true);
     if (!selectedSegment) return;
     const option = ambiguityOptions[idx];
     if (!option) return;
@@ -906,19 +909,36 @@ export default function TranslationReviewPage() {
   }
 
   async function handleApproveCurrentBlock() {
-    if (!selectedBlock) return;
+    if (!selectedBlock || !selectedSegment) return;
     const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     const selectedDecisionTranslation = getSelectedDecisionTranslation();
     const selectedDecisionStatus = getSelectedDecisionStatus();
+
+    // Pre-compute: next unresolved ambiguous segment in this block (not the current one)
+    const nextUnresolvedAmbiguousInBlock = selectedBlock.segments.find(
+      (seg) =>
+        seg.id !== selectedSegment.id &&
+        !isAcceptableFinalStatus(seg.review_status) &&
+        seg.ambiguity_detected &&
+        getAmbiguityChoiceDetails(seg).ambiguityChoiceFound
+    ) ?? null;
+
     setActionLoading(true);
     setMessage("");
     setError("");
     try {
-      const toApprove = selectedBlock.segments.filter(
-        (segment) => !isAcceptableFinalStatus(segment.review_status) && segment.final_translation.trim().length > 0
-      );
+      // Approve the selected segment + non-ambiguous unresolved segments only.
+      // Never auto-approve other ambiguous segments — each one requires an explicit user decision.
+      const toApprove = selectedBlock.segments.filter((segment) => {
+        if (!isAcceptableFinalStatus(segment.review_status) && segment.final_translation.trim()) {
+          if (segment.id === selectedSegment.id) return true;
+          if (segment.ambiguity_detected && getAmbiguityChoiceDetails(segment).ambiguityChoiceFound) return false;
+          return true;
+        }
+        return false;
+      });
       for (const segment of toApprove) {
-        if (selectedSegment && segment.id === selectedSegment.id) {
+        if (segment.id === selectedSegment.id) {
           await persistResult(segment.id, selectedDecisionTranslation, selectedDecisionStatus);
         } else {
           await persistResult(segment.id, segment.final_translation, "approved");
@@ -928,12 +948,19 @@ export default function TranslationReviewPage() {
       if (transitionToReviewCompleteState(summary as ReviewSummary)) {
         return;
       }
-      moveToBlockById(nextBlockId);
-      setMessage(
-        toApprove.length > 0
-          ? `Approved ${toApprove.length} segment${toApprove.length === 1 ? "" : "s"} in Block ${selectedBlock.block_index + 1}.`
-          : "Block already reviewed. Moved to next block."
-      );
+      if (nextUnresolvedAmbiguousInBlock) {
+        // Stay on the current block — navigate to the next ambiguous segment that needs a decision
+        setSelectedId(nextUnresolvedAmbiguousInBlock.id);
+        setMessage("Approved. Resolve the next ambiguous segment in this block.");
+      } else {
+        // All ambiguous segments in this block are resolved — advance to next unresolved block
+        moveToBlockById(nextBlockId);
+        setMessage(
+          toApprove.length > 0
+            ? `Block ${selectedBlock.block_index + 1} approved.`
+            : "Block already reviewed. Moved to next block."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve block");
     } finally {
@@ -1289,12 +1316,14 @@ export default function TranslationReviewPage() {
             blockAmbiguityIssuesLength={blockAmbiguityIssues.length}
             activeBlockAmbiguityPosition={activeBlockAmbiguityPosition}
             ambiguityChoiceIndex={ambiguityChoiceIndex}
+            isAmbiguityChoiceUserSelected={isAmbiguityChoiceUserSelected}
             ambiguityOptions={ambiguityOptions}
             currentSuggestionIndex={currentSuggestionIndex}
             onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
             onClearAmbiguityChoice={() => {
               setPrevAmbiguityChoiceIndex(ambiguityChoiceIndex);
               setAmbiguityChoiceIndex(null);
+              setIsAmbiguityChoiceUserSelected(false);
             }}
             previousAmbiguityChoiceIndex={prevAmbiguityChoiceIndex}
             isReadOnly={isReadOnly}

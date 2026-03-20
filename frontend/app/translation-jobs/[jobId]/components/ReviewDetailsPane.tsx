@@ -36,6 +36,7 @@ type ReviewDetailsPaneProps = {
   blockAmbiguityIssuesLength: number;
   activeBlockAmbiguityPosition: number;
   ambiguityChoiceIndex: number | null;
+  isAmbiguityChoiceUserSelected: boolean;
   previousAmbiguityChoiceIndex: number | null;
   ambiguityOptions: AmbiguityOption[];
   currentSuggestionIndex: number | null;
@@ -82,6 +83,7 @@ export function ReviewDetailsPane({
   blockAmbiguityIssuesLength,
   activeBlockAmbiguityPosition,
   ambiguityChoiceIndex,
+  isAmbiguityChoiceUserSelected,
   previousAmbiguityChoiceIndex,
   ambiguityOptions,
   currentSuggestionIndex,
@@ -206,7 +208,9 @@ export function ReviewDetailsPane({
           {/* State 2: choice made, not yet approved */}
           {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex !== null && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
-              <p className="font-medium text-amber-900">Accepted Translation</p>
+              <p className="font-medium text-amber-900">
+                {isAmbiguityChoiceUserSelected ? "Accepted Translation" : "Suggested Translation"}
+              </p>
               <p className="mt-2 text-slate-800">{ambiguityOptions[ambiguityChoiceIndex]?.translation ?? ""}</p>
               {ambiguityExplanation && (
                 <p className="mt-3 text-xs text-slate-700">{cleanPanelText(ambiguityExplanation)}</p>
@@ -235,7 +239,7 @@ export function ReviewDetailsPane({
             </div>
           )}
 
-          {isEditing && canEditSelectedSegment && !isSafeDecisionOnlyMode && (
+          {isEditing && canEditSelectedSegment && (
             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit selected translation</p>
               <textarea
@@ -406,7 +410,11 @@ export function ReviewDetailsPane({
               </p>
             )}
             {!currentBlockResolved && (
-              <p className="text-xs text-slate-500">Decide this block to continue to the next unresolved block.</p>
+              <p className="text-xs text-slate-500">
+                {unresolvedBlocks <= 1
+                  ? "This is the last block. Approve to complete your review."
+                  : "Review and approve this block to continue."}
+              </p>
             )}
             {/* Navigation — bottom of panel */}
             <div className="flex items-center gap-2 pt-1">
