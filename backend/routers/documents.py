@@ -1,4 +1,5 @@
 import os
+import types
 import uuid
 import logging
 from datetime import datetime
@@ -136,7 +137,7 @@ def _run_document_pipeline(document_id: int, user_id: int | None = None):
         db.close()
 
 
-def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural"):
+def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None):
     """Happy-path orchestration: parse document, then create and execute translation job."""
     db = SessionLocal()
     try:
@@ -145,8 +146,9 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
             return
 
         immediate_tasks = _ImmediateBackgroundTasks()
+        _mock_user = types.SimpleNamespace(id=user_id) if user_id is not None else None
         if doc.status in {"uploaded", PARSE_FAILED_STATUS}:
-            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db, current_user=None)
+            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db, current_user=_mock_user)
             db.expire_all()
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
@@ -188,7 +190,7 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
                 background_tasks=immediate_tasks,
                 payload=TranslationJobCreateRequest(translation_style=style_value),
                 db=db,
-                current_user=None,
+                current_user=_mock_user,
             )
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
@@ -466,6 +468,7 @@ def upload_and_translate_document(
     translation_style: str = Form("natural", min_length=1, max_length=20),
     customer_id: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_user),
 ):
     """Upload document and automatically run parse + translation for the default flow."""
     style_value = translation_style.strip().lower()
@@ -479,7 +482,8 @@ def upload_and_translate_document(
         customer_id=customer_id,
         db=db,
     )
-    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value)
+    uid = current_user.id if current_user is not None else None
+    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value, uid)
     return doc
 
 
