@@ -968,10 +968,10 @@ export default function TranslationReviewPage() {
 
   function handleEditSelectedTranslation() {
     if (selectedSegment) {
-      setDraftTranslation(selectedSegment.final_translation || "");
+      setDraftTranslation(cleanPanelText(selectedSegment.final_translation) || selectedSegment.final_translation || "");
     }
     setIsEditing(true);
-    setMessage("Edit mode enabled. Update the translation and save.");
+    setMessage("");
     setError("");
   }
 
@@ -980,12 +980,10 @@ export default function TranslationReviewPage() {
       handleEditSelectedTranslation();
       return;
     }
-    setIsEditing((current) => {
-      if (!current) {
-        setDraftTranslation(selectedSegment?.final_translation || "");
-      }
-      return !current;
-    });
+    // Canceling: restore draft to original and exit edit mode
+    setDraftTranslation(cleanPanelText(selectedSegment?.final_translation) || selectedSegment?.final_translation || "");
+    setIsEditing(false);
+    setMessage("");
   }
 
   async function handleRetryJob() {

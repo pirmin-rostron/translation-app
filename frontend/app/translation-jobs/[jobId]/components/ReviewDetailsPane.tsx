@@ -329,8 +329,8 @@ export function ReviewDetailsPane({
             )}
             {!isReadOnly && currentBlockResolved && !isEditing && (
               <>
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  Approved. Continue to the next unresolved block or edit again if needed.
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
+                  Translation approved.
                 </div>
                 <button
                   type="button"
@@ -342,12 +342,12 @@ export function ReviewDetailsPane({
                 </button>
               </>
             )}
-            {!isReadOnly && isEditing && hasDraftChanges && (
+            {!isReadOnly && isEditing && (
               <>
                 <button
                   type="button"
                   onClick={onSaveSegmentEdit}
-                  disabled={actionLoading || !draftTranslation.trim()}
+                  disabled={actionLoading || !hasDraftChanges || !draftTranslation.trim()}
                   className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                 >
                   Save edited result
