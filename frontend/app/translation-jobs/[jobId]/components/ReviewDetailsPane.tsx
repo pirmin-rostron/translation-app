@@ -215,24 +215,34 @@ export function ReviewDetailsPane({
               {ambiguityExplanation && (
                 <p className="mt-3 text-xs text-slate-700">{cleanPanelText(ambiguityExplanation)}</p>
               )}
-              <div className="mt-3 space-y-1.5">
+              <div className="mt-3 space-y-2">
                 {ambiguityOptions.map((option, idx) => {
                   const isSelected = ambiguityChoiceIndex === idx;
                   return (
-                    <div
+                    <label
                       key={`${option.meaning}-${idx}`}
-                      className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${
-                        isSelected ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-white"
+                      className={`block cursor-pointer rounded-lg border px-3 py-2 ${
+                        isSelected ? "border-amber-400 bg-amber-50" : "border-amber-200 bg-white"
                       }`}
                     >
-                      <span className={`mt-0.5 text-xs ${isSelected ? "text-amber-600" : "text-slate-300"}`}>
-                        {isSelected ? "✓" : "○"}
-                      </span>
-                      <p className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? "text-amber-700" : "text-slate-400"}`}>
-                        {cleanPanelText(option.meaning)}
-                        {idx === currentSuggestionIndex ? " — Suggested" : ""}
-                      </p>
-                    </div>
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="ambiguity-choice-state2"
+                          value={`option-${idx}`}
+                          checked={isSelected}
+                          onChange={() => onAmbiguityChoiceChange(idx)}
+                          disabled={isReadOnly}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                            {cleanPanelText(option.meaning)}
+                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </label>
                   );
                 })}
               </div>
