@@ -809,7 +809,7 @@ export default function TranslationReviewPage() {
     return "approved";
   }
 
-  function handleAmbiguityChoiceChange(idx: number) {
+  async function handleAmbiguityChoiceChange(idx: number) {
     setAmbiguityChoiceIndex(idx);
     if (!selectedSegment) return;
     const option = ambiguityOptions[idx];
@@ -820,15 +820,35 @@ export default function TranslationReviewPage() {
       return;
     }
     setError("");
-    setDraftTranslation(updatedTranslation);
-    setBlocks((currentBlocks) =>
-      currentBlocks.map((block) => ({
-        ...block,
-        segments: block.segments.map((segment) =>
-          segment.id === selectedSegment.id ? { ...segment, final_translation: updatedTranslation } : segment
-        ),
-      }))
-    );
+
+    // Pre-compute navigation targets using current block state before the reload.
+    const nextAmbiguousInBlock = selectedBlock?.segments.find(
+      (segment) =>
+        segment.id !== selectedSegment.id &&
+        !isAcceptableFinalStatus(segment.review_status) &&
+        getAmbiguityChoiceDetails(segment).ambiguityChoiceFound
+    ) ?? null;
+    const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
+
+    setActionLoading(true);
+    setMessage("");
+    try {
+      const summary = await saveResult(selectedSegment.id, updatedTranslation, "approved");
+      if (transitionToReviewCompleteState(summary)) {
+        return;
+      }
+      if (nextAmbiguousInBlock) {
+        setSelectedId(nextAmbiguousInBlock.id);
+        setMessage("Translation chosen. Moving to next ambiguity in this block.");
+      } else {
+        moveToBlockById(nextBlockId);
+        setMessage("Translation chosen and approved.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save choice");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   function handleSemanticChoiceChange(value: SemanticChoiceOption) {
@@ -1113,7 +1133,7 @@ export default function TranslationReviewPage() {
   const hasDraftChanges =
     (draftTranslation || "").trim() !== (selectedSegment?.final_translation || "").trim();
   const ambiguityChoiceDetails = getAmbiguityChoiceDetails(selectedSegment);
-  const hasAmbiguityChoice = ambiguityChoiceDetails.ambiguityChoiceFound;
+  const hasAmbiguityChoice = ambiguityChoiceDetails.ambiguityChoiceFound && !isAcceptableFinalStatus(selectedSegment?.review_status ?? "");
   const ambiguityOptions = ambiguityChoiceDetails.options;
   const currentSuggestionMatches = ambiguityOptions
     .map((option, idx) => ({ idx, normalized: normalizeChoiceText(option.translation) }))

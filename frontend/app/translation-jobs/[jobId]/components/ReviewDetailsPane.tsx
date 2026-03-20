@@ -175,17 +175,9 @@ export function ReviewDetailsPane({
           )}
           {hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
-              <p className="font-medium text-amber-900">Ambiguity detected</p>
+              <p className="font-medium text-amber-900">Choose a Translation</p>
               {ambiguityExplanation && (
                 <p className="mt-2 text-xs text-slate-700">{cleanPanelText(ambiguityExplanation)}</p>
-              )}
-              {blockAmbiguityIssuesLength > 1 && (
-                <p className="mt-2 text-xs font-medium text-amber-800">
-                  Ambiguity {activeBlockAmbiguityPosition} of {blockAmbiguityIssuesLength} in this block
-                </p>
-              )}
-              {ambiguityChoiceIndex == null && (
-                <p className="mt-2 text-xs text-amber-800">Choose one meaning to continue.</p>
               )}
               <div className="mt-3 space-y-2">
                 {ambiguityOptions.map((option, idx) => (
@@ -291,15 +283,17 @@ export function ReviewDetailsPane({
 
           <div className="mt-6 space-y-3">
             {!isReadOnly && !currentBlockResolved && !isEditing && (
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={onApproveCurrentBlock}
-                  disabled={primaryActionDisabled || (isEditing && hasDraftChanges)}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
-                >
-                  {primaryDecisionLabel}
-                </button>
+              <div className={`grid gap-2 ${hasAmbiguityChoice ? "grid-cols-2" : "grid-cols-3"}`}>
+                {!hasAmbiguityChoice && (
+                  <button
+                    type="button"
+                    onClick={onApproveCurrentBlock}
+                    disabled={primaryActionDisabled || (isEditing && hasDraftChanges)}
+                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                  >
+                    {primaryDecisionLabel}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onToggleEdit}
