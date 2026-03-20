@@ -4,6 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { documentsApi } from "../services/api";
 
+const TARGET_LANGUAGE_OPTIONS = [
+  { value: "German", label: "German" },
+  { value: "French", label: "French" },
+  { value: "Dutch", label: "Dutch" },
+  { value: "Spanish", label: "Spanish" },
+  { value: "Japanese", label: "Japanese" },
+  { value: "Korean", label: "Korean" },
+];
+
 const INDUSTRY_OPTIONS = [
   { value: "", label: "Not specified" },
   { value: "Government", label: "Government" },
@@ -25,10 +34,10 @@ const DOMAIN_OPTIONS = [
 export default function UploadPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [targetLanguage, setTargetLanguage] = useState("");
+  const [targetLanguage, setTargetLanguage] = useState("German");
   const [industry, setIndustry] = useState("");
   const [domain, setDomain] = useState("");
-  const [translationStyle, setTranslationStyle] = useState<"natural" | "literal">("natural");
+  const [translationStyle, setTranslationStyle] = useState<"natural" | "formal" | "literal">("natural");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -61,17 +70,11 @@ export default function UploadPage() {
       setError("Please select a file");
       return;
     }
-    const trimmed = targetLanguage.trim();
-    if (!trimmed) {
-      setError("Target language is required");
-      return;
-    }
-
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("target_language", trimmed);
+      formData.append("target_language", targetLanguage);
       if (industry.trim()) formData.append("industry", industry.trim());
       if (domain.trim()) formData.append("domain", domain.trim());
       formData.append("translation_style", translationStyle);
@@ -121,16 +124,18 @@ export default function UploadPage() {
             >
               Target language
             </label>
-            <input
+            <select
               id="target_language"
-              type="text"
               value={targetLanguage}
               onChange={(e) => setTargetLanguage(e.target.value)}
-              placeholder="e.g. German"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-              maxLength={50}
-              required
-            />
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent bg-white"
+            >
+              {TARGET_LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label
@@ -186,6 +191,16 @@ export default function UploadPage() {
                   onChange={() => setTranslationStyle("natural")}
                 />
                 <span>Natural (recommended)</span>
+              </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="translation-style"
+                  value="formal"
+                  checked={translationStyle === "formal"}
+                  onChange={() => setTranslationStyle("formal")}
+                />
+                <span>Formal</span>
               </label>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
                 <input

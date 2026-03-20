@@ -460,8 +460,8 @@ def upload_and_translate_document(
 ):
     """Upload document and automatically run parse + translation for the default flow."""
     style_value = translation_style.strip().lower()
-    if style_value not in {"natural", "literal"}:
-        raise HTTPException(status_code=400, detail="translation_style must be one of: literal, natural")
+    if style_value not in {"natural", "formal", "literal"}:
+        raise HTTPException(status_code=400, detail="translation_style must be one of: formal, literal, natural")
     doc = upload_document(
         file=file,
         target_language=target_language,
