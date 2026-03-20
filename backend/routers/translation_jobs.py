@@ -41,6 +41,7 @@ from schemas import (
 )
 from services.auth import get_current_active_user
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
+from services.usage import JOB_CREATED, JOB_EXPORTED, WORDS_TRANSLATED, record_event
 from services.translation import SegmentContext, get_translation_provider
 from services.translation_memory import (
     TranslationMemoryMatch,
@@ -123,7 +124,7 @@ def _queue_stage_job(
     return stage_job
 
 
-def _run_translation_pipeline(translation_job_id: int):
+def _run_translation_pipeline(translation_job_id: int, user_id: int | None = None):
     db = SessionLocal()
     try:
         job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
@@ -174,6 +175,23 @@ def _run_translation_pipeline(translation_job_id: int):
                     stage_job.document_id,
                     translation_job_id,
                 )
+                if stage_job.stage_name == TRANSLATION_STAGE:
+                    _job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
+                    word_count = 0
+                    if _job:
+                        _segs = (
+                            db.query(DocumentSegment)
+                            .filter(DocumentSegment.document_id == _job.document_id)
+                            .all()
+                        )
+                        word_count = sum(len((s.source_text or "").split()) for s in _segs)
+                    record_event(
+                        db,
+                        WORDS_TRANSLATED,
+                        user_id=user_id,
+                        job_id=translation_job_id,
+                        meta={"word_count": word_count},
+                    )
             except Exception as exc:
                 db.rollback()
                 job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
@@ -1331,6 +1349,7 @@ def create_translation_job(
     background_tasks: BackgroundTasks,
     payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_user),
 ):
     """Create a translation job and queue staged background processing."""
     doc = db.query(Document).filter(Document.id == document_id).first()
@@ -1382,7 +1401,9 @@ def create_translation_job(
     job.progress_completed_segments = 0
     db.commit()
     db.refresh(job)
-    background_tasks.add_task(_run_translation_pipeline, job.id)
+    uid = current_user.id if current_user is not None else None
+    record_event(db, JOB_CREATED, user_id=uid, job_id=job.id, document_id=document_id)
+    background_tasks.add_task(_run_translation_pipeline, job.id, uid)
     return job
 
 
@@ -1634,6 +1655,7 @@ def export_translation_job(
     export_format: str | None = Query(default=None),
     export_mode: str | None = Query(default=None),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_user),
 ):
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id).first()
     if not job:
@@ -1674,6 +1696,8 @@ def export_translation_job(
     job.status = JOB_STATUS_EXPORTED
     job.last_saved_at = exported_at
     db.commit()
+    uid = current_user.id if current_user is not None else None
+    record_event(db, JOB_EXPORTED, user_id=uid, job_id=job_id, document_id=job.document_id)
     return ExportResponse(
         job_id=job.id,
         status=job.status,

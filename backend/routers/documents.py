@@ -20,6 +20,7 @@ from schemas import (
 from services.auth import get_current_active_user
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
+from services.usage import DOCUMENT_INGESTED, record_event
 
 
 router = APIRouter(
@@ -71,7 +72,7 @@ def _queue_stage_job(
     return stage_job
 
 
-def _run_document_pipeline(document_id: int):
+def _run_document_pipeline(document_id: int, user_id: int | None = None):
     db = SessionLocal()
     try:
         while True:
@@ -115,6 +116,8 @@ def _run_document_pipeline(document_id: int):
                 stage_job.finished_at = datetime.utcnow()
                 db.commit()
                 logger.info("Stage success: stage=%s document_id=%d", stage_job.stage_name, document_id)
+                if stage_job.stage_name == SEGMENT_STAGE:
+                    record_event(db, DOCUMENT_INGESTED, user_id=user_id, document_id=document_id)
             except Exception as exc:
                 db.rollback()
                 doc = db.query(Document).filter(Document.id == document_id).first()
@@ -143,7 +146,7 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
 
         immediate_tasks = _ImmediateBackgroundTasks()
         if doc.status in {"uploaded", PARSE_FAILED_STATUS}:
-            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db)
+            parse_document_by_id(document_id=document_id, background_tasks=immediate_tasks, db=db, current_user=None)
             db.expire_all()
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
@@ -185,6 +188,7 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
                 background_tasks=immediate_tasks,
                 payload=TranslationJobCreateRequest(translation_style=style_value),
                 db=db,
+                current_user=None,
             )
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
@@ -521,6 +525,7 @@ def parse_document_by_id(
     document_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_user),
 ):
     """Queue parse + segment background stages for a document."""
     doc = db.query(Document).filter(Document.id == document_id).first()
@@ -548,7 +553,8 @@ def parse_document_by_id(
     doc.status = PARSING_STATUS
     db.commit()
     db.refresh(doc)
-    background_tasks.add_task(_run_document_pipeline, document_id)
+    uid = current_user.id if current_user is not None else None
+    background_tasks.add_task(_run_document_pipeline, document_id, uid)
     return doc
 
 
