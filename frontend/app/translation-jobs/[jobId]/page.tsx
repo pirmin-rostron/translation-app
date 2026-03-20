@@ -440,6 +440,7 @@ export default function TranslationReviewPage() {
   const [draftTranslation, setDraftTranslation] = useState("");
   const [semanticChoice, setSemanticChoice] = useState<SemanticChoiceOption>("current");
   const [ambiguityChoiceIndex, setAmbiguityChoiceIndex] = useState<number | null>(null);
+  const [prevAmbiguityChoiceIndex, setPrevAmbiguityChoiceIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -522,6 +523,7 @@ export default function TranslationReviewPage() {
       .filter((entry) => entry.normalized.length > 0 && currentTranslationNormalized.includes(entry.normalized))
       .map((entry) => entry.idx);
     setAmbiguityChoiceIndex(matchingIndices.length === 1 ? matchingIndices[0] : null);
+    setPrevAmbiguityChoiceIndex(null);
     setIsEditing(false);
   }, [selectedSegment?.id]);
 
@@ -704,7 +706,8 @@ export default function TranslationReviewPage() {
         {block.segments.map((segment) => {
           const isActive = segment.id === selectedSegment?.id;
           const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
-          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
+          // Amber only when active, unresolved, AND no choice made yet (State 1). State 2 shows no highlight.
+          const isUnresolvedActiveAmbiguity = isActive && segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status) && ambiguityChoiceIndex === null;
           const shouldHighlight = isUnresolvedActiveAmbiguity || isResolvedAmbiguity;
           const highlightClass = isUnresolvedActiveAmbiguity
             ? "bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5"
@@ -968,7 +971,7 @@ export default function TranslationReviewPage() {
 
   function handleEditSelectedTranslation() {
     if (selectedSegment) {
-      setDraftTranslation(cleanPanelText(selectedSegment.final_translation) || selectedSegment.final_translation || "");
+      setDraftTranslation(selectedSegment.final_translation || "");
     }
     setIsEditing(true);
     setMessage("");
@@ -981,7 +984,7 @@ export default function TranslationReviewPage() {
       return;
     }
     // Canceling: restore draft to original and exit edit mode
-    setDraftTranslation(cleanPanelText(selectedSegment?.final_translation) || selectedSegment?.final_translation || "");
+    setDraftTranslation(selectedSegment?.final_translation || "");
     setIsEditing(false);
     setMessage("");
   }
@@ -1159,6 +1162,7 @@ export default function TranslationReviewPage() {
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
+  const resolvedAmbiguity = Boolean(selectedSegment?.ambiguity_detected && isAcceptableFinalStatus(selectedSegment?.review_status ?? ""));
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
   const guidanceStatusLabel = workflowStatus === "exported" ? "Exported" : reviewComplete ? "Review Complete" : "In Review";
@@ -1274,7 +1278,11 @@ export default function TranslationReviewPage() {
             ambiguityOptions={ambiguityOptions}
             currentSuggestionIndex={currentSuggestionIndex}
             onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
-            onClearAmbiguityChoice={() => setAmbiguityChoiceIndex(null)}
+            onClearAmbiguityChoice={() => {
+              setPrevAmbiguityChoiceIndex(ambiguityChoiceIndex);
+              setAmbiguityChoiceIndex(null);
+            }}
+            previousAmbiguityChoiceIndex={prevAmbiguityChoiceIndex}
             isReadOnly={isReadOnly}
             isEditing={isEditing}
             canEditSelectedSegment={canEditSelectedSegment}
@@ -1286,6 +1294,7 @@ export default function TranslationReviewPage() {
             semanticChoice={semanticChoice}
             onSemanticChoiceChange={handleSemanticChoiceChange}
             currentBlockResolved={currentBlockResolved}
+            resolvedAmbiguity={resolvedAmbiguity}
             onApproveCurrentBlock={handleApproveCurrentBlock}
             primaryActionDisabled={primaryActionDisabled}
             onToggleEdit={handleToggleEdit}

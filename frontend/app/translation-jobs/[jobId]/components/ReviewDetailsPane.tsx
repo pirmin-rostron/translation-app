@@ -36,6 +36,7 @@ type ReviewDetailsPaneProps = {
   blockAmbiguityIssuesLength: number;
   activeBlockAmbiguityPosition: number;
   ambiguityChoiceIndex: number | null;
+  previousAmbiguityChoiceIndex: number | null;
   ambiguityOptions: AmbiguityOption[];
   currentSuggestionIndex: number | null;
   onAmbiguityChoiceChange: (idx: number) => void;
@@ -51,6 +52,7 @@ type ReviewDetailsPaneProps = {
   semanticChoice: SemanticChoiceOption;
   onSemanticChoiceChange: (value: SemanticChoiceOption) => void;
   currentBlockResolved: boolean;
+  resolvedAmbiguity: boolean;
   onApproveCurrentBlock: () => void;
   primaryActionDisabled: boolean;
   onToggleEdit: () => void;
@@ -80,6 +82,7 @@ export function ReviewDetailsPane({
   blockAmbiguityIssuesLength,
   activeBlockAmbiguityPosition,
   ambiguityChoiceIndex,
+  previousAmbiguityChoiceIndex,
   ambiguityOptions,
   currentSuggestionIndex,
   onAmbiguityChoiceChange,
@@ -95,6 +98,7 @@ export function ReviewDetailsPane({
   semanticChoice,
   onSemanticChoiceChange,
   currentBlockResolved,
+  resolvedAmbiguity,
   onApproveCurrentBlock,
   primaryActionDisabled,
   onToggleEdit,
@@ -137,24 +141,7 @@ export function ReviewDetailsPane({
           <p className="mt-1 text-sm text-slate-500">
             Reviewing Block {selectedBlock.block_index + 1} of {orderedBlocksLength}
           </p>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onPreviousBlock}
-              disabled={selectedBlockPosition <= 0}
-              className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-            >
-              Previous block
-            </button>
-            <button
-              type="button"
-              onClick={onNextBlock}
-              disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocksLength - 1}
-              className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-            >
-              Next block
-            </button>
-          </div>
+
           {isLastBlock && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
               {unresolvedBlocks === 0 ? (
@@ -169,6 +156,8 @@ export function ReviewDetailsPane({
               <p className="text-sm text-slate-700">No issues detected.</p>
             </div>
           )}
+
+          {/* State 1: choose a translation */}
           {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex === null && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
               <p className="font-medium text-amber-900">Choose a Translation</p>
@@ -176,38 +165,73 @@ export function ReviewDetailsPane({
                 <p className="mt-2 text-xs text-slate-700">{cleanPanelText(ambiguityExplanation)}</p>
               )}
               <div className="mt-3 space-y-2">
-                {ambiguityOptions.map((option, idx) => (
-                  <label
-                    key={`${option.meaning}-${idx}`}
-                    className="block cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-2"
-                  >
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="radio"
-                        name="ambiguity-choice"
-                        value={`option-${idx}`}
-                        checked={ambiguityChoiceIndex === idx}
-                        onChange={() => onAmbiguityChoiceChange(idx)}
-                        disabled={isReadOnly}
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                          {cleanPanelText(option.meaning)}
-                          {idx === currentSuggestionIndex ? " - Current suggestion" : ""}
-                        </p>
+                {ambiguityOptions.map((option, idx) => {
+                  const isPrevChoice = previousAmbiguityChoiceIndex === idx;
+                  return (
+                    <label
+                      key={`${option.meaning}-${idx}`}
+                      className={`block cursor-pointer rounded-lg border px-3 py-2 ${
+                        isPrevChoice ? "border-amber-400 bg-amber-50" : "border-amber-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="ambiguity-choice"
+                          value={`option-${idx}`}
+                          checked={previousAmbiguityChoiceIndex === idx}
+                          onChange={() => onAmbiguityChoiceChange(idx)}
+                          disabled={isReadOnly}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                            {cleanPanelText(option.meaning)}
+                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
               </div>
+              {previousAmbiguityChoiceIndex !== null && (
+                <p className="mt-2 text-xs text-slate-500">
+                  You previously selected this option. Select a different option to change.
+                </p>
+              )}
             </div>
           )}
 
+          {/* State 2: choice made, not yet approved */}
           {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex !== null && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
               <p className="font-medium text-amber-900">Accepted Translation</p>
               <p className="mt-2 text-slate-800">{ambiguityOptions[ambiguityChoiceIndex]?.translation ?? ""}</p>
+              {ambiguityExplanation && (
+                <p className="mt-3 text-xs text-slate-700">{cleanPanelText(ambiguityExplanation)}</p>
+              )}
+              <div className="mt-3 space-y-1.5">
+                {ambiguityOptions.map((option, idx) => {
+                  const isSelected = ambiguityChoiceIndex === idx;
+                  return (
+                    <div
+                      key={`${option.meaning}-${idx}`}
+                      className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${
+                        isSelected ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <span className={`mt-0.5 text-xs ${isSelected ? "text-amber-600" : "text-slate-300"}`}>
+                        {isSelected ? "✓" : "○"}
+                      </span>
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? "text-amber-700" : "text-slate-400"}`}>
+                        {cleanPanelText(option.meaning)}
+                        {idx === currentSuggestionIndex ? " — Suggested" : ""}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -314,7 +338,7 @@ export function ReviewDetailsPane({
                     disabled={actionLoading || (!hasAmbiguityChoice && !canEditSelectedSegment)}
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                   >
-                    {hasAmbiguityChoice && ambiguityChoiceIndex !== null ? "Change choice" : isEditing ? "Cancel edit" : "Edit"}
+                    {hasAmbiguityChoice && ambiguityChoiceIndex !== null ? "Change choice" : "Edit"}
                   </button>
                   <button
                     type="button"
@@ -329,7 +353,11 @@ export function ReviewDetailsPane({
             )}
             {!isReadOnly && currentBlockResolved && !isEditing && (
               <>
-                <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
+                <div className={`rounded-lg border px-3 py-2 text-sm ${
+                  resolvedAmbiguity
+                    ? "border-purple-200 bg-purple-50 text-purple-800"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                }`}>
                   Translation approved.
                 </div>
                 <button
@@ -350,7 +378,7 @@ export function ReviewDetailsPane({
                   disabled={actionLoading || !hasDraftChanges || !draftTranslation.trim()}
                   className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
                 >
-                  Save edited result
+                  Save translation
                 </button>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -359,7 +387,7 @@ export function ReviewDetailsPane({
                     disabled={actionLoading}
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                   >
-                    Cancel edit
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -380,6 +408,25 @@ export function ReviewDetailsPane({
             {!currentBlockResolved && (
               <p className="text-xs text-slate-500">Decide this block to continue to the next unresolved block.</p>
             )}
+            {/* Navigation — bottom of panel */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onPreviousBlock}
+                disabled={selectedBlockPosition <= 0}
+                className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+              >
+                Previous block
+              </button>
+              <button
+                type="button"
+                onClick={onNextBlock}
+                disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocksLength - 1}
+                className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+              >
+                Next block
+              </button>
+            </div>
           </div>
         </>
       )}
