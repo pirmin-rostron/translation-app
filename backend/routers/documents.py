@@ -23,6 +23,7 @@ from services.auth import get_current_active_user, get_current_org
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 from services.usage import DOCUMENT_INGESTED, record_event
+from tasks import run_document_pipeline
 
 
 router = APIRouter(
@@ -189,7 +190,6 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
             style_value = (translation_style or "natural").strip().lower()
             create_translation_job(
                 document_id=document_id,
-                background_tasks=immediate_tasks,
                 payload=TranslationJobCreateRequest(translation_style=style_value),
                 db=db,
                 current_user=_mock_user,
@@ -199,6 +199,11 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
     finally:
         db.close()
+
+
+def _run_document_pipeline_from_task(document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural") -> None:
+    """Thin wrapper called by the Celery run_document_pipeline task."""
+    _run_default_upload_to_review_pipeline(document_id=document_id, translation_style=translation_style, user_id=user_id, org_id=org_id)
 
 
 def _execute_parsing_stage(db: Session, document_id: int):
@@ -473,7 +478,6 @@ def upload_document(
 
 @router.post("/upload-and-translate", response_model=DocumentResponse)
 def upload_and_translate_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     target_language: str = Form(..., min_length=1, max_length=50),
     industry: str | None = Form(None, max_length=100),
@@ -498,7 +502,7 @@ def upload_and_translate_document(
         current_org=current_org,
     )
     uid = current_user.id if current_user is not None else None
-    background_tasks.add_task(_run_default_upload_to_review_pipeline, doc.id, style_value, uid, current_org.id)
+    run_document_pipeline.delay(doc.id, uid, current_org.id, style_value)
     return doc
 
 

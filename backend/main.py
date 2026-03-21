@@ -45,7 +45,7 @@ def recover_stuck_jobs() -> None:
         try:
             stuck_jobs = (
                 db.query(TranslationJob)
-                .filter(TranslationJob.status.in_({"translating", "parsing"}))
+                .filter(TranslationJob.status.in_({"translating", "parsing", "queued"}))
                 .all()
             )
             for job in stuck_jobs:

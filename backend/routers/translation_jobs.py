@@ -49,6 +49,7 @@ from services.translation_memory import (
     find_semantic_memory_match,
     store_approved_translation,
 )
+from tasks import run_translation_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -213,6 +214,11 @@ def _run_translation_pipeline(translation_job_id: int, user_id: int | None = Non
                 return
     finally:
         db.close()
+
+
+def _run_translation_pipeline_from_task(translation_job_id: int, user_id: int | None = None, org_id: int | None = None) -> None:
+    """Thin wrapper called by the Celery run_translation_pipeline task."""
+    _run_translation_pipeline(translation_job_id=translation_job_id, user_id=user_id)
 
 
 def _get_glossary_candidates(
@@ -1385,7 +1391,6 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 @router.post("/documents/{document_id}/translation-jobs", response_model=TranslationJobResponse)
 def create_translation_job(
     document_id: int,
-    background_tasks: BackgroundTasks,
     payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
@@ -1444,7 +1449,7 @@ def create_translation_job(
     db.refresh(job)
     uid = current_user.id if current_user is not None else None
     record_event(db, JOB_CREATED, user_id=uid, job_id=job.id, document_id=document_id)
-    background_tasks.add_task(_run_translation_pipeline, job.id, uid)
+    run_translation_pipeline.delay(job.id, uid, current_org.id if current_org is not None else None)
     return job
 
 
