@@ -1,5 +1,6 @@
 """Translation service abstraction. Swap providers via environment config."""
 
+import concurrent.futures
 import json
 import logging
 import os
@@ -188,9 +189,14 @@ def _fix_typographic_quotes(text: str) -> str:
     """Replace Unicode typographic double-quote characters inside JSON string values with \\".
 
     Characters handled (all replaced with escaped double-quote):
-      U+201E „  LEFT DOUBLE QUOTATION MARK (German opening)
+      U+201E „  DOUBLE LOW-9 QUOTATION MARK (German opening)
       U+201C "  LEFT DOUBLE QUOTATION MARK
       U+201D "  RIGHT DOUBLE QUOTATION MARK
+
+    Also handles the case where a German „ (U+201E) is paired with a plain ASCII closing "
+    (U+0022) — a common model output pattern. Without this, the ASCII close is treated as
+    the JSON string terminator, leaving the rest of the value outside the string and causing
+    json.loads to fail even though „ itself was replaced correctly.
 
     Only characters that appear inside an already-open JSON string are touched;
     structural ASCII double-quotes that delimit the string are left unchanged.
@@ -198,6 +204,8 @@ def _fix_typographic_quotes(text: str) -> str:
     result: list[str] = []
     in_string = False
     escaped = False
+    expects_close = False  # True after seeing „; next " (ASCII or typographic) is its pair
+
     for char in text:
         if escaped:
             result.append(char)
@@ -206,13 +214,37 @@ def _fix_typographic_quotes(text: str) -> str:
             result.append(char)
             escaped = True
         elif char == '"':
-            result.append(char)
-            in_string = not in_string
+            if in_string and expects_close:
+                # ASCII " closing a „...pair — escape it rather than ending the JSON string.
+                result.append('\\"')
+                expects_close = False
+            else:
+                result.append(char)
+                in_string = not in_string
         elif in_string and char in _TYPOGRAPHIC_QUOTES:
             result.append('\\"')
+            if char == "\u201e":       # „ — German opening; expect a matching close
+                expects_close = True
+            elif expects_close:        # typographic close consumed the pending flag
+                expects_close = False
         else:
             result.append(char)
     return "".join(result)
+
+
+# Inline regression test — verifies the exact case that was failing:
+# „ (U+201E) paired with a plain ASCII closing " inside a JSON string value.
+assert _fix_typographic_quotes(
+    '{"primary_translation": "\u201eVereinbarung" bedeutet.", "ambiguity_detected": false}'
+) == '{"primary_translation": "\\"Vereinbarung\\" bedeutet.", "ambiguity_detected": false}', (
+    "_fix_typographic_quotes: ASCII closing quote after \u201e was not escaped"
+)
+import json as _json_test
+assert _json_test.loads(
+    _fix_typographic_quotes(
+        '{"primary_translation": "\u201eVereinbarung" bedeutet diesen Vertrag zwischen dem Kunden und dem Anbieter.", "ambiguity_detected": false, "ambiguity_details": null}'
+    )
+)["primary_translation"] == '"Vereinbarung" bedeutet diesen Vertrag zwischen dem Kunden und dem Anbieter.'
 
 
 def _parse_json_safely(raw_text: str, segment_id: int | None = None) -> object:
@@ -358,6 +390,7 @@ class ClaudeTranslationProvider(TranslationProvider):
             lines.append(glossary_block)
         lines += [
             "",
+            "Important: Use only straight ASCII double quotes (\") inside JSON string values. Never use typographic quotes such as „ \u201c \u201d or any other Unicode quote characters in your JSON output.",
             "Your output must always be a single valid JSON object — no prose, no markdown, no explanation outside the JSON.",
         ]
         return "\n".join(lines)
@@ -532,18 +565,29 @@ Segment:
         industry: str | None = None,
         domain: str | None = None,
     ) -> list[TranslationSegmentResult]:
-        """Translate each segment individually. One API call per segment."""
-        return [
-            self._translate_segment(
-                segment=s,
-                source_language=source_language,
-                target_language=target_language,
-                translation_style=translation_style,
-                industry=industry,
-                domain=domain,
-            )
-            for s in segments
-        ]
+        """Translate segments in parallel using a thread pool. Results preserve input order."""
+
+        def _translate_one(segment: SegmentContext) -> TranslationSegmentResult:
+            try:
+                return self._translate_segment(
+                    segment=segment,
+                    source_language=source_language,
+                    target_language=target_language,
+                    translation_style=translation_style,
+                    industry=industry,
+                    domain=domain,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "translate_batch: segment_id=%d failed: %s",
+                    segment.segment_id,
+                    exc,
+                )
+                raise
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(_translate_one, s) for s in segments]
+            return [f.result() for f in futures]
 
 
 def _is_valid_api_key(key: str) -> bool:

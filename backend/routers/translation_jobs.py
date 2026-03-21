@@ -1145,162 +1145,158 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     db.commit()
 
     total_segments = len(segments)
-    completed_segments = 0
     job.progress_total_segments = total_segments
     job.progress_completed_segments = 0
     job.progress_started_at = datetime.utcnow()
     db.commit()
 
-    for i in range(0, len(segments), 1):
-        batch = segments[i : i + 1]
-        exact_memory_matches: dict[int, TranslationMemoryMatch] = {}
-        semantic_suggestions: dict[int, TranslationMemoryMatch] = {}
-        missing_segments: list[DocumentSegment] = []
-        glossary_matches_by_segment: dict[int, list[dict]] = {}
+    # --- Pass 1: run all memory checks across every segment upfront ---
+    exact_memory_matches: dict[int, TranslationMemoryMatch] = {}
+    semantic_suggestions: dict[int, TranslationMemoryMatch] = {}
+    missing_segments: list[DocumentSegment] = []
+    glossary_matches_by_segment: dict[int, list[dict]] = {}
 
-        for s in batch:
-            glossary_matches_by_segment[s.id] = _match_glossary_terms_for_segment(
-                source_text=s.source_text,
-                glossary_terms=glossary_candidates,
+    for s in segments:
+        glossary_matches_by_segment[s.id] = _match_glossary_terms_for_segment(
+            source_text=s.source_text,
+            glossary_terms=glossary_candidates,
+        )
+        exact_match = find_exact_memory_match(
+            db=db,
+            source_text=s.source_text,
+            source_language=source_lang,
+            target_language=doc.target_language,
+            customer_id=job.customer_id,
+            industry=doc.industry,
+            domain=doc.domain,
+        )
+        if exact_match:
+            exact_memory_matches[s.id] = TranslationMemoryMatch(
+                approved=exact_match,
+                match_type="exact",
+                similarity=1.0,
             )
-            exact_match = find_exact_memory_match(
-                db=db,
+            continue
+
+        semantic_match = find_semantic_memory_match(
+            db=db,
+            source_text=s.source_text,
+            source_language=source_lang,
+            target_language=doc.target_language,
+            customer_id=job.customer_id,
+            industry=doc.industry,
+            domain=doc.domain,
+        )
+        if semantic_match:
+            semantic_suggestions[s.id] = semantic_match
+        missing_segments.append(s)
+
+    # --- Pass 2: call translate_batch ONCE with all segments that need translation ---
+    provider_results_by_segment_id: dict[int, object] = {}
+    if missing_segments:
+        batch_ctx = [
+            SegmentContext(
+                segment_id=s.id,
                 source_text=s.source_text,
+                context_before=s.context_before,
+                context_after=s.context_after,
+                glossary_terms=glossary_matches_by_segment.get(s.id, []),
+            )
+            for s in missing_segments
+        ]
+        try:
+            provider_results = provider.translate_batch(
+                segments=batch_ctx,
                 source_language=source_lang,
                 target_language=doc.target_language,
-                customer_id=job.customer_id,
                 industry=doc.industry,
                 domain=doc.domain,
+                translation_style=translation_style,
             )
-            if exact_match:
-                exact_memory_matches[s.id] = TranslationMemoryMatch(
-                    approved=exact_match,
-                    match_type="exact",
-                    similarity=1.0,
-                )
-                continue
-
-            semantic_match = find_semantic_memory_match(
-                db=db,
-                source_text=s.source_text,
-                source_language=source_lang,
-                target_language=doc.target_language,
-                customer_id=job.customer_id,
-                industry=doc.industry,
-                domain=doc.domain,
+        except Exception as batch_err:
+            logger.warning(
+                "Stage fallback: batch translation failed for job=%d, falling back to single segments: %s",
+                translation_job_id,
+                batch_err,
             )
-            if semantic_match:
-                semantic_suggestions[s.id] = semantic_match
-            missing_segments.append(s)
-
-        provider_results_by_segment_id: dict[int, object] = {}
-        if missing_segments:
-            batch_ctx = [
-                SegmentContext(
-                    segment_id=s.id,
+            provider_results = [
+                provider.translate(
                     source_text=s.source_text,
-                    context_before=s.context_before,
-                    context_after=s.context_after,
-                    glossary_terms=glossary_matches_by_segment.get(s.id, []),
-                )
-                for s in missing_segments
-            ]
-            try:
-                results = provider.translate_batch(
-                    segments=batch_ctx,
                     source_language=source_lang,
                     target_language=doc.target_language,
                     industry=doc.industry,
                     domain=doc.domain,
+                    context_before=s.context_before,
+                    context_after=s.context_after,
+                    glossary_terms=glossary_matches_by_segment.get(s.id, []),
                     translation_style=translation_style,
                 )
-            except Exception as batch_err:
-                logger.warning(
-                    "Stage fallback: batch translation failed for job=%d, falling back to single segments: %s",
-                    translation_job_id,
-                    batch_err,
-                )
-                results = [
-                    provider.translate(
-                        source_text=s.source_text,
-                        source_language=source_lang,
-                        target_language=doc.target_language,
-                        industry=doc.industry,
-                        domain=doc.domain,
-                        context_before=s.context_before,
-                        context_after=s.context_after,
-                        glossary_terms=glossary_matches_by_segment.get(s.id, []),
-                        translation_style=translation_style,
-                    )
-                    for s in missing_segments
-                ]
-            for seg, res in zip(missing_segments, results, strict=True):
-                provider_results_by_segment_id[seg.id] = res
+                for s in missing_segments
+            ]
+        for seg, res in zip(missing_segments, provider_results, strict=True):
+            provider_results_by_segment_id[seg.id] = res
 
-        batch_results: list[TranslationResult] = []
-        for seg in batch:
-            if seg.id in exact_memory_matches:
-                match = exact_memory_matches[seg.id]
-                approved = match.approved
-                batch_results.append(
-                    TranslationResult(
-                        job_id=translation_job_id,
-                        segment_id=seg.id,
-                        primary_translation=approved.approved_translation,
-                        final_translation=approved.approved_translation,
-                        confidence_score=match.similarity,
-                        # Memory can prefill a suggestion, but review must remain job-isolated and unresolved.
-                        review_status="unreviewed",
-                        exact_memory_used=True,
-                        semantic_memory_used=False,
-                        semantic_memory_details=None,
-                        ambiguity_detected=False,
-                        ambiguity_details=None,
-                        glossary_applied=False,
-                        glossary_matches=None,
-                    )
+    # --- Pass 3: build all TranslationResult rows and write in one commit ---
+    all_results: list[TranslationResult] = []
+    for seg in segments:
+        if seg.id in exact_memory_matches:
+            match = exact_memory_matches[seg.id]
+            approved = match.approved
+            all_results.append(
+                TranslationResult(
+                    job_id=translation_job_id,
+                    segment_id=seg.id,
+                    primary_translation=approved.approved_translation,
+                    final_translation=approved.approved_translation,
+                    confidence_score=match.similarity,
+                    # Memory can prefill a suggestion, but review must remain job-isolated and unresolved.
+                    review_status="unreviewed",
+                    exact_memory_used=True,
+                    semantic_memory_used=False,
+                    semantic_memory_details=None,
+                    ambiguity_detected=False,
+                    ambiguity_details=None,
+                    glossary_applied=False,
+                    glossary_matches=None,
                 )
-            else:
-                res = provider_results_by_segment_id[seg.id]
-                glossary_matches = glossary_matches_by_segment.get(seg.id, [])
-                semantic_suggestion = semantic_suggestions.get(seg.id)
-                semantic_details = (
-                    {
-                        "match_type": "semantic_memory",
-                        "suggested_translation": semantic_suggestion.approved.approved_translation,
-                        "similarity_score": semantic_suggestion.similarity,
-                        "source_text": semantic_suggestion.approved.source_text,
-                    }
-                    if semantic_suggestion
-                    else None
+            )
+        else:
+            res = provider_results_by_segment_id[seg.id]
+            seg_glossary_matches = glossary_matches_by_segment.get(seg.id, [])
+            semantic_suggestion = semantic_suggestions.get(seg.id)
+            semantic_details = (
+                {
+                    "match_type": "semantic_memory",
+                    "suggested_translation": semantic_suggestion.approved.approved_translation,
+                    "similarity_score": semantic_suggestion.similarity,
+                    "source_text": semantic_suggestion.approved.source_text,
+                }
+                if semantic_suggestion
+                else None
+            )
+            all_results.append(
+                TranslationResult(
+                    job_id=translation_job_id,
+                    segment_id=seg.id,
+                    primary_translation=res.primary_translation,
+                    final_translation=res.primary_translation,
+                    confidence_score=None,
+                    review_status="unreviewed",
+                    exact_memory_used=False,
+                    semantic_memory_used=bool(semantic_suggestion),
+                    semantic_memory_details=semantic_details,
+                    ambiguity_detected=res.ambiguity_detected,
+                    ambiguity_details=res.ambiguity_details,
+                    glossary_applied=bool(seg_glossary_matches),
+                    glossary_matches=_build_glossary_matches_payload(seg_glossary_matches),
                 )
-                batch_results.append(
-                    TranslationResult(
-                        job_id=translation_job_id,
-                        segment_id=seg.id,
-                        primary_translation=res.primary_translation,
-                        final_translation=res.primary_translation,
-                        confidence_score=None,
-                        review_status="unreviewed",
-                        exact_memory_used=False,
-                        semantic_memory_used=bool(semantic_suggestion),
-                        semantic_memory_details=semantic_details,
-                        ambiguity_detected=res.ambiguity_detected,
-                        ambiguity_details=res.ambiguity_details,
-                        glossary_applied=bool(glossary_matches),
-                        glossary_matches=_build_glossary_matches_payload(glossary_matches),
-                    )
-                )
+            )
 
-        db.add_all(batch_results)
-        completed_segments += len(batch_results)
-        job.progress_completed_segments = completed_segments
-        db.commit()
-
+    db.add_all(all_results)
     job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
     doc = db.query(Document).filter(Document.id == job.document_id).first()
     job.translation_provider = provider_name
-    job.translation_batch_size = 1
+    job.translation_batch_size = len(missing_segments)
     job.status = JOB_STATUS_TRANSLATING
     job.progress_total_segments = total_segments
     job.progress_completed_segments = total_segments
