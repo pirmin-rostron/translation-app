@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -42,6 +43,7 @@ from schemas import (
 from services.auth import get_current_active_user, get_current_org
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
 from services.usage import AMBIGUITY_RESOLVED, JOB_CREATED, JOB_EXPORTED, TRANSLATION_EDITED, WORDS_TRANSLATED, record_event
+from services.webhook import deliver_webhook
 from services.translation import SegmentContext, get_translation_provider
 from services.translation_memory import (
     TranslationMemoryMatch,
@@ -1705,6 +1707,14 @@ def mark_ready_for_export(
     job.status = JOB_STATUS_READY_FOR_EXPORT
     db.commit()
     db.refresh(job)
+    if job.org_id is not None:
+        from models import OrgWebhook
+        hooks = [(h.url, h.secret) for h in db.query(OrgWebhook).filter(OrgWebhook.org_id == job.org_id, OrgWebhook.is_active.is_(True)).all()]
+        threading.Thread(
+            target=deliver_webhook,
+            args=(hooks, "job.ready_for_export", {"job_id": job.id, "document_id": job.document_id}),
+            daemon=True,
+        ).start()
     return _calculate_review_summary(db, job)
 
 
@@ -1786,6 +1796,14 @@ def export_translation_job(
     db.commit()
     uid = current_user.id if current_user is not None else None
     record_event(db, JOB_EXPORTED, user_id=uid, job_id=job_id, document_id=job.document_id, org_id=job.org_id)
+    if job.org_id is not None:
+        from models import OrgWebhook
+        hooks = [(h.url, h.secret) for h in db.query(OrgWebhook).filter(OrgWebhook.org_id == job.org_id, OrgWebhook.is_active.is_(True)).all()]
+        threading.Thread(
+            target=deliver_webhook,
+            args=(hooks, "job.exported", {"job_id": job.id, "document_id": job.document_id, "filename": filename}),
+            daemon=True,
+        ).start()
     return ExportResponse(
         job_id=job.id,
         status=job.status,

@@ -207,6 +207,18 @@ class DocumentSegment(Base):
     annotations = relationship("SegmentAnnotation", back_populates="segment")
 
 
+class OrgWebhook(Base):
+    __tablename__ = "org_webhooks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=False, index=True)
+    url = Column(String, nullable=False)
+    secret = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 class SegmentAnnotation(Base):
     __tablename__ = "segment_annotations"
 

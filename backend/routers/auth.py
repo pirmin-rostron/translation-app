@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Organisation, OrgMembership, UsageEvent, User
+from models import Organisation, OrgMembership, OrgWebhook, UsageEvent, User
 from services.auth import (
     VALID_ORG_ROLES,
     create_access_token,
@@ -176,6 +176,26 @@ class AuditLogResponse(BaseModel):
     offset: int
     limit: int
     events: list[AuditEventOut]
+
+
+class WebhookCreateRequest(BaseModel):
+    url: str
+
+
+class WebhookOut(BaseModel):
+    id: int
+    org_id: int
+    url: str
+    is_active: bool
+    created_at: datetime
+    created_by_user_id: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+class WebhookCreateResponse(WebhookOut):
+    secret: str
 
 
 # --- Endpoints ---
@@ -580,3 +600,56 @@ def get_org_audit_log(
     total = q.count()
     events = q.order_by(UsageEvent.created_at.desc()).offset(offset).limit(limit).all()
     return AuditLogResponse(total=total, offset=offset, limit=limit, events=events)
+
+
+@router.post("/org/webhooks", response_model=WebhookCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_webhook(
+    body: WebhookCreateRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    current_user: User = Depends(get_current_active_user),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Register a webhook URL for the organisation. Requires owner or admin role.
+
+    The signing secret is auto-generated and returned only in this response — store it securely.
+    """
+    hook = OrgWebhook(
+        org_id=current_org.id,
+        url=body.url,
+        secret=secrets.token_hex(32),
+        created_by_user_id=current_user.id,
+    )
+    db.add(hook)
+    db.commit()
+    db.refresh(hook)
+    return hook
+
+
+@router.get("/org/webhooks", response_model=list[WebhookOut])
+def list_webhooks(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """List all webhooks registered for the organisation."""
+    return db.query(OrgWebhook).filter(OrgWebhook.org_id == current_org.id).all()
+
+
+@router.delete("/org/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_webhook(
+    webhook_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Delete (deregister) a webhook by ID. Must belong to the current organisation."""
+    hook = (
+        db.query(OrgWebhook)
+        .filter(OrgWebhook.id == webhook_id, OrgWebhook.org_id == current_org.id)
+        .first()
+    )
+    if not hook:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    db.delete(hook)
+    db.commit()
