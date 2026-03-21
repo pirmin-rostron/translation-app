@@ -20,6 +20,23 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
     ...(init?.headers as Record<string, string> | undefined),
   };
   const res = await fetch(url, { ...init, headers: mergedHeaders });
+
+  if (res.status === 401 && typeof window !== "undefined") {
+    const authPaths = ["/login", "/register"];
+    if (!authPaths.some((p) => window.location.pathname.startsWith(p))) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { useAuthStore } = require("../stores/authStore") as typeof import("../stores/authStore");
+        useAuthStore.getState().clearAuth();
+      } catch {
+        // Store unavailable — clear cookie directly as fallback.
+        document.cookie = "auth_token=; path=/; max-age=0";
+      }
+      window.location.href = "/login?reason=session_expired";
+      throw new Error("Session expired");
+    }
+  }
+
   if (!res.ok) {
     const payload = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(payload.detail ?? `Request failed (${res.status})`);

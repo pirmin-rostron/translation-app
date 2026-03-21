@@ -220,6 +220,14 @@ def me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
+@router.post("/refresh")
+def refresh_token(current_user: User = Depends(get_current_active_user)):
+    """Issue a fresh token for the current authenticated user. Call this before the existing
+    token expires to maintain the session."""
+    token = create_access_token(current_user.id, current_user.email)
+    return {"access_token": token, "token_type": "bearer"}
+
+
 @router.post("/change-password")
 def change_password(
     body: ChangePasswordRequest,
