@@ -1393,9 +1393,7 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 
 
 @router.post("/documents/{document_id}/translation-jobs", response_model=TranslationJobResponse)
-@limiter.limit("20/hour")
 def create_translation_job(
-    request: Request,
     document_id: int,
     payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),

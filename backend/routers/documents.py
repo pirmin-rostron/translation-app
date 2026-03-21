@@ -518,6 +518,7 @@ def upload_and_translate_document(
     if style_value not in {"natural", "formal", "literal"}:
         raise HTTPException(status_code=400, detail="translation_style must be one of: formal, literal, natural")
     doc = upload_document(
+        request=request,
         file=file,
         target_language=target_language,
         industry=industry,
