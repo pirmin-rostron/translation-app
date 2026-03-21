@@ -447,8 +447,8 @@ export default function TranslationReviewPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const blockRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const reviewGuidanceRef = useRef<HTMLElement | null>(null);
+  const blockRefs = useRef<Record<number, HTMLElement | null>>({});
+  const reviewGuidanceRef = useRef<HTMLElement>(null);
   const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
   const allSegments = useMemo(

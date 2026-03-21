@@ -29,28 +29,37 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 // --- React Query key factories ---
 
-export const documentKeys = {
-  all: () => ["documents"] as const,
-  detail: (id: number) => ["documents", id] as const,
-  blocks: (id: number) => ["documents", id, "blocks"] as const,
-  segments: (id: number) => ["documents", id, "segments"] as const,
-  translationJobs: (id: number) => ["documents", id, "translation-jobs"] as const,
-  stages: (id: number) => ["documents", id, "stages"] as const,
-  progress: (id: number) => ["documents", id, "progress"] as const,
+// Unified key factory — use this everywhere (hooks, invalidateQueries, etc.)
+export const queryKeys = {
+  documents: {
+    all: () => ["documents"] as const,
+    detail: (id: number) => ["documents", id] as const,
+    progress: (id: number) => ["documents", id, "progress"] as const,
+    stages: (id: number) => ["documents", id, "stages"] as const,
+    blocks: (id: number) => ["documents", id, "blocks"] as const,
+    segments: (id: number) => ["documents", id, "segments"] as const,
+  },
+  translationJobs: {
+    all: () => ["translation-jobs"] as const,
+    byDocument: (documentId: number) => ["documents", documentId, "translation-jobs"] as const,
+    detail: (id: number) => ["translation-jobs", id] as const,
+    progress: (id: number) => ["translation-jobs", id, "progress"] as const,
+    reviewBlocks: (id: number) => ["translation-jobs", id, "review-blocks"] as const,
+    reviewSummary: (id: number) => ["translation-jobs", id, "review-summary"] as const,
+    exports: (id: number) => ["translation-jobs", id, "exports"] as const,
+  },
+  glossaryTerms: {
+    all: () => ["glossary-terms"] as const,
+  },
 } as const;
 
+// Legacy per-domain exports kept for backward compatibility
+export const documentKeys = queryKeys.documents;
 export const translationJobKeys = {
-  detail: (jobId: number) => ["translation-jobs", jobId] as const,
-  reviewBlocks: (jobId: number) => ["translation-jobs", jobId, "review-blocks"] as const,
-  reviewSummary: (jobId: number) => ["translation-jobs", jobId, "review-summary"] as const,
-  progress: (jobId: number) => ["translation-jobs", jobId, "progress"] as const,
-  exports: (jobId: number) => ["translation-jobs", jobId, "exports"] as const,
+  ...queryKeys.translationJobs,
   preview: (jobId: number) => ["translation-jobs", jobId, "preview"] as const,
-} as const;
-
-export const glossaryKeys = {
-  all: () => ["glossary-terms"] as const,
-} as const;
+};
+export const glossaryKeys = queryKeys.glossaryTerms;
 
 // --- Shared input types ---
 
@@ -146,6 +155,12 @@ export const translationJobsApi = {
 
   markReady: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/mark-ready`, { method: "POST" }),
+
+  approveSafeSegments: <T>(jobId: number) =>
+    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/approve-safe-segments`, { method: "POST" }),
+
+  saveDraft: <T>(jobId: number) =>
+    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/save-draft`, { method: "POST" }),
 };
 
 // --- translation_results (part of translation_jobs router boundary) ---

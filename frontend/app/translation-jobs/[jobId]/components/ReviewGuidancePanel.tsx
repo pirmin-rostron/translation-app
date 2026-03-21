@@ -1,11 +1,11 @@
 "use client";
 
-import type { RefObject } from "react";
+import type { Ref } from "react";
 
 type GuidanceStatus = "In Review" | "Review Complete" | "Exported";
 
 type ReviewGuidancePanelProps = {
-  reviewGuidanceRef: RefObject<HTMLElement | null>;
+  reviewGuidanceRef: Ref<HTMLElement>;
   statusLabel: GuidanceStatus;
   completedBlocks: number;
   totalBlocks: number;

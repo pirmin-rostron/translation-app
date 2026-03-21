@@ -3,22 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { getLanguageDisplayName } from "../utils/language";
 
-import { documentsApi } from "../services/api";
-
-type Document = {
-  id: number;
-  filename: string;
-  file_type: string;
-  source_language: string | null;
-  target_language: string;
-  industry: string | null;
-  domain: string | null;
-  status: string;
-  error_message?: string | null;
-  created_at: string;
-};
+import { documentsApi, queryKeys } from "../services/api";
+import { useDocuments } from "../hooks/queries";
+import type { Document } from "../hooks/queries";
 
 type TranslationJobOverview = {
   id: number;
@@ -37,18 +27,22 @@ const REVIEW_STATUSES = new Set(["in_review", "draft_saved", "review_complete", 
 
 export default function AllTranslationsPage() {
   const router = useRouter();
-  const [docs, setDocs] = useState<Document[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: docs = [], isLoading: loading, error: docsError } = useDocuments();
+  const errorMessage = docsError instanceof Error ? docsError.message : docsError ? "Failed to load documents" : "";
+
   const [latestJobsByDocumentId, setLatestJobsByDocumentId] = useState<Record<number, TranslationJobOverview | null>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [parsingId, setParsingId] = useState<number | null>(null);
   const [openingDocId, setOpeningDocId] = useState<number | null>(null);
 
-  const fetchDocs = async () => {
-    const payload = await documentsApi.list<Document[]>();
-    setDocs(payload);
-    const jobsByDocEntries = await Promise.all(
-      payload.map(async (doc) => {
+  // Fetch the latest job for each document whenever the document list changes.
+  useEffect(() => {
+    if (docs.length === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      docs.map(async (doc) => {
         try {
           const jobs = await documentsApi.getTranslationJobs<TranslationJobOverview[]>(doc.id);
           return [doc.id, jobs[0] ?? null] as const;
@@ -56,25 +50,27 @@ export default function AllTranslationsPage() {
           return [doc.id, null] as const;
         }
       })
-    );
-    setLatestJobsByDocumentId(Object.fromEntries(jobsByDocEntries));
-  };
+    ).then((entries) => {
+      if (!cancelled) setLatestJobsByDocumentId(Object.fromEntries(entries));
+    });
+    return () => { cancelled = true; };
+  }, [docs]);
 
   const handleParse = async (docId: number) => {
-    setError("");
+    setActionError("");
     setParsingId(docId);
     try {
       await documentsApi.parse<unknown>(docId);
-      await fetchDocs();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Parse failed");
+      setActionError(err instanceof Error ? err.message : "Parse failed");
     } finally {
       setParsingId(null);
     }
   };
 
   const handleOpenWorkflow = async (doc: Document) => {
-    setError("");
+    setActionError("");
     setOpeningDocId(doc.id);
     try {
       const latestJob = latestJobsByDocumentId[doc.id];
@@ -89,17 +85,13 @@ export default function AllTranslationsPage() {
       }
       router.push(`/documents/${doc.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to open workflow");
+      setActionError(err instanceof Error ? err.message : "Failed to open workflow");
     } finally {
       setOpeningDocId(null);
     }
   };
 
-  useEffect(() => {
-    fetchDocs()
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load documents"))
-      .finally(() => setLoading(false));
-  }, []);
+  const error = errorMessage || actionError;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -121,7 +113,7 @@ export default function AllTranslationsPage() {
 
         {loading && <p className="text-slate-600">Loading…</p>}
         {error && <p className="mb-4 text-red-600">{error}</p>}
-        {!loading && !error && docs.length === 0 && (
+        {!loading && !errorMessage && docs.length === 0 && (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-600 shadow-sm">
             No translations yet. Import a document to get started.
           </div>
