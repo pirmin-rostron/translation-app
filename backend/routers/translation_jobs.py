@@ -1464,7 +1464,7 @@ def get_translation_job(
     current_org: Organisation = Depends(get_current_org),
 ):
     """Get a translation job by id."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return job
@@ -1476,7 +1476,7 @@ def get_translation_progress(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return _calculate_translation_progress(db, job)
@@ -1490,7 +1490,7 @@ def list_translation_results(
     current_org: Organisation = Depends(get_current_org),
 ):
     """List translation results for a job."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if filter not in {"all", "ambiguities", "semantic-memory", "glossary", "memory", "flagged"}:
@@ -1535,7 +1535,7 @@ def list_review_blocks(
     current_org: Organisation = Depends(get_current_org),
 ):
     """Return translated document blocks with nested segment results and annotations."""
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1623,7 +1623,7 @@ def get_review_summary(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return _calculate_review_summary(db, job)
@@ -1635,7 +1635,7 @@ def save_review_draft(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1654,7 +1654,7 @@ def approve_safe_segments(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1689,7 +1689,7 @@ def mark_ready_for_export(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1723,7 +1723,7 @@ def reopen_review(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
@@ -1745,7 +1745,7 @@ def export_translation_job(
     current_user=Depends(get_current_active_user),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     raw_mode = formatting_mode if formatting_mode is not None else export_mode
@@ -1804,7 +1804,7 @@ def preview_translation_job(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1829,7 +1829,7 @@ def list_exports(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     doc = db.query(Document).filter(Document.id == job.document_id).first()
@@ -1846,7 +1846,7 @@ def download_export(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -1881,7 +1881,7 @@ def update_translation_result(
     if not result:
         raise HTTPException(status_code=404, detail="Translation result not found")
 
-    job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     if job.status == JOB_STATUS_EXPORTED:
@@ -1981,7 +1981,7 @@ def list_translation_stage_jobs(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
     return (
@@ -1999,7 +1999,7 @@ def retry_translation_job(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id).first()
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
@@ -2033,6 +2033,22 @@ def retry_translation_job(
     return job
 
 
+@router.delete("/translation-jobs/{job_id}", status_code=204)
+def delete_translation_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Soft-delete a translation job. Exported jobs cannot be deleted."""
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == JOB_STATUS_EXPORTED:
+        raise HTTPException(status_code=400, detail="Exported jobs cannot be deleted")
+    job.deleted_at = datetime.utcnow()
+    db.commit()
+
+
 @router.get("/documents/{document_id}/translation-jobs", response_model=list[TranslationJobResponse])
 def list_document_translation_jobs(
     document_id: int,
@@ -2040,12 +2056,12 @@ def list_document_translation_jobs(
     current_org: Organisation = Depends(get_current_org),
 ):
     """List translation jobs for a document."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     jobs = (
         db.query(TranslationJob)
-        .filter(TranslationJob.document_id == document_id, TranslationJob.org_id == current_org.id)
+        .filter(TranslationJob.document_id == document_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None))
         .order_by(TranslationJob.created_at.desc())
         .all()
     )

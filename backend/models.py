@@ -70,6 +70,7 @@ class TranslationJob(Base):
     translation_batch_size = Column(Integer, nullable=True)  # batch size used
     created_at = Column(DateTime, default=datetime.utcnow)
     org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
+    deleted_at = Column(DateTime, nullable=True, default=None)
 
     document = relationship("Document", backref="translation_jobs")
     results = relationship("TranslationResult", back_populates="job")
@@ -145,6 +146,7 @@ class Document(Base):
     status = Column(String(50), nullable=False, default="uploaded")
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
 
     blocks = relationship("DocumentBlock", back_populates="document")
     segments = relationship("DocumentSegment", back_populates="document")

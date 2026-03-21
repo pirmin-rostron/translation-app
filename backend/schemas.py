@@ -29,6 +29,7 @@ class DocumentResponse(BaseModel):
     status: str
     error_message: str | None
     created_at: datetime
+    deleted_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -103,6 +104,7 @@ class TranslationJobResponse(BaseModel):
     translation_provider: str | None
     translation_batch_size: int | None
     created_at: datetime
+    deleted_at: datetime | None = None
 
     class Config:
         from_attributes = True

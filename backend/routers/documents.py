@@ -520,7 +520,7 @@ def list_documents(
     """List all documents belonging to the current user's organisation."""
     return (
         db.query(Document)
-        .filter(Document.org_id == current_org.id)
+        .filter(Document.org_id == current_org.id, Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
         .all()
     )
@@ -533,7 +533,7 @@ def get_document(
     current_org: Organisation = Depends(get_current_org),
 ):
     """Get a single document by id."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -547,7 +547,7 @@ def update_document_source_language(
     current_org: Organisation = Depends(get_current_org),
 ):
     """Update a document's source language (manual override)."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     value = body.source_language.strip().lower()
@@ -571,7 +571,7 @@ def parse_document_by_id(
     current_org: Organisation = Depends(get_current_org),
 ):
     """Queue parse + segment background stages for a document."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -608,7 +608,7 @@ def list_document_segments(
     current_org: Organisation = Depends(get_current_org),
 ):
     """List segments for a document."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     segments = (
@@ -627,7 +627,7 @@ def list_document_blocks(
     current_org: Organisation = Depends(get_current_org),
 ):
     """List parsed document blocks for a document."""
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     blocks = (
@@ -645,7 +645,7 @@ def list_document_stage_jobs(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return (
@@ -665,7 +665,7 @@ def get_document_progress(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     stage_jobs = (
@@ -687,7 +687,7 @@ def retry_document_pipeline(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id).first()
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -718,3 +718,22 @@ def retry_document_pipeline(
     logger.info("Retry queued for document_id=%d with %d failed stages", document_id, len(failed_stages))
     background_tasks.add_task(_run_document_pipeline, document_id)
     return doc
+
+
+@router.delete("/{document_id}", status_code=204)
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Soft-delete a document and all its translation jobs."""
+    doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    now = datetime.utcnow()
+    doc.deleted_at = now
+    db.query(TranslationJob).filter(
+        TranslationJob.document_id == document_id,
+        TranslationJob.deleted_at.is_(None),
+    ).update({"deleted_at": now}, synchronize_session=False)
+    db.commit()
