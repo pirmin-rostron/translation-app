@@ -1150,6 +1150,13 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     job.progress_started_at = datetime.utcnow()
     db.commit()
 
+    start_time = datetime.utcnow()
+    logger.info(
+        "Translation timing start: job_id=%d segments=%d",
+        translation_job_id,
+        total_segments,
+    )
+
     # --- Pass 1: run all memory checks across every segment upfront ---
     exact_memory_matches: dict[int, TranslationMemoryMatch] = {}
     semantic_suggestions: dict[int, TranslationMemoryMatch] = {}
@@ -1236,6 +1243,18 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         for seg, res in zip(missing_segments, provider_results, strict=True):
             provider_results_by_segment_id[seg.id] = res
 
+    translate_end_time = datetime.utcnow()
+    translate_duration = (translate_end_time - start_time).total_seconds()
+    segments_per_second = len(missing_segments) / translate_duration if translate_duration > 0 else 0
+    logger.info(
+        "Translation timing complete: job_id=%d segments=%d translated=%d duration=%.1fs rate=%.1f seg/s",
+        translation_job_id,
+        total_segments,
+        len(missing_segments),
+        translate_duration,
+        segments_per_second,
+    )
+
     # --- Pass 3: build all TranslationResult rows and write in one commit ---
     all_results: list[TranslationResult] = []
     for seg in segments:
@@ -1302,6 +1321,14 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     job.progress_completed_segments = total_segments
     job.error_message = None
     db.commit()
+
+    total_end_time = datetime.utcnow()
+    total_duration = (total_end_time - start_time).total_seconds()
+    logger.info(
+        "Translation timing total: job_id=%d total_duration=%.1fs",
+        translation_job_id,
+        total_duration,
+    )
 
 
 def _execute_ambiguity_stage(db: Session, translation_job_id: int):
