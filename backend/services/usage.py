@@ -21,6 +21,7 @@ JOB_EXPORTED = "job_exported"
 TRANSLATION_EDITED = "translation_edited"
 AMBIGUITY_RESOLVED = "ambiguity_resolved"
 USER_DELETED = "user_deleted"
+ORG_CREATED = "org_created"
 
 
 def record_event(

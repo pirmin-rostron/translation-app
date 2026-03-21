@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from services.usage import (
     DOCUMENT_INGESTED,
     JOB_CREATED,
     JOB_EXPORTED,
+    ORG_CREATED,
     USER_DELETED,
     USER_LOGIN,
     USER_LOGIN_FAILED,
@@ -106,6 +107,10 @@ class OrgOut(BaseModel):
 class OrgResponse(BaseModel):
     org: OrgOut
     role: str
+
+
+class OrgCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
 
 
 class InviteRequest(BaseModel):
@@ -344,6 +349,33 @@ def change_password(
     current_user.hashed_password = hash_password(body.new_password)
     db.commit()
     return {"message": "Password changed successfully"}
+
+
+@router.post("/org", response_model=OrgResponse, status_code=status.HTTP_201_CREATED)
+def create_org(
+    body: OrgCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Create a new organisation and make the current user its owner.
+
+    Fails with 409 if the user already belongs to an organisation.
+    """
+    existing = db.query(OrgMembership).filter(OrgMembership.user_id == current_user.id).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already belong to an organisation. Leave your current organisation before creating a new one.",
+        )
+    org = Organisation(name=body.name.strip(), is_active=True)
+    db.add(org)
+    db.flush()  # populate org.id before creating membership
+    membership = OrgMembership(org_id=org.id, user_id=current_user.id, role="owner")
+    db.add(membership)
+    db.commit()
+    db.refresh(org)
+    record_event(db, ORG_CREATED, user_id=current_user.id, org_id=org.id)
+    return OrgResponse(org=org, role="owner")
 
 
 @router.get("/org", response_model=OrgResponse)
