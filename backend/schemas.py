@@ -133,6 +133,15 @@ class GlossaryTermCreateRequest(BaseModel):
     domain: str | None = Field(None, max_length=100)
 
 
+class GlossaryTermUpdateRequest(BaseModel):
+    source_term: str | None = Field(None, min_length=1, max_length=255)
+    target_term: str | None = Field(None, min_length=1, max_length=255)
+    source_language: str | None = Field(None, min_length=1, max_length=50)
+    target_language: str | None = Field(None, min_length=1, max_length=50)
+    industry: str | None = Field(None, max_length=100)
+    domain: str | None = Field(None, max_length=100)
+
+
 class GlossaryTermResponse(BaseModel):
     id: int
     source_term: str
