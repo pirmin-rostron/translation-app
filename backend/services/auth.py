@@ -117,3 +117,23 @@ def get_current_org(
             detail="Organisation not found or inactive",
         )
     return org
+
+
+VALID_ORG_ROLES: frozenset[str] = frozenset({"owner", "admin", "translator", "reviewer"})
+
+
+def require_org_role(required_roles: list[str]):
+    """Return a FastAPI dependency that raises 403 if the current user's role is not in required_roles.
+
+    Usage::
+
+        membership: OrgMembership = Depends(require_org_role(["owner", "admin"]))
+    """
+    def _check(membership: OrgMembership = Depends(get_current_membership)) -> OrgMembership:
+        if membership.role not in required_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This operation requires one of these roles: {', '.join(required_roles)}",
+            )
+        return membership
+    return _check

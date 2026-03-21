@@ -1,7 +1,8 @@
+import secrets
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -10,11 +11,13 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Organisation, OrgMembership, UsageEvent, User
 from services.auth import (
+    VALID_ORG_ROLES,
     create_access_token,
     get_current_active_user,
     get_current_membership,
     get_current_org,
     hash_password,
+    require_org_role,
     verify_password,
 )
 from services.usage import (
@@ -100,6 +103,50 @@ class OrgOut(BaseModel):
 class OrgResponse(BaseModel):
     org: OrgOut
     role: str
+
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str
+    full_name: Optional[str] = None
+
+
+class UserInviteOut(BaseModel):
+    id: int
+    email: str
+    full_name: Optional[str]
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class InviteResponse(BaseModel):
+    user: UserInviteOut
+    role: str
+    is_new_user: bool
+    temporary_password: Optional[str] = None
+
+
+class MemberOut(BaseModel):
+    user_id: int
+    email: str
+    full_name: Optional[str]
+    role: str
+    joined_at: datetime
+
+
+class UpdateRoleRequest(BaseModel):
+    role: str
+
+
+class MembershipOut(BaseModel):
+    user_id: int
+    role: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # --- Endpoints ---
@@ -221,3 +268,185 @@ def usage(
     )
 
     return UsageResponse(totals=totals, recent=recent_rows)
+
+
+@router.post("/invite", response_model=InviteResponse)
+def invite_user(
+    body: InviteRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Invite a user to the current organisation.
+
+    If the user does not exist, a new account is created with a random temporary
+    password returned in the response — this is the only time it is visible.
+    If the user already exists but is not a member, they are added to the org.
+    Returns 201 for new users and 200 for existing users added to the org.
+    """
+    if body.role not in VALID_ORG_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid role. Must be one of: {', '.join(sorted(VALID_ORG_ROLES))}",
+        )
+
+    normalised_email = body.email.strip().lower()
+    existing_user = db.query(User).filter(User.email == normalised_email).first()
+
+    if existing_user:
+        existing_membership = (
+            db.query(OrgMembership)
+            .filter(
+                OrgMembership.org_id == current_org.id,
+                OrgMembership.user_id == existing_user.id,
+            )
+            .first()
+        )
+        if existing_membership:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User is already a member of this organisation",
+            )
+        db.add(OrgMembership(org_id=current_org.id, user_id=existing_user.id, role=body.role))
+        db.commit()
+        response.status_code = status.HTTP_200_OK
+        return InviteResponse(
+            user=UserInviteOut(
+                id=existing_user.id,
+                email=existing_user.email,
+                full_name=existing_user.full_name,
+                is_active=existing_user.is_active,
+            ),
+            role=body.role,
+            is_new_user=False,
+        )
+
+    temporary_password = secrets.token_hex(16)
+    new_user = User(
+        email=normalised_email,
+        hashed_password=hash_password(temporary_password),
+        full_name=body.full_name,
+        is_active=True,
+    )
+    db.add(new_user)
+    db.flush()
+    db.add(OrgMembership(org_id=current_org.id, user_id=new_user.id, role=body.role))
+    db.commit()
+    db.refresh(new_user)
+    record_event(db, USER_REGISTERED, user_id=new_user.id, meta={"email": new_user.email, "invited": True})
+    response.status_code = status.HTTP_201_CREATED
+    return InviteResponse(
+        user=UserInviteOut(
+            id=new_user.id,
+            email=new_user.email,
+            full_name=new_user.full_name,
+            is_active=new_user.is_active,
+        ),
+        role=body.role,
+        is_new_user=True,
+        temporary_password=temporary_password,
+    )
+
+
+@router.get("/org/members", response_model=list[MemberOut])
+def list_org_members(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return all members of the current user's organisation with their roles."""
+    rows = (
+        db.query(OrgMembership, User)
+        .join(User, OrgMembership.user_id == User.id)
+        .filter(OrgMembership.org_id == current_org.id)
+        .all()
+    )
+    return [
+        MemberOut(
+            user_id=m.user_id,
+            email=u.email,
+            full_name=u.full_name,
+            role=m.role,
+            joined_at=m.joined_at,
+        )
+        for m, u in rows
+    ]
+
+
+@router.patch("/org/members/{user_id}", response_model=MembershipOut)
+def update_member_role(
+    user_id: int,
+    body: UpdateRoleRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Update the role of a member within the current organisation.
+
+    Requires owner or admin role. Admins cannot change the org owner's role —
+    that operation is reserved for the owner. Users cannot change their own role.
+    """
+    if body.role not in VALID_ORG_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid role. Must be one of: {', '.join(sorted(VALID_ORG_ROLES))}",
+        )
+    if user_id == acting_membership.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot change your own role",
+        )
+    target = (
+        db.query(OrgMembership)
+        .filter(OrgMembership.org_id == current_org.id, OrgMembership.user_id == user_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in this organisation",
+        )
+    if target.role == "owner" and acting_membership.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the owner can change the owner's role",
+        )
+    target.role = body.role
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+@router.delete("/org/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_org_member(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    acting_membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Remove a member from the organisation. Does not delete the User record.
+
+    Cannot remove yourself or the org owner.
+    """
+    if user_id == acting_membership.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot remove yourself from the organisation",
+        )
+    target = (
+        db.query(OrgMembership)
+        .filter(OrgMembership.org_id == current_org.id, OrgMembership.user_id == user_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in this organisation",
+        )
+    if target.role == "owner":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove the organisation owner",
+        )
+    db.delete(target)
+    db.commit()
