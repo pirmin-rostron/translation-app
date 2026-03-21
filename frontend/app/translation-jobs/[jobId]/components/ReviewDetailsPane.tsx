@@ -62,6 +62,10 @@ type ReviewDetailsPaneProps = {
   onSkipBlock: () => void;
   hasDraftChanges: boolean;
   onSaveSegmentEdit: () => void;
+  exactMemoryUsed: boolean;
+  semanticMemoryUsed: boolean;
+  memorySimilarityScore: number | null;
+  memorySourceText: string | null;
 };
 
 export function ReviewDetailsPane({
@@ -110,6 +114,10 @@ export function ReviewDetailsPane({
   onSkipBlock,
   hasDraftChanges,
   onSaveSegmentEdit,
+  exactMemoryUsed,
+  semanticMemoryUsed,
+  memorySimilarityScore,
+  memorySourceText,
 }: ReviewDetailsPaneProps) {
   const primaryDecisionLabel = hasSemanticChoice && !hasAmbiguityChoice ? "Confirm selection" : "Approve";
 
@@ -321,6 +329,30 @@ export function ReviewDetailsPane({
                   </div>
                 </label>
               </div>
+            </div>
+          )}
+
+          {exactMemoryUsed && (
+            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+              <p className="font-medium text-blue-700">Translation Memory: Exact Match</p>
+              <p className="mt-1 text-xs text-slate-600">
+                This translation was recalled from a previous approved decision.
+              </p>
+            </div>
+          )}
+          {!exactMemoryUsed && semanticMemoryUsed && (
+            <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm">
+              <p className="font-medium text-indigo-700">
+                Translation Memory: Semantic Match
+                {typeof memorySimilarityScore === "number"
+                  ? ` (~${Math.round(memorySimilarityScore * 100)}%)`
+                  : ""}
+              </p>
+              {memorySourceText && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Original source: <span className="italic">{memorySourceText}</span>
+                </p>
+              )}
             </div>
           )}
 

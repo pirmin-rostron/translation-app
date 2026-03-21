@@ -19,6 +19,12 @@ type FilterChip = {
   count: number;
 };
 
+type BlockMemoryState = {
+  hasExact: boolean;
+  hasSemantic: boolean;
+  similarityScore: number | null;
+};
+
 type DocumentDiffPaneProps = {
   activeFilter: ReviewFilter;
   onFilterChange: (filter: ReviewFilter) => void;
@@ -30,6 +36,7 @@ type DocumentDiffPaneProps = {
   segmentColorStates: Map<number, string>;
   renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
   segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
+  blockMemoryStates: Map<string, BlockMemoryState>;
 };
 
 const COLOR_PRIORITY = ["unresolved-ambiguity", "approved-ambiguity", "approved", "memory-match"];
@@ -59,6 +66,7 @@ export function DocumentDiffPane({
   segmentColorStates,
   renderNode,
   segmentRefs,
+  blockMemoryStates,
 }: DocumentDiffPaneProps) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -110,6 +118,16 @@ export function DocumentDiffPane({
                       : isActive
                         ? "border-slate-300 bg-slate-100"
                         : "border-slate-200 bg-white";
+            const memoryState = blockMemoryStates.get(node.key);
+            const memoryBadge = memoryState?.hasExact ? (
+              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                Exact Match
+              </span>
+            ) : memoryState?.hasSemantic ? (
+              <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                Semantic{typeof memoryState.similarityScore === "number" ? ` ~${Math.round(memoryState.similarityScore * 100)}%` : " Match"}
+              </span>
+            ) : null;
             return (
               <div
                 key={node.key}
@@ -120,8 +138,9 @@ export function DocumentDiffPane({
                   });
                 }}
               >
-                <div className="border-b border-slate-200/80 bg-white px-4 py-2">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 bg-white px-4 py-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{blockLabel}</p>
+                  {memoryBadge}
                 </div>
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                   <div className="min-w-0 bg-slate-100/45 px-4 py-4">{renderNode(node, "source")}</div>

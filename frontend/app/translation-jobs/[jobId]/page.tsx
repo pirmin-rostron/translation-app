@@ -474,6 +474,25 @@ export default function TranslationReviewPage() {
     [visibleBlocks]
   );
   const displayedNodes = useMemo(() => buildDocumentNodes(visibleBlocks), [visibleBlocks]);
+  const blockMemoryStates = useMemo(() => {
+    const map = new Map<string, { hasExact: boolean; hasSemantic: boolean; similarityScore: number | null }>();
+    for (const block of visibleBlocks) {
+      const key = `block-${block.id}`;
+      const hasExact = block.segments.some((s) => s.exact_memory_used);
+      const hasSemantic = !hasExact && block.segments.some((s) => s.semantic_memory_used);
+      let similarityScore: number | null = null;
+      if (hasSemantic) {
+        for (const s of block.segments) {
+          const score = s.semantic_memory_details?.similarity_score ?? null;
+          if (score !== null && (similarityScore === null || score > similarityScore)) {
+            similarityScore = score;
+          }
+        }
+      }
+      map.set(key, { hasExact, hasSemantic, similarityScore });
+    }
+    return map;
+  }, [visibleBlocks]);
   const segmentColorStates = useMemo(() => {
     const map = new Map<number, string>();
     for (const { segment } of allSegments) {
@@ -1252,6 +1271,23 @@ export default function TranslationReviewPage() {
     { key: "glossary", label: "Glossary", count: reviewCounts.glossary_count },
     { key: "memory", label: "Memory", count: reviewCounts.memory_count },
   ];
+  const selectedBlockExactMemory = selectedBlock?.segments.some((s) => s.exact_memory_used) ?? false;
+  const selectedBlockSemanticMemory = !selectedBlockExactMemory && (selectedBlock?.segments.some((s) => s.semantic_memory_used) ?? false);
+  const selectedBlockMemorySimilarity: number | null = (() => {
+    if (!selectedBlockSemanticMemory || !selectedBlock) return null;
+    let best: number | null = null;
+    for (const s of selectedBlock.segments) {
+      const score = s.semantic_memory_details?.similarity_score ?? null;
+      if (score !== null && (best === null || score > best)) best = score;
+    }
+    return best;
+  })();
+  const selectedBlockMemorySourceText: string | null = selectedBlockSemanticMemory
+    ? (selectedBlock?.segments.find(
+        (s) => s.semantic_memory_used && s.semantic_memory_details?.source_text
+      )?.semantic_memory_details?.source_text ?? null)
+    : null;
+
   const firstUnresolvedAmbiguityBlockId = getFirstUnresolvedAmbiguityBlockId();
   const nextUnresolvedBlockId = getNextUnresolvedBlockId();
   const recommendedNextStep =
@@ -1327,6 +1363,7 @@ export default function TranslationReviewPage() {
             segmentColorStates={segmentColorStates}
             renderNode={(node, side) => renderNode(node as DocumentNode, side)}
             segmentRefs={segmentRefs}
+            blockMemoryStates={blockMemoryStates}
           />
 
           <ReviewDetailsPane
@@ -1382,6 +1419,10 @@ export default function TranslationReviewPage() {
             onSkipBlock={handleSkipBlock}
             hasDraftChanges={hasDraftChanges}
             onSaveSegmentEdit={handleSaveSegmentEdit}
+            exactMemoryUsed={selectedBlockExactMemory}
+            semanticMemoryUsed={selectedBlockSemanticMemory}
+            memorySimilarityScore={selectedBlockMemorySimilarity}
+            memorySourceText={selectedBlockMemorySourceText}
           />
         </div>
         {showExportModal && (
