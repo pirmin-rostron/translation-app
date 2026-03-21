@@ -1,3 +1,4 @@
+import hashlib
 import os
 import types
 import uuid
@@ -401,6 +402,11 @@ def _calculate_document_progress(doc: Document, stage_jobs: list[ProcessingStage
     )
 
 
+def _compute_file_hash(file_bytes: bytes) -> str:
+    """Return SHA-256 hex digest of file content."""
+    return hashlib.sha256(file_bytes).hexdigest()
+
+
 def validate_file(file: UploadFile) -> tuple[str, str]:
     """Validate file type and return (filename, file_type)."""
     if not file.filename:
@@ -436,6 +442,8 @@ def upload_document(
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
 
+    content_hash = _compute_file_hash(contents)
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stored_filename = f"{uuid.uuid4().hex}_{filename}"
     filepath = UPLOAD_DIR / stored_filename
@@ -454,6 +462,7 @@ def upload_document(
         industry=industry_val,
         domain=domain_val,
         org_id=current_org.id,
+        content_hash=content_hash,
         status="uploaded",
     )
     db.add(doc)

@@ -674,6 +674,22 @@ export default function TranslationReviewPage() {
   }
 
   useEffect(() => {
+    // Reset all UI-decision state on job change so no state bleeds if the
+    // component is ever reused across jobs without a full remount.
+    setActiveFilter("all");
+    setSelectedId(null);
+    setDraftTranslation("");
+    setSemanticChoice("current");
+    setAmbiguityChoiceIndex(null);
+    setPrevAmbiguityChoiceIndex(null);
+    setIsAmbiguityChoiceUserSelected(false);
+    setIsEditing(false);
+    setShowExportModal(false);
+    setShowPreviewModal(false);
+    setExportResult(null);
+    setMessage("");
+    setError("");
+
     if (Number.isNaN(jobId)) {
       setError("Invalid job ID");
       setLoading(false);

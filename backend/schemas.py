@@ -25,6 +25,7 @@ class DocumentResponse(BaseModel):
     customer_id: str
     industry: str | None
     domain: str | None
+    content_hash: str | None = None
     status: str
     error_message: str | None
     created_at: datetime

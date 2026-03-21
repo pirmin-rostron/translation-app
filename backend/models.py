@@ -140,6 +140,7 @@ class Document(Base):
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
     org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
+    content_hash = Column(String, nullable=True, index=True)
     status = Column(String(50), nullable=False, default="uploaded")
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
