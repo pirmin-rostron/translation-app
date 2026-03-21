@@ -7,7 +7,9 @@ import {
   queryKeys,
   translationJobsApi,
   translationResultsApi,
+  usageApi,
 } from "../services/api";
+import type { UsageResponse } from "../services/api";
 
 // ---------------------------------------------------------------------------
 // Shared response types
@@ -216,6 +218,14 @@ export function useReviewSummary(jobId: number | undefined) {
     queryFn: () => translationJobsApi.getReviewSummary<ReviewSummary>(jobId!),
     enabled: jobId != null,
     staleTime: 10_000,
+  });
+}
+
+export function useUsage() {
+  return useQuery<UsageResponse>({
+    queryKey: ["usage"],
+    queryFn: () => usageApi.get(),
+    staleTime: 30_000,
   });
 }
 

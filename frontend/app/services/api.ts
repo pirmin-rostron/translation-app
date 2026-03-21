@@ -174,6 +174,34 @@ export const translationResultsApi = {
     }),
 };
 
+// --- auth router ---
+
+export type UsageEvent = {
+  id: number;
+  event_type: string;
+  user_id: number | null;
+  job_id: number | null;
+  document_id: number | null;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type UsageResponse = {
+  totals: {
+    users_registered: number;
+    logins: number;
+    documents_ingested: number;
+    jobs_created: number;
+    words_translated: number;
+    jobs_exported: number;
+  };
+  recent: UsageEvent[];
+};
+
+export const usageApi = {
+  get: () => apiFetch<UsageResponse>(`${API_URL}/auth/usage`),
+};
+
 // --- glossary_terms router ---
 
 export const glossaryTermsApi = {
