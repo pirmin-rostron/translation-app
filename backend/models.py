@@ -219,6 +219,17 @@ class OrgWebhook(Base):
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token = Column(String, nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class SegmentAnnotation(Base):
     __tablename__ = "segment_annotations"
 

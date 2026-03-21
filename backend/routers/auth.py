@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Organisation, OrgMembership, OrgWebhook, UsageEvent, User
+from models import Organisation, OrgMembership, OrgWebhook, PasswordResetToken, UsageEvent, User
 from services.auth import (
     VALID_ORG_ROLES,
     create_access_token,
@@ -201,6 +201,22 @@ class WebhookOut(BaseModel):
 
 class WebhookCreateResponse(WebhookOut):
     secret: str
+
+
+class PasswordResetRequestBody(BaseModel):
+    email: str
+
+
+class PasswordResetConfirmBody(BaseModel):
+    token: str
+    new_password: str
+
+
+class PasswordResetRequestResponse(BaseModel):
+    message: str
+    # Temporary: reset_token is returned directly until email delivery is implemented.
+    # When email infrastructure is added, remove this field and send the token by email instead.
+    reset_token: Optional[str] = None
 
 
 # --- Endpoints ---
@@ -685,3 +701,96 @@ def delete_webhook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
     db.delete(hook)
     db.commit()
+
+
+@router.post("/reset-password/request", response_model=PasswordResetRequestResponse)
+@limiter.limit("5/hour")
+def reset_password_request(
+    request: Request,
+    body: PasswordResetRequestBody,
+    db: Session = Depends(get_db),
+) -> PasswordResetRequestResponse:
+    """Request a password reset token for the given email address.
+
+    Always returns the same message regardless of whether the email exists, to prevent
+    account enumeration. The reset_token field is temporary — it will be removed once
+    email delivery is implemented and tokens are sent by email instead.
+    """
+    _RESET_MESSAGE = "If that email exists, a reset token has been issued."
+
+    normalised_email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == normalised_email).first()
+
+    if not user or not user.is_active:
+        # Do not reveal whether the email exists or account is inactive.
+        return PasswordResetRequestResponse(message=_RESET_MESSAGE)
+
+    # Invalidate any existing unused tokens for this user.
+    now = datetime.utcnow()
+    (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .update({"used_at": now}, synchronize_session=False)
+    )
+
+    reset_token = secrets.token_urlsafe(32)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token=reset_token,
+            expires_at=now + timedelta(hours=1),
+        )
+    )
+    db.commit()
+
+    return PasswordResetRequestResponse(message=_RESET_MESSAGE, reset_token=reset_token)
+
+
+@router.post("/reset-password/confirm")
+@limiter.limit("10/hour")
+def reset_password_confirm(
+    request: Request,
+    body: PasswordResetConfirmBody,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Consume a password reset token and set a new password.
+
+    Returns 400 for invalid, already-used, or expired tokens. The token is
+    single-use: used_at is set on successful reset.
+    """
+    record = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token == body.token)
+        .first()
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+    if record.used_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset token has already been used",
+        )
+    if record.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset token has expired",
+        )
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be at least 8 characters",
+        )
+
+    user = db.query(User).filter(User.id == record.user_id).first()
+    user.hashed_password = hash_password(body.new_password)
+    record.used_at = datetime.utcnow()
+    db.commit()
+
+    return {"message": "Password reset successfully. You can now log in."}

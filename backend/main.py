@@ -1,12 +1,16 @@
 import logging
+import os
 from pathlib import Path
 
+import redis as redis_lib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 
-from database import SessionLocal, init_db
+from database import SessionLocal, engine, init_db
 from limiter import limiter
 from models import Document, TranslationJob
 from routers import auth, documents, glossary_terms, translation_jobs
@@ -93,3 +97,40 @@ def startup():
 def health() -> dict:
     """Health check endpoint for monitoring and load balancers."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready() -> JSONResponse:
+    """Readiness check — verifies DB and Redis connectivity.
+
+    Returns 200 when all dependencies are reachable, 503 when any are not.
+    Never exposes internal error details in the response body.
+    """
+    db_status = "ok"
+    redis_status = "ok"
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        logging.exception("Readiness check: DB connection failed")
+        db_status = "error"
+
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+        r = redis_lib.from_url(redis_url, socket_connect_timeout=2)
+        r.ping()
+    except Exception:
+        logging.exception("Readiness check: Redis connection failed")
+        redis_status = "error"
+
+    all_ok = db_status == "ok" and redis_status == "ok"
+    http_status = 200 if all_ok else 503
+    return JSONResponse(
+        status_code=http_status,
+        content={
+            "status": "ready" if all_ok else "degraded",
+            "db": db_status,
+            "redis": redis_status,
+        },
+    )
