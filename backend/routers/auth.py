@@ -149,6 +149,11 @@ class MembershipOut(BaseModel):
         from_attributes = True
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # --- Endpoints ---
 
 
@@ -213,6 +218,32 @@ def login(
 def me(current_user: User = Depends(get_current_active_user)):
     """Return the profile of the currently authenticated user."""
     return current_user
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Change the authenticated user's password.
+
+    Verifies the current password before applying the change. The new password
+    must be at least 8 characters. The password hash is never returned.
+    """
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be at least 8 characters",
+        )
+    current_user.hashed_password = hash_password(body.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 
 @router.get("/org", response_model=OrgResponse)
