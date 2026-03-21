@@ -36,6 +36,11 @@ services:
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
@@ -56,6 +61,11 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       REDIS_URL: redis://redis:6379/0
       PYTHONPATH: /app
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
     depends_on:
       - postgres
       - redis

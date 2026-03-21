@@ -1,5 +1,6 @@
 import hashlib
 import os
+import tempfile
 import types
 import uuid
 import logging
@@ -22,6 +23,7 @@ from schemas import (
 from services.auth import get_current_active_user, get_current_org
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
+from services.storage import get_storage
 from services.usage import DOCUMENT_INGESTED, record_event
 from tasks import run_document_pipeline
 from limiter import limiter
@@ -213,11 +215,21 @@ def _execute_parsing_stage(db: Session, document_id: int):
     if not doc:
         raise ValueError("Document not found")
 
-    filepath = UPLOAD_DIR / doc.stored_filename
-    if not filepath.exists():
-        raise ValueError("File not found on disk")
+    storage = get_storage()
+    try:
+        file_content = storage.load(doc.stored_filename)
+    except FileNotFoundError:
+        raise ValueError("File not found in storage")
 
-    parsed_blocks = parse_document(filepath, doc.file_type)
+    # parse_document reads from a file path; write to a tempfile to stay backend-agnostic.
+    tmp = tempfile.NamedTemporaryFile(suffix=f".{doc.file_type}", delete=False)
+    try:
+        tmp.write(file_content)
+        tmp.flush()
+        parsed_blocks = parse_document(Path(tmp.name), doc.file_type)
+    finally:
+        tmp.close()
+        Path(tmp.name).unlink(missing_ok=True)
     if not parsed_blocks:
         raise ValueError("Parsed document has no blocks")
 
@@ -453,12 +465,19 @@ def upload_document(
 
     content_hash = _compute_file_hash(contents)
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stored_filename = f"{uuid.uuid4().hex}_{filename}"
-    filepath = UPLOAD_DIR / stored_filename
-    filepath.write_bytes(contents)
+    storage = get_storage()
+    storage.save(stored_filename, contents, file.content_type or "application/octet-stream")
 
-    detected = detect_language(filepath, file_type)
+    # detect_language reads from a file path; use a tempfile to stay backend-agnostic.
+    tmp = tempfile.NamedTemporaryFile(suffix=Path(filename).suffix.lower(), delete=False)
+    try:
+        tmp.write(contents)
+        tmp.flush()
+        detected = detect_language(Path(tmp.name), file_type)
+    finally:
+        tmp.close()
+        Path(tmp.name).unlink(missing_ok=True)
     source_language = detected if detected else "unknown"
 
     doc = Document(
