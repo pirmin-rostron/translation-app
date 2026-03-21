@@ -18,6 +18,8 @@ DOCUMENT_INGESTED = "document_ingested"
 JOB_CREATED = "job_created"
 WORDS_TRANSLATED = "words_translated"
 JOB_EXPORTED = "job_exported"
+TRANSLATION_EDITED = "translation_edited"
+AMBIGUITY_RESOLVED = "ambiguity_resolved"
 
 
 def record_event(

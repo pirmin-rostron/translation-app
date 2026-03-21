@@ -86,6 +86,79 @@ def store_embedding_if_missing(db: Session, approved: ApprovedTranslation) -> li
     return embedding
 
 
+def store_approved_translation(
+    db: Session,
+    source_text: str,
+    approved_translation: str,
+    source_language: str,
+    target_language: str,
+    customer_id: str,
+    industry: str | None,
+    domain: str | None,
+) -> None:
+    """Upsert an approved translation into the translation memory.
+
+    If a record already exists for the same key (source_text, source_language,
+    target_language, customer_id, industry, domain), update its translation and
+    embedding. Otherwise create a new record. Never raises — errors are logged
+    and swallowed.
+    """
+    try:
+        normalized_industry = _normalized_optional(industry)
+        normalized_domain = _normalized_optional(domain)
+
+        existing = (
+            db.query(ApprovedTranslation)
+            .filter(
+                ApprovedTranslation.source_text == source_text,
+                ApprovedTranslation.source_language == source_language,
+                ApprovedTranslation.target_language == target_language,
+                ApprovedTranslation.customer_id == customer_id,
+                ApprovedTranslation.industry == normalized_industry,
+                ApprovedTranslation.domain == normalized_domain,
+            )
+            .first()
+        )
+
+        embedding = generate_source_embedding(source_text)
+
+        if existing is not None:
+            existing.approved_translation = approved_translation
+            if embedding is not None:
+                existing.source_embedding = embedding
+            db.flush()
+            logger.info(
+                "Translation memory updated: source_language=%s target_language=%s",
+                source_language,
+                target_language,
+            )
+        else:
+            db.add(
+                ApprovedTranslation(
+                    source_text=source_text,
+                    approved_translation=approved_translation,
+                    source_language=source_language,
+                    target_language=target_language,
+                    customer_id=customer_id,
+                    industry=normalized_industry,
+                    domain=normalized_domain,
+                    source_embedding=embedding,
+                )
+            )
+            db.flush()
+            logger.info(
+                "Translation memory created: source_language=%s target_language=%s",
+                source_language,
+                target_language,
+            )
+    except Exception:
+        logger.exception(
+            "Failed to store approved translation: source_language=%s target_language=%s",
+            source_language,
+            target_language,
+        )
+
+
 def find_exact_memory_match(
     db: Session,
     source_text: str,

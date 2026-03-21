@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
 from models import (
-    ApprovedTranslation,
     Document,
     DocumentBlock,
     DocumentSegment,
@@ -42,13 +41,13 @@ from schemas import (
 )
 from services.auth import get_current_active_user, get_current_org
 from services.glossary import glossary_match_in_text, glossary_term_to_match, normalize_optional
-from services.usage import JOB_CREATED, JOB_EXPORTED, WORDS_TRANSLATED, record_event
+from services.usage import AMBIGUITY_RESOLVED, JOB_CREATED, JOB_EXPORTED, TRANSLATION_EDITED, WORDS_TRANSLATED, record_event
 from services.translation import SegmentContext, get_translation_provider
 from services.translation_memory import (
     TranslationMemoryMatch,
     find_exact_memory_match,
     find_semantic_memory_match,
-    generate_source_embedding,
+    store_approved_translation,
 )
 
 logger = logging.getLogger(__name__)
@@ -1853,6 +1852,7 @@ def update_translation_result(
     body: TranslationResultUpdateRequest,
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
+    current_user=Depends(get_current_active_user),
 ):
     """Save a reviewed translation result and record approved choices only."""
     result = db.query(TranslationResult).filter(TranslationResult.id == result_id).first()
@@ -1885,8 +1885,8 @@ def update_translation_result(
     result.review_status = review_status
 
     if review_status in {"approved", "edited"}:
-        embedding = generate_source_embedding(segment.source_text)
-        approved = ApprovedTranslation(
+        store_approved_translation(
+            db=db,
             source_text=segment.source_text,
             approved_translation=final_translation,
             source_language=job.source_language,
@@ -1894,9 +1894,7 @@ def update_translation_result(
             customer_id=job.customer_id,
             industry=job.industry,
             domain=job.domain,
-            source_embedding=embedding,
         )
-        db.add(approved)
 
     _replace_segment_annotations(db, segment, result)
     if segment.block_id is not None:
@@ -1909,6 +1907,7 @@ def update_translation_result(
     semantic_match_found, suggested_translation, similarity_score, current_translation = _semantic_choice_payload(result)
     ambiguity_choice_found, ambiguity_source_phrase, ambiguity_options = _ambiguity_choice_payload(result)
 
+    uid = current_user.id if current_user is not None else None
     if review_status in {"approved", "edited"}:
         logger.info(
             "Saved reviewed translation result_id=%d review_status=%s and stored translation memory",
@@ -1921,6 +1920,11 @@ def update_translation_result(
             result.id,
             result.review_status,
         )
+
+    if final_translation != result.primary_translation:
+        record_event(db, TRANSLATION_EDITED, user_id=uid, job_id=result.job_id)
+    if getattr(result, "ambiguity_detected", False) and review_status == "approved":
+        record_event(db, AMBIGUITY_RESOLVED, user_id=uid, job_id=result.job_id)
 
     return TranslationResultResponse(
         id=result.id,
