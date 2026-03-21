@@ -20,6 +20,7 @@ WORDS_TRANSLATED = "words_translated"
 JOB_EXPORTED = "job_exported"
 TRANSLATION_EDITED = "translation_edited"
 AMBIGUITY_RESOLVED = "ambiguity_resolved"
+USER_DELETED = "user_deleted"
 
 
 def record_event(

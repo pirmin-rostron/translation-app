@@ -24,6 +24,7 @@ from services.usage import (
     DOCUMENT_INGESTED,
     JOB_CREATED,
     JOB_EXPORTED,
+    USER_DELETED,
     USER_LOGIN,
     USER_LOGIN_FAILED,
     USER_REGISTERED,
@@ -252,6 +253,49 @@ def refresh_token(current_user: User = Depends(get_current_active_user)):
     token expires to maintain the session."""
     token = create_access_token(current_user.id, current_user.email)
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.delete("/me")
+def delete_me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Anonymise the current user's account in compliance with GDPR right-to-erasure.
+
+    This is a soft anonymisation rather than a hard delete, to preserve referential
+    integrity with UsageEvent, TranslationJob, and other org-owned records. The user
+    row is retained but all personally-identifiable fields are overwritten:
+
+    - email → "deleted_{id}@deleted.invalid" (unique, clearly synthetic)
+    - full_name → None
+    - hashed_password → a random hex string (not a valid hash — login always fails)
+    - is_active → False
+
+    OrgMembership rows are deleted so the user no longer appears in any org.
+    The audit event is recorded with user_id=None (already anonymised at commit time).
+    Existing JWT tokens remain valid until their 7-day expiry — acceptable given the
+    account is immediately deactivated and the password invalidated.
+    """
+    unusable_hash = secrets.token_hex(32)
+
+    # Capture org_id before removing memberships, for the audit event.
+    membership = db.query(OrgMembership).filter(OrgMembership.user_id == current_user.id).first()
+    org_id = membership.org_id if membership else None
+
+    current_user.email = f"deleted_{current_user.id}@deleted.invalid"
+    current_user.full_name = None
+    current_user.hashed_password = unusable_hash
+    current_user.is_active = False
+
+    db.query(OrgMembership).filter(OrgMembership.user_id == current_user.id).delete(
+        synchronize_session=False
+    )
+
+    db.commit()
+
+    record_event(db, USER_DELETED, user_id=None, org_id=org_id)
+
+    return {"message": "Your account has been deleted. You will be logged out shortly."}
 
 
 @router.post("/change-password")
