@@ -1103,6 +1103,19 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     if not doc:
         raise ValueError("Document not found")
 
+    existing_count = (
+        db.query(TranslationResult)
+        .filter(TranslationResult.job_id == translation_job_id)
+        .count()
+    )
+    if existing_count > 0:
+        logger.warning(
+            "Translation stage called on job_id=%d which already has %d results — skipping to prevent duplicates",
+            translation_job_id,
+            existing_count,
+        )
+        return
+
     job.status = JOB_STATUS_TRANSLATING
     job.error_message = None
     db.commit()
