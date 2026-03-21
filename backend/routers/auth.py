@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -30,6 +30,8 @@ from services.usage import (
     WORDS_TRANSLATED,
     record_event,
 )
+
+from limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -154,11 +156,33 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class AuditEventOut(BaseModel):
+    id: int
+    event_type: str
+    user_id: Optional[int]
+    job_id: Optional[int]
+    document_id: Optional[int]
+    org_id: Optional[int]
+    meta: Optional[dict]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogResponse(BaseModel):
+    total: int
+    offset: int
+    limit: int
+    events: list[AuditEventOut]
+
+
 # --- Endpoints ---
 
 
 @router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user. Email must be unique."""
     normalised_email = body.email.strip().lower()
     if db.query(User).filter(User.email == normalised_email).first():
@@ -179,7 +203,9 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -229,7 +255,9 @@ def refresh_token(current_user: User = Depends(get_current_active_user)):
 
 
 @router.post("/change-password")
+@limiter.limit("5/minute")
 def change_password(
+    request: Request,
     body: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -310,7 +338,9 @@ def usage(
 
 
 @router.post("/invite", response_model=InviteResponse)
+@limiter.limit("20/minute")
 def invite_user(
+    request: Request,
     body: InviteRequest,
     response: Response,
     db: Session = Depends(get_db),
@@ -373,7 +403,7 @@ def invite_user(
     db.add(OrgMembership(org_id=current_org.id, user_id=new_user.id, role=body.role))
     db.commit()
     db.refresh(new_user)
-    record_event(db, USER_REGISTERED, user_id=new_user.id, meta={"email": new_user.email, "invited": True})
+    record_event(db, USER_REGISTERED, user_id=new_user.id, org_id=current_org.id, meta={"email": new_user.email, "invited": True})
     response.status_code = status.HTTP_201_CREATED
     return InviteResponse(
         user=UserInviteOut(
@@ -489,3 +519,20 @@ def remove_org_member(
         )
     db.delete(target)
     db.commit()
+
+
+@router.get("/org/audit", response_model=AuditLogResponse)
+def get_org_audit_log(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    event_type: Optional[str] = Query(default=None),
+):
+    """Return a paginated audit log of usage events scoped to the current organisation."""
+    q = db.query(UsageEvent).filter(UsageEvent.org_id == current_org.id)
+    if event_type is not None:
+        q = q.filter(UsageEvent.event_type == event_type)
+    total = q.count()
+    events = q.order_by(UsageEvent.created_at.desc()).offset(offset).limit(limit).all()
+    return AuditLogResponse(total=total, offset=offset, limit=limit, events=events)

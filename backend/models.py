@@ -22,6 +22,7 @@ class UsageEvent(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     job_id = Column(Integer, ForeignKey("translation_jobs.id"), nullable=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
     meta = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 

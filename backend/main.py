@@ -3,8 +3,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from database import SessionLocal, init_db
+from limiter import limiter
 from models import Document, TranslationJob
 from routers import auth, documents, glossary_terms, translation_jobs
 from seeds import seed_initial_admin
@@ -24,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 Path("uploads").mkdir(exist_ok=True)
 

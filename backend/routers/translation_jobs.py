@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from docx import Document as DocxDocument
 from sqlalchemy.orm import Session
@@ -50,6 +50,7 @@ from services.translation_memory import (
     store_approved_translation,
 )
 from tasks import run_translation_pipeline
+from limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -191,6 +192,7 @@ def _run_translation_pipeline(translation_job_id: int, user_id: int | None = Non
                         WORDS_TRANSLATED,
                         user_id=user_id,
                         job_id=translation_job_id,
+                        org_id=_job.org_id if _job else None,
                         meta={"word_count": word_count},
                     )
             except Exception as exc:
@@ -1389,7 +1391,9 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 
 
 @router.post("/documents/{document_id}/translation-jobs", response_model=TranslationJobResponse)
+@limiter.limit("20/hour")
 def create_translation_job(
+    request: Request,
     document_id: int,
     payload: TranslationJobCreateRequest | None = None,
     db: Session = Depends(get_db),
@@ -1448,7 +1452,7 @@ def create_translation_job(
     db.commit()
     db.refresh(job)
     uid = current_user.id if current_user is not None else None
-    record_event(db, JOB_CREATED, user_id=uid, job_id=job.id, document_id=document_id)
+    record_event(db, JOB_CREATED, user_id=uid, job_id=job.id, document_id=document_id, org_id=job.org_id)
     run_translation_pipeline.delay(job.id, uid, current_org.id if current_org is not None else None)
     return job
 
@@ -1781,7 +1785,7 @@ def export_translation_job(
     job.last_saved_at = exported_at
     db.commit()
     uid = current_user.id if current_user is not None else None
-    record_event(db, JOB_EXPORTED, user_id=uid, job_id=job_id, document_id=job.document_id)
+    record_event(db, JOB_EXPORTED, user_id=uid, job_id=job_id, document_id=job.document_id, org_id=job.org_id)
     return ExportResponse(
         job_id=job.id,
         status=job.status,
@@ -1940,9 +1944,9 @@ def update_translation_result(
         )
 
     if final_translation != result.primary_translation:
-        record_event(db, TRANSLATION_EDITED, user_id=uid, job_id=result.job_id)
+        record_event(db, TRANSLATION_EDITED, user_id=uid, job_id=result.job_id, org_id=job.org_id)
     if getattr(result, "ambiguity_detected", False) and review_status == "approved":
-        record_event(db, AMBIGUITY_RESOLVED, user_id=uid, job_id=result.job_id)
+        record_event(db, AMBIGUITY_RESOLVED, user_id=uid, job_id=result.job_id, org_id=job.org_id)
 
     return TranslationResultResponse(
         id=result.id,

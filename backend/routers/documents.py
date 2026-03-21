@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -24,6 +24,7 @@ from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 from services.usage import DOCUMENT_INGESTED, record_event
 from tasks import run_document_pipeline
+from limiter import limiter
 
 
 router = APIRouter(
@@ -120,7 +121,8 @@ def _run_document_pipeline(document_id: int, user_id: int | None = None):
                 db.commit()
                 logger.info("Stage success: stage=%s document_id=%d", stage_job.stage_name, document_id)
                 if stage_job.stage_name == SEGMENT_STAGE:
-                    record_event(db, DOCUMENT_INGESTED, user_id=user_id, document_id=document_id)
+                    _doc = db.query(Document).filter(Document.id == document_id).first()
+                    record_event(db, DOCUMENT_INGESTED, user_id=user_id, document_id=document_id, org_id=_doc.org_id if _doc else None)
             except Exception as exc:
                 db.rollback()
                 doc = db.query(Document).filter(Document.id == document_id).first()
@@ -427,7 +429,9 @@ def validate_file(file: UploadFile) -> tuple[str, str]:
 
 
 @router.post("/upload", response_model=DocumentResponse)
+@limiter.limit("30/hour")
 def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     target_language: str = Form(..., min_length=1, max_length=50),
     industry: str | None = Form(None, max_length=100),
@@ -477,7 +481,9 @@ def upload_document(
 
 
 @router.post("/upload-and-translate", response_model=DocumentResponse)
+@limiter.limit("20/hour")
 def upload_and_translate_document(
+    request: Request,
     file: UploadFile = File(...),
     target_language: str = Form(..., min_length=1, max_length=50),
     industry: str | None = Form(None, max_length=100),

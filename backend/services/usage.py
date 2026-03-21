@@ -29,6 +29,7 @@ def record_event(
     user_id: int | None = None,
     job_id: int | None = None,
     document_id: int | None = None,
+    org_id: int | None = None,
     meta: dict[str, Any] | None = None,
 ) -> None:
     """Record a usage event. Never raises — errors are logged and swallowed."""
@@ -38,6 +39,7 @@ def record_event(
             user_id=user_id,
             job_id=job_id,
             document_id=document_id,
+            org_id=org_id,
             meta=meta,
         )
         db.add(event)
