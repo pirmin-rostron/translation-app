@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import GlossaryTerm, Organisation
-from schemas import GlossaryTermCreateRequest, GlossaryTermResponse, GlossaryTermUpdateRequest
+from schemas import GlossaryImportResponse, GlossaryTermCreateRequest, GlossaryTermResponse, GlossaryTermUpdateRequest
 from services.auth import get_current_active_user, get_current_org
 from services.glossary import normalize_optional
 
@@ -102,3 +106,122 @@ def delete_glossary_term(
     db.delete(term)
     db.commit()
     return {"status": "deleted"}
+
+
+_MAX_IMPORT_ROWS = 1000
+
+
+@router.post("/import", response_model=GlossaryImportResponse)
+async def import_glossary_terms(
+    file: UploadFile,
+    source_language: str = Form(...),
+    target_language: str = Form(...),
+    industry: Optional[str] = Form(None),
+    domain: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Bulk-import glossary terms from a CSV file.
+
+    The CSV must have a header row with columns: source_term, target_term.
+    Duplicate terms (same source_term + source_language + target_language + org)
+    are skipped rather than overwritten. All new terms are committed in a single
+    transaction — the import is all-or-nothing for the new rows.
+    """
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a .csv")
+
+    raw = await file.read()
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        content = raw.decode("latin-1")
+
+    try:
+        reader = csv.DictReader(io.StringIO(content))
+        # Consume the iterator into a list so we can detect parse failures up-front
+        # and enforce the row limit before touching the DB.
+        rows = list(reader)
+    except Exception:
+        raise HTTPException(status_code=400, detail="CSV could not be parsed")
+
+    if not {"source_term", "target_term"}.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(
+            status_code=400,
+            detail="CSV must have header columns: source_term, target_term",
+        )
+
+    if len(rows) > _MAX_IMPORT_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"CSV exceeds the maximum of {_MAX_IMPORT_ROWS} rows",
+        )
+
+    norm_source_lang = source_language.strip()
+    norm_target_lang = target_language.strip()
+    norm_industry = normalize_optional(industry)
+    norm_domain = normalize_optional(domain)
+
+    # Fetch existing (source_term, source_language, target_language) tuples for this org
+    # in one query to avoid N+1 lookups inside the loop.
+    existing_keys: set[tuple[str, str, str]] = {
+        (t.source_term, t.source_language, t.target_language)
+        for t in db.query(
+            GlossaryTerm.source_term,
+            GlossaryTerm.source_language,
+            GlossaryTerm.target_language,
+        )
+        .filter(
+            GlossaryTerm.org_id == current_org.id,
+            GlossaryTerm.source_language == norm_source_lang,
+            GlossaryTerm.target_language == norm_target_lang,
+        )
+        .all()
+    }
+
+    new_terms: list[GlossaryTerm] = []
+    skipped = 0
+    errors: list[str] = []
+
+    for i, row in enumerate(rows, start=2):  # row 1 is the header
+        source_term = (row.get("source_term") or "").strip()
+        target_term = (row.get("target_term") or "").strip()
+
+        if not source_term and not target_term:
+            # Silently skip blank rows
+            continue
+        if not source_term:
+            errors.append(f"row {i}: missing source_term")
+            continue
+        if not target_term:
+            errors.append(f"row {i}: missing target_term")
+            continue
+
+        key = (source_term, norm_source_lang, norm_target_lang)
+        if key in existing_keys:
+            skipped += 1
+            continue
+
+        new_terms.append(
+            GlossaryTerm(
+                source_term=source_term,
+                target_term=target_term,
+                source_language=norm_source_lang,
+                target_language=norm_target_lang,
+                industry=norm_industry,
+                domain=norm_domain,
+                org_id=current_org.id,
+            )
+        )
+        # Track in-memory to catch duplicates within the same upload
+        existing_keys.add(key)
+
+    if new_terms:
+        db.add_all(new_terms)
+        db.commit()
+
+    return GlossaryImportResponse(
+        imported=len(new_terms),
+        skipped=skipped,
+        errors=errors,
+    )

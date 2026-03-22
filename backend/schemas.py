@@ -158,6 +158,12 @@ class GlossaryTermResponse(BaseModel):
         from_attributes = True
 
 
+class GlossaryImportResponse(BaseModel):
+    imported: int
+    skipped: int
+    errors: list[str]
+
+
 class GlossaryMatchResponse(BaseModel):
     source_term: str
     target_term: str
