@@ -48,6 +48,10 @@ export default function Nav() {
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
+  // Landing page renders its own header — suppress the app nav there.
+  // All hooks must be called unconditionally above this point.
+  if (pathname === "/") return null;
+
   function handleLogout() {
     clearAuth();
     router.push("/login");
