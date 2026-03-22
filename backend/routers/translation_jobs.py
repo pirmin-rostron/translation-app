@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import os
 import re
 import threading
@@ -10,6 +11,7 @@ from collections import defaultdict
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from docx import Document as DocxDocument
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -29,6 +31,7 @@ from schemas import (
     PreviewResponse,
     ExportFileResponse,
     ProcessingStageJobResponse,
+    ReviewBlocksPageResponse,
     ReviewSummaryResponse,
     TranslationJobCreateRequest,
     TranslationProgressResponse,
@@ -1044,6 +1047,35 @@ def _calculate_translation_progress(db: Session, job: TranslationJob) -> Transla
     stage_label = "Translation queued"
     percentage = 0.0
 
+    # Block counts: number of blocks whose every segment has a TranslationResult for this job.
+    _block_subq = (
+        db.query(
+            DocumentSegment.block_id,
+            func.count(DocumentSegment.id).label("seg_count"),
+            func.count(TranslationResult.id).label("result_count"),
+        )
+        .outerjoin(
+            TranslationResult,
+            and_(
+                TranslationResult.segment_id == DocumentSegment.id,
+                TranslationResult.job_id == job.id,
+            ),
+        )
+        .filter(
+            DocumentSegment.document_id == job.document_id,
+            DocumentSegment.block_id.isnot(None),
+        )
+        .group_by(DocumentSegment.block_id)
+        .subquery()
+    )
+    blocks_total: int = db.query(func.count()).select_from(_block_subq).scalar() or 0
+    blocks_completed: int = (
+        db.query(func.count())
+        .select_from(_block_subq)
+        .filter(_block_subq.c.seg_count == _block_subq.c.result_count)
+        .scalar()
+    ) or 0
+
     completed_statuses = {
         JOB_STATUS_IN_REVIEW,
         JOB_STATUS_DRAFT_SAVED,
@@ -1060,6 +1092,8 @@ def _calculate_translation_progress(db: Session, job: TranslationJob) -> Transla
             percentage=100.0,
             eta_seconds=0,
             is_complete=True,
+            blocks_completed=blocks_total,
+            blocks_total=blocks_total,
         )
 
     if translation_stage and translation_stage.status in {"running", "queued"}:
@@ -1102,6 +1136,8 @@ def _calculate_translation_progress(db: Session, job: TranslationJob) -> Transla
         percentage=round(max(min(percentage, 100.0), 0.0), 1),
         eta_seconds=eta_seconds,
         is_complete=False,
+        blocks_completed=blocks_completed,
+        blocks_total=blocks_total,
     )
 
 
@@ -1277,65 +1313,75 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         segments_per_second,
     )
 
-    # --- Pass 3: build all TranslationResult rows and write in one commit ---
-    all_results: list[TranslationResult] = []
+    # --- Pass 3: build TranslationResult rows per block and commit incrementally ---
+    # Each block commit makes that block's translations visible to polling frontends
+    # before the full job finishes.
+    segments_by_block: dict[int | None, list[DocumentSegment]] = defaultdict(list)
     for seg in segments:
-        if seg.id in exact_memory_matches:
-            match = exact_memory_matches[seg.id]
-            approved = match.approved
-            all_results.append(
-                TranslationResult(
-                    job_id=translation_job_id,
-                    segment_id=seg.id,
-                    primary_translation=approved.approved_translation,
-                    final_translation=approved.approved_translation,
-                    confidence_score=match.similarity,
-                    # Memory can prefill a suggestion, but review must remain job-isolated and unresolved.
-                    review_status="unreviewed",
-                    exact_memory_used=True,
-                    semantic_memory_used=False,
-                    semantic_memory_details=None,
-                    ambiguity_detected=False,
-                    ambiguity_details=None,
-                    glossary_applied=False,
-                    glossary_matches=None,
-                )
-            )
-        else:
-            res = provider_results_by_segment_id[seg.id]
-            seg_glossary_matches = glossary_matches_by_segment.get(seg.id, [])
-            semantic_suggestion = semantic_suggestions.get(seg.id)
-            semantic_details = (
-                {
-                    "match_type": "semantic_memory",
-                    "suggested_translation": semantic_suggestion.approved.approved_translation,
-                    "similarity_score": semantic_suggestion.similarity,
-                    "source_text": semantic_suggestion.approved.source_text,
-                }
-                if semantic_suggestion
-                else None
-            )
-            all_results.append(
-                TranslationResult(
-                    job_id=translation_job_id,
-                    segment_id=seg.id,
-                    primary_translation=res.primary_translation,
-                    final_translation=res.primary_translation,
-                    confidence_score=None,
-                    review_status="unreviewed",
-                    exact_memory_used=False,
-                    semantic_memory_used=bool(semantic_suggestion),
-                    semantic_memory_details=semantic_details,
-                    ambiguity_detected=res.ambiguity_detected,
-                    ambiguity_details=res.ambiguity_details,
-                    glossary_applied=bool(seg_glossary_matches),
-                    glossary_matches=_build_glossary_matches_payload(seg_glossary_matches),
-                )
-            )
+        segments_by_block[seg.block_id].append(seg)
 
-    db.add_all(all_results)
-    job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
-    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    completed_count = 0
+    for block_segs in segments_by_block.values():
+        block_results: list[TranslationResult] = []
+        for seg in block_segs:
+            if seg.id in exact_memory_matches:
+                match = exact_memory_matches[seg.id]
+                approved = match.approved
+                block_results.append(
+                    TranslationResult(
+                        job_id=translation_job_id,
+                        segment_id=seg.id,
+                        primary_translation=approved.approved_translation,
+                        final_translation=approved.approved_translation,
+                        confidence_score=match.similarity,
+                        # Memory can prefill a suggestion, but review must remain job-isolated and unresolved.
+                        review_status="unreviewed",
+                        exact_memory_used=True,
+                        semantic_memory_used=False,
+                        semantic_memory_details=None,
+                        ambiguity_detected=False,
+                        ambiguity_details=None,
+                        glossary_applied=False,
+                        glossary_matches=None,
+                    )
+                )
+            else:
+                res = provider_results_by_segment_id[seg.id]
+                seg_glossary_matches = glossary_matches_by_segment.get(seg.id, [])
+                semantic_suggestion = semantic_suggestions.get(seg.id)
+                semantic_details = (
+                    {
+                        "match_type": "semantic_memory",
+                        "suggested_translation": semantic_suggestion.approved.approved_translation,
+                        "similarity_score": semantic_suggestion.similarity,
+                        "source_text": semantic_suggestion.approved.source_text,
+                    }
+                    if semantic_suggestion
+                    else None
+                )
+                block_results.append(
+                    TranslationResult(
+                        job_id=translation_job_id,
+                        segment_id=seg.id,
+                        primary_translation=res.primary_translation,
+                        final_translation=res.primary_translation,
+                        confidence_score=None,
+                        review_status="unreviewed",
+                        exact_memory_used=False,
+                        semantic_memory_used=bool(semantic_suggestion),
+                        semantic_memory_details=semantic_details,
+                        ambiguity_detected=res.ambiguity_detected,
+                        ambiguity_details=res.ambiguity_details,
+                        glossary_applied=bool(seg_glossary_matches),
+                        glossary_matches=_build_glossary_matches_payload(seg_glossary_matches),
+                    )
+                )
+        db.add_all(block_results)
+        completed_count += len(block_segs)
+        job.progress_completed_segments = completed_count
+        db.commit()
+
+    # Final metadata update after all blocks are committed.
     job.translation_provider = provider_name
     job.translation_batch_size = len(missing_segments)
     job.status = JOB_STATUS_TRANSLATING
@@ -1528,46 +1574,84 @@ def list_translation_results(
     return out
 
 
-@router.get("/translation-jobs/{job_id}/review-blocks", response_model=list[ReviewBlockResponse])
+@router.get("/translation-jobs/{job_id}/review-blocks", response_model=ReviewBlocksPageResponse)
 def list_review_blocks(
     job_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Return translated document blocks with nested segment results and annotations."""
+    """Return a page of translated document blocks with nested segment results and annotations.
+
+    Blocks that have no TranslationResult rows yet (still translating) are returned with
+    empty segments so the frontend can show placeholders while polling.
+    """
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+
+    total_blocks: int = (
+        db.query(func.count(DocumentBlock.id))
+        .filter(DocumentBlock.document_id == job.document_id)
+        .scalar()
+    ) or 0
+    total_pages = max(1, math.ceil(total_blocks / page_size))
+    offset = (page - 1) * page_size
 
     blocks = (
         db.query(DocumentBlock)
         .filter(DocumentBlock.document_id == job.document_id)
         .order_by(DocumentBlock.block_index)
-        .all()
-    )
-    segments = (
-        db.query(DocumentSegment)
-        .filter(DocumentSegment.document_id == job.document_id)
-        .order_by(DocumentSegment.segment_index)
-        .all()
-    )
-    results = (
-        db.query(TranslationResult)
-        .filter(TranslationResult.job_id == job_id)
+        .offset(offset)
+        .limit(page_size)
         .all()
     )
 
-    results_by_segment_id = {result.segment_id: result for result in results}
-    annotations = (
-        db.query(SegmentAnnotation)
-        .join(DocumentSegment, SegmentAnnotation.segment_id == DocumentSegment.id)
+    if not blocks:
+        return ReviewBlocksPageResponse(
+            blocks=[],
+            page=page,
+            page_size=page_size,
+            total_blocks=total_blocks,
+            total_pages=total_pages,
+            job_status=job.status,
+        )
+
+    block_ids = {block.id for block in blocks}
+
+    segments = (
+        db.query(DocumentSegment)
         .filter(
             DocumentSegment.document_id == job.document_id,
+            DocumentSegment.block_id.in_(block_ids),
+        )
+        .order_by(DocumentSegment.segment_index)
+        .all()
+    )
+    segment_ids = {seg.id for seg in segments}
+
+    results = (
+        db.query(TranslationResult)
+        .filter(
+            TranslationResult.job_id == job_id,
+            TranslationResult.segment_id.in_(segment_ids),
+        )
+        .all()
+    ) if segment_ids else []
+
+    results_by_segment_id = {result.segment_id: result for result in results}
+
+    annotations = (
+        db.query(SegmentAnnotation)
+        .filter(
+            SegmentAnnotation.segment_id.in_(segment_ids),
             SegmentAnnotation.translation_job_id == job_id,
         )
         .order_by(SegmentAnnotation.id)
         .all()
-    )
+    ) if segment_ids else []
+
     annotations_by_segment_id: dict[int, list[SegmentAnnotation]] = defaultdict(list)
     for annotation in annotations:
         annotations_by_segment_id[annotation.segment_id].append(annotation)
@@ -1614,7 +1698,14 @@ def list_review_blocks(
             )
         )
 
-    return review_blocks
+    return ReviewBlocksPageResponse(
+        blocks=review_blocks,
+        page=page,
+        page_size=page_size,
+        total_blocks=total_blocks,
+        total_pages=total_pages,
+        job_status=job.status,
+    )
 
 
 @router.get("/translation-jobs/{job_id}/review-summary", response_model=ReviewSummaryResponse)

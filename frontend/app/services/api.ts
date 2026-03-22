@@ -146,8 +146,8 @@ export const translationJobsApi = {
   getById: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}`),
 
-  getReviewBlocks: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/review-blocks`),
+  getReviewBlocks: <T>(jobId: number, page: number = 1, pageSize: number = 10) =>
+    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/review-blocks?page=${page}&page_size=${pageSize}`),
 
   getReviewSummary: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/review-summary`),

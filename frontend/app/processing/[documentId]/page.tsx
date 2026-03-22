@@ -37,6 +37,8 @@ type TranslationProgress = {
   completed_segments: number;
   eta_seconds: number | null;
   is_complete: boolean;
+  blocks_completed: number;
+  blocks_total: number;
 };
 
 type PipelineStepStatus = "complete" | "current" | "upcoming" | "failed";
@@ -307,11 +309,17 @@ export default function ProcessingPage() {
     : translationDone
       ? "Your document is ready for review."
       : translationProgress
-        ? `Translating document… • ${
-            isTranslationEtaReliable(translationProgress)
-              ? formatEta(translationProgress.eta_seconds)
-              : "Calculating remaining time…"
-          }`
+        ? translationProgress.blocks_completed < 10
+          ? `Preparing your first page… • ${
+              isTranslationEtaReliable(translationProgress)
+                ? formatEta(translationProgress.eta_seconds)
+                : "Calculating remaining time…"
+            }`
+          : `Translating document… • ${
+              isTranslationEtaReliable(translationProgress)
+                ? formatEta(translationProgress.eta_seconds)
+                : "Calculating remaining time…"
+            }`
         : docProgress?.is_active
           ? `${docProgress.stage_label} • ${
               docProgress.eta_seconds == null ? "Calculating remaining time" : formatEta(docProgress.eta_seconds)
@@ -319,10 +327,18 @@ export default function ProcessingPage() {
           : "This usually takes a minute or two. You can stay on this page.";
   const displayProgress = introPhase === "upload" ? 0 : introPhase === "parse" ? 16 : overallProgress;
 
+  // Early redirect: as soon as 10 blocks are ready the user can start reviewing,
+  // even if translation is still running for the rest of the document.
+  useEffect(() => {
+    if (!latestJob || translationDone) return;
+    if (!translationProgress || translationProgress.blocks_completed < 10) return;
+    router.replace(`/translation-jobs/${latestJob.id}?page=1`);
+  }, [latestJob, translationDone, translationProgress, router]);
+
   useEffect(() => {
     if (!translationDone || !latestJob) return;
     const timer = window.setTimeout(() => {
-      router.replace(`/translation-jobs/${latestJob.id}`);
+      router.replace(`/translation-jobs/${latestJob.id}?page=1`);
     }, 2200);
     return () => window.clearTimeout(timer);
   }, [latestJob, router, translationDone]);

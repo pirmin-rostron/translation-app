@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DocumentDiffPane } from "./components/DocumentDiffPane";
 import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
 import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
@@ -192,6 +192,17 @@ type TranslationProgress = {
   percentage: number;
   eta_seconds: number | null;
   is_complete: boolean;
+  blocks_completed: number;
+  blocks_total: number;
+};
+
+type ReviewBlocksPage = {
+  blocks: DocumentBlock[];
+  page: number;
+  page_size: number;
+  total_blocks: number;
+  total_pages: number;
+  job_status: string;
 };
 
 function normalizeSegmentStatus(status: string) {
@@ -416,10 +427,23 @@ function getHeadingTag(block: DocumentBlock): "h1" | "h2" | "h3" {
   return "h3";
 }
 
-export default function TranslationReviewPage() {
+const PAGE_SIZE = 10;
+
+function TranslationReviewPageInner() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const jobId = Number(params.jobId);
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  // Keep a ref so interval callbacks always read the latest page without recreating the interval.
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  // Track the previous page to detect page-change navigations without triggering the full job reset.
+  const prevPageRef = useRef(page);
+
   const [job, setJob] = useState<TranslationJob | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalBlocks, setTotalBlocks] = useState(0);
   const [doc, setDoc] = useState<DocumentMeta | null>(null);
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
@@ -644,9 +668,11 @@ export default function TranslationReviewPage() {
     }
   }
 
-  async function loadReviewBlocks() {
-    const payload = await translationJobsApi.getReviewBlocks<DocumentBlock[]>(jobId);
-    setBlocks(payload);
+  async function loadReviewBlocks(targetPage: number) {
+    const payload = await translationJobsApi.getReviewBlocks<ReviewBlocksPage>(jobId, targetPage, PAGE_SIZE);
+    setBlocks(payload.blocks);
+    setTotalPages(payload.total_pages);
+    setTotalBlocks(payload.total_blocks);
   }
 
   async function loadJobMeta() {
@@ -696,7 +722,8 @@ export default function TranslationReviewPage() {
       return;
     }
 
-    Promise.all([loadJobMeta(), loadReviewBlocks(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()])
+    prevPageRef.current = page;
+    Promise.all([loadJobMeta(), loadReviewBlocks(page), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()])
       .then(async ([loadedJob]) => {
         return documentsApi.getById<DocumentMeta>(loadedJob.document_id).catch(() => null);
       })
@@ -705,12 +732,20 @@ export default function TranslationReviewPage() {
       .finally(() => setLoading(false));
   }, [jobId]);
 
+  // Reload blocks when the page changes (page-navigation, not job change).
+  useEffect(() => {
+    if (prevPageRef.current === page) return;
+    prevPageRef.current = page;
+    setSelectedId(null);
+    void loadReviewBlocks(page);
+  }, [page]);
+
   useEffect(() => {
     if (!job) return;
     if (!["translation_queued", "translating"].includes(job.status)) return;
     const timer = window.setInterval(() => {
       void loadJobMeta();
-      void loadReviewBlocks();
+      void loadReviewBlocks(pageRef.current);
       void loadReviewSummary();
       void loadTranslationProgress();
       void loadExportHistory();
@@ -724,7 +759,7 @@ export default function TranslationReviewPage() {
 
   async function saveResult(resultId: number, finalTranslation: string, reviewStatus: string) {
     await persistResult(resultId, finalTranslation, reviewStatus);
-    const [, summary] = await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+    const [, summary] = await Promise.all([loadReviewBlocks(page), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
     return summary as ReviewSummary;
   }
 
@@ -988,7 +1023,7 @@ export default function TranslationReviewPage() {
           await persistResult(segment.id, segment.final_translation, "approved");
         }
       }
-      const [, summary] = await Promise.all([loadReviewBlocks(), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
+      const [, summary] = await Promise.all([loadReviewBlocks(page), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
       if (transitionToReviewCompleteState(summary as ReviewSummary)) {
         return;
       }
@@ -1021,6 +1056,10 @@ export default function TranslationReviewPage() {
     moveToBlockById(nextBlockId);
     setMessage("Skipped block. Moved to next block.");
     setError("");
+  }
+
+  function handlePageChange(newPage: number) {
+    router.push(`/translation-jobs/${jobId}?page=${newPage}`);
   }
 
   function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string): [string, boolean] {
@@ -1441,6 +1480,41 @@ export default function TranslationReviewPage() {
             memorySourceText={selectedBlockMemorySourceText}
           />
         </div>
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+            <button
+              type="button"
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page <= 1}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ← Previous
+            </button>
+            <div className="text-center">
+              <p className="text-sm text-slate-600">
+                Page {page} of {totalPages}
+              </p>
+              <p className="text-xs text-slate-400">{totalBlocks} blocks total</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        )}
+
+        {/* More blocks translating indicator — shown when on the last available page and job is still running */}
+        {page >= totalPages && ["translation_queued", "translating"].includes(job.status) && (
+          <p className="mt-4 text-center text-xs text-slate-500">
+            More blocks translating… page count will update as they complete.
+          </p>
+        )}
+
         {showExportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
             <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -1611,5 +1685,13 @@ export default function TranslationReviewPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function TranslationReviewPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 p-6">Loading…</div>}>
+      <TranslationReviewPageInner />
+    </Suspense>
   );
 }

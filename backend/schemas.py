@@ -267,6 +267,15 @@ class ProcessingStageJobResponse(BaseModel):
         from_attributes = True
 
 
+class ReviewBlocksPageResponse(BaseModel):
+    blocks: list[ReviewBlockResponse]
+    page: int
+    page_size: int
+    total_blocks: int
+    total_pages: int
+    job_status: str
+
+
 class ReviewSummaryResponse(BaseModel):
     job_id: int
     total_segments: int
@@ -330,3 +339,5 @@ class TranslationProgressResponse(BaseModel):
     percentage: float
     eta_seconds: int | None
     is_complete: bool
+    blocks_completed: int = 0
+    blocks_total: int = 0
