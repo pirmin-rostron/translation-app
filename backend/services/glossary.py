@@ -1,3 +1,5 @@
+import re
+
 from models import GlossaryTerm
 
 
@@ -21,4 +23,5 @@ def glossary_term_to_match(term: GlossaryTerm) -> dict:
 
 
 def glossary_match_in_text(source_text: str, source_term: str) -> bool:
-    return source_term.lower() in source_text.lower()
+    pattern = re.compile(r'\b' + re.escape(source_term) + r'\b', re.IGNORECASE)
+    return bool(pattern.search(source_text))

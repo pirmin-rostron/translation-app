@@ -1364,7 +1364,7 @@ function TranslationReviewPageInner() {
         : hasReviewProgress
           ? "Continue reviewing"
           : "Start reviewing";
-  const secondaryGuidanceLabel = guidanceStatusLabel === "Review Complete" ? "Export document" : undefined;
+  const secondaryGuidanceLabel = (guidanceStatusLabel === "Review Complete" || guidanceStatusLabel === "Exported") ? "Export document" : undefined;
   const isPrimaryGuidanceDisabled = guidanceStatusLabel === "Exported" && !latestExport?.download_url;
 
   return (
