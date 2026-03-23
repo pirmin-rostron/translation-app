@@ -7,7 +7,7 @@ import "./landing.css";
 
 const dmSans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type FormState = "idle" | "loading" | "success" | "error";
 
@@ -67,7 +67,7 @@ export default function LandingPage() {
     setMessage("");
 
     try {
-      const res = await fetch(`${API_URL}/api/waitlist`, {
+      const res = await fetch(`/api/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),
