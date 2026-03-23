@@ -1178,7 +1178,7 @@ function TranslationReviewPageInner() {
 
   function handlePrimaryGuidanceAction() {
     if (guidanceStatusLabel === "Exported") {
-      handleDownloadLatestExport();
+      handleOpenExportModal();
       return;
     }
     if (guidanceStatusLabel === "Review Complete") {
@@ -1358,14 +1358,17 @@ function TranslationReviewPageInner() {
   const hasReviewProgress = reviewCounts.completed_blocks > 0;
   const primaryGuidanceLabel =
     guidanceStatusLabel === "Exported"
-      ? "Download Latest Export"
+      ? "Export document"
       : guidanceStatusLabel === "Review Complete"
         ? "Preview Document"
         : hasReviewProgress
           ? "Continue reviewing"
           : "Start reviewing";
-  const secondaryGuidanceLabel = (guidanceStatusLabel === "Review Complete" || guidanceStatusLabel === "Exported") ? "Export document" : undefined;
-  const isPrimaryGuidanceDisabled = guidanceStatusLabel === "Exported" && !latestExport?.download_url;
+  const secondaryGuidanceLabel =
+    guidanceStatusLabel === "Exported" ? "Preview document"
+    : guidanceStatusLabel === "Review Complete" ? "Export document"
+    : undefined;
+  const isPrimaryGuidanceDisabled = false;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1401,7 +1404,7 @@ function TranslationReviewPageInner() {
           actionLoading={actionLoading}
           onPrimaryAction={handlePrimaryGuidanceAction}
           secondaryActionLabel={secondaryGuidanceLabel}
-          onSecondaryAction={secondaryGuidanceLabel ? handleOpenExportModal : undefined}
+          onSecondaryAction={guidanceStatusLabel === "Exported" ? handleOpenPreviewDocument : secondaryGuidanceLabel ? handleOpenExportModal : undefined}
           message={message || undefined}
           error={error || undefined}
         />

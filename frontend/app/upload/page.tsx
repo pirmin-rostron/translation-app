@@ -294,7 +294,7 @@ export default function UploadPage() {
           )}
 
           {/* ── apply-to-all defaults (only shown while configuring) ── */}
-          {fileList.length > 0 && !isProcessing && (
+          {fileList.length > 1 && !isProcessing && (
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <p className="mb-3 text-sm font-semibold text-slate-700">Apply defaults to all files</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
