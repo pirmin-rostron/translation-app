@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -172,12 +174,54 @@ def split_block_into_segments(block: ParsedDocumentBlock) -> list[str]:
     return segments if segments else [text]
 
 
+def group_blocks_by_heading(blocks: list[ParsedDocumentBlock]) -> list[ParsedDocumentBlock]:
+    """Merge each heading block with the content blocks that follow it.
+
+    A heading starts a section that accumulates all following paragraphs and
+    bullet items until the next heading (or end of document).  The merged block
+    uses block_type "paragraph" since it contains mixed content.  A heading
+    with no following content is emitted as-is.  Documents with no headings
+    are returned unchanged.
+    """
+    if not any(b.block_type == "heading" for b in blocks):
+        return blocks
+
+    result: list[ParsedDocumentBlock] = []
+    pending_heading: ParsedDocumentBlock | None = None
+    pending_texts: list[str] = []
+
+    def _flush() -> None:
+        if pending_heading is None:
+            return
+        if pending_texts:
+            merged = pending_heading.text_original + "\n" + "\n".join(pending_texts)
+            result.append(ParsedDocumentBlock(block_type="paragraph", text_original=merged, formatting_json=None))
+        else:
+            result.append(pending_heading)
+
+    for block in blocks:
+        if block.block_type == "heading":
+            _flush()
+            pending_heading = block
+            pending_texts = []
+        else:
+            if pending_heading is not None:
+                pending_texts.append(block.text_original)
+            else:
+                result.append(block)
+
+    _flush()
+    return result
+
+
 def parse_document(filepath: Path, file_type: str) -> list[ParsedDocumentBlock]:
     """Parse a document file into ordered document blocks."""
     if file_type == "txt":
-        return parse_txt(filepath)
-    if file_type == "docx":
-        return parse_docx(filepath)
-    if file_type == "rtf":
-        return parse_rtf(filepath)
-    raise ValueError(f"Unsupported file type: {file_type}")
+        blocks = parse_txt(filepath)
+    elif file_type == "docx":
+        blocks = parse_docx(filepath)
+    elif file_type == "rtf":
+        blocks = parse_rtf(filepath)
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
+    return group_blocks_by_heading(blocks)

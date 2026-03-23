@@ -794,7 +794,7 @@ function TranslationReviewPageInner() {
     if (!block.segments.length) {
       const fallbackText = side === "source" ? (block.source_text_display || "") : (block.translated_text_display || "");
       return (
-        <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
+        <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md transition-colors hover:bg-slate-100/60">
           {fallbackText}
         </span>
       );
