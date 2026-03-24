@@ -126,14 +126,14 @@ export default function DashboardPage() {
   const { data: jobs, isLoading: jobsLoading } = useQuery<TranslationJob[]>({
     queryKey: QUERY_KEYS.recentJobs,
     queryFn: () =>
-      apiFetch(`${API_URL}/translation-jobs?limit=10&order=desc`) as Promise<TranslationJob[]>,
+      apiFetch(`${API_URL}/api/translation-jobs?limit=10&order=desc`) as Promise<TranslationJob[]>,
     enabled: !!token,
     staleTime: 30_000,
   });
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: QUERY_KEYS.stats,
-    queryFn: () => apiFetch(`${API_URL}/translation-jobs/stats`) as Promise<DashboardStats>,
+    queryFn: () => apiFetch(`${API_URL}/api/translation-jobs/stats`) as Promise<DashboardStats>,
     enabled: !!token,
     staleTime: 60_000,
   });
