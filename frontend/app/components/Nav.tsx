@@ -31,11 +31,6 @@ const navItems: NavItem[] = [
     href: "/certified-translation",
     match: (pathname) => pathname.startsWith("/certified-translation"),
   },
-  {
-    label: "Settings",
-    href: "/settings",
-    match: (pathname) => pathname.startsWith("/settings"),
-  },
 ];
 
 // Routes that manage their own header — suppress the app nav here
@@ -56,7 +51,7 @@ export default function Nav() {
   }
 
   return (
-    <nav className="border-b border-slate-200 bg-white">
+    <nav className="border-b border-stone-200" style={{ backgroundColor: "#F5F2EC" }}>
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
         <Link
           href="/dashboard"
@@ -80,7 +75,7 @@ export default function Nav() {
                 className={[
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-stone-900 text-white"
+                    ? "bg-[#1A110A] text-white"
                     : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
                 ].join(" ")}
               >
