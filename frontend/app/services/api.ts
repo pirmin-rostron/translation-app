@@ -93,48 +93,48 @@ export type GlossaryTermCreate = {
 
 export const documentsApi = {
   list: <T>() =>
-    apiFetch<T>(`${API_URL}/api/documents`),
+    apiFetch<T>(`${API_URL}/documents`),
 
   getById: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}`),
+    apiFetch<T>(`${API_URL}/documents/${id}`),
 
   getBlocks: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/blocks`),
+    apiFetch<T>(`${API_URL}/documents/${id}/blocks`),
 
   getSegments: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/segments`),
+    apiFetch<T>(`${API_URL}/documents/${id}/segments`),
 
   getTranslationJobs: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/translation-jobs`),
+    apiFetch<T>(`${API_URL}/documents/${id}/translation-jobs`),
 
   getStages: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/stages`),
+    apiFetch<T>(`${API_URL}/documents/${id}/stages`),
 
   getProgress: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/progress`),
+    apiFetch<T>(`${API_URL}/documents/${id}/progress`),
 
   parse: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/parse`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/documents/${id}/parse`, { method: "POST" }),
 
   retry: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/retry`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/documents/${id}/retry`, { method: "POST" }),
 
   createTranslationJob: <T>(id: number, translationStyle: "natural" | "literal") =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/translation-jobs`, {
+    apiFetch<T>(`${API_URL}/documents/${id}/translation-jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ translation_style: translationStyle }),
     }),
 
   updateSourceLanguage: <T>(id: number, sourceLanguage: string) =>
-    apiFetch<T>(`${API_URL}/api/documents/${id}/source-language`, {
+    apiFetch<T>(`${API_URL}/documents/${id}/source-language`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source_language: sourceLanguage }),
     }),
 
   uploadAndTranslate: <T>(formData: FormData) =>
-    apiFetch<T>(`${API_URL}/api/documents/upload-and-translate`, {
+    apiFetch<T>(`${API_URL}/documents/upload-and-translate`, {
       method: "POST",
       body: formData,
     }),
@@ -184,7 +184,7 @@ export const translationJobsApi = {
 
 export const translationResultsApi = {
   update: <T>(resultId: number, finalTranslation: string, reviewStatus: string) =>
-    apiFetch<T>(`${API_URL}/api/translation-results/${resultId}`, {
+    apiFetch<T>(`${API_URL}/translation-results/${resultId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ final_translation: finalTranslation, review_status: reviewStatus }),
@@ -223,15 +223,15 @@ export const usageApi = {
 
 export const glossaryTermsApi = {
   list: <T>() =>
-    apiFetch<T>(`${API_URL}/api/glossary-terms`),
+    apiFetch<T>(`${API_URL}/glossary-terms`),
 
   create: <T>(data: GlossaryTermCreate) =>
-    apiFetch<T>(`${API_URL}/api/glossary-terms`, {
+    apiFetch<T>(`${API_URL}/glossary-terms`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
 
   delete: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/api/glossary-terms/${id}`, { method: "DELETE" }),
+    apiFetch<T>(`${API_URL}/glossary-terms/${id}`, { method: "DELETE" }),
 };
