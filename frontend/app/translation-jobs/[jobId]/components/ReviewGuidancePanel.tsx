@@ -44,37 +44,37 @@ export function ReviewGuidancePanel({
   const showAmbiguityRow = unresolvedAmbiguities > 0;
 
   return (
-    <section ref={reviewGuidanceRef} className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Review Guidance</p>
+    <section ref={reviewGuidanceRef} className="mb-6 border border-stone-200 bg-white p-5">
+      <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Review Guidance</p>
 
-      <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Status overview</p>
-        <p className="mt-1 text-xl font-semibold text-slate-900">{statusLabel}</p>
+      <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Status overview</p>
+        <p className="mt-1 text-xl font-semibold" style={{ color: "#1A110A" }}>{statusLabel}</p>
       </div>
 
-      <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Progress summary</p>
-        <p className="mt-1 text-sm text-slate-700">
-          <span className="font-semibold text-slate-900">{completedBlocks}</span> of{" "}
-          <span className="font-semibold text-slate-900">{totalBlocks}</span> blocks reviewed
+      <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Progress summary</p>
+        <p className="mt-1 text-sm text-stone-600">
+          <span className="font-semibold" style={{ color: "#1A110A" }}>{completedBlocks}</span> of{" "}
+          <span className="font-semibold" style={{ color: "#1A110A" }}>{totalBlocks}</span> blocks reviewed
         </p>
-        <p className="mt-1 text-sm text-slate-700">
-          Remaining blocks: <span className="font-semibold text-slate-900">{unresolvedBlocks}</span>
+        <p className="mt-1 text-sm text-stone-600">
+          Remaining blocks: <span className="font-semibold" style={{ color: "#1A110A" }}>{unresolvedBlocks}</span>
         </p>
         {showAmbiguityRow && (
-          <p className="mt-1 text-sm text-slate-700">
-            Ambiguities: <span className="font-semibold text-slate-900">{unresolvedAmbiguities}</span>
+          <p className="mt-1 text-sm text-stone-600">
+            Ambiguities: <span className="font-semibold" style={{ color: "#1A110A" }}>{unresolvedAmbiguities}</span>
           </p>
         )}
       </div>
 
-      <div className="mt-3 rounded-lg border border-indigo-200 bg-white px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recommended next step</p>
-        <p className="mt-1 text-sm text-slate-700">{recommendedNextStep}</p>
+      <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Recommended next step</p>
+        <p className="mt-1 text-sm text-stone-600">{recommendedNextStep}</p>
       </div>
 
-      <p className="mt-3 text-sm text-slate-600">
-        Style: <span className="font-medium text-slate-900">{translationStyle === "literal" ? "Literal" : "Natural"}</span>
+      <p className="mt-3 text-xs text-stone-400">
+        Style: <span className="font-medium">{translationStyle === "literal" ? "Literal" : "Natural"}</span>
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -82,7 +82,8 @@ export function ReviewGuidancePanel({
           type="button"
           onClick={onPrimaryAction}
           disabled={actionLoading || isPrimaryActionDisabled}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundColor: "#0D7B6E" }}
         >
           {primaryActionLabel}
         </button>
@@ -90,7 +91,7 @@ export function ReviewGuidancePanel({
           <button
             type="button"
             onClick={onSecondaryAction}
-            className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+            className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             {secondaryActionLabel}
           </button>

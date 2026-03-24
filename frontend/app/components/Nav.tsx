@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
 ];
 
 // Routes that manage their own header — suppress the app nav here
-const NAV_SUPPRESSED_ROUTES = ["/", "/login", "/register", "/dashboard"];
+const NAV_SUPPRESSED_ROUTES = ["/", "/login", "/register"];
 
 export default function Nav() {
   const pathname = usePathname();

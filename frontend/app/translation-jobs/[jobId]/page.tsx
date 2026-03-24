@@ -794,21 +794,21 @@ function TranslationReviewPageInner() {
     if (!block.segments.length) {
       const fallbackText = side === "source" ? (block.source_text_display || "") : (block.translated_text_display || "");
       return (
-        <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md transition-colors hover:bg-slate-100/60">
+        <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md transition-colors hover:bg-stone-100/60">
           {fallbackText}
         </span>
       );
     }
 
     return (
-      <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-slate-100/60">
+      <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-stone-100/60">
         {block.segments.map((segment) => {
           const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
           const isUnresolvedAmbiguity = segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
           const shouldHighlight = isUnresolvedAmbiguity || isResolvedAmbiguity;
           const highlightClass = isUnresolvedAmbiguity
             ? "bg-amber-100 border-b-2 border-amber-400 rounded-sm px-0.5"
-            : "bg-purple-100 border-b-2 border-purple-300 rounded-sm px-0.5";
+            : "bg-teal-100 border-b-2 border-teal-300 rounded-sm px-0.5";
 
           const text = side === "source" ? segment.source_text : (segment.final_translation || "");
           const ambiguityAnnotation = shouldHighlight
@@ -858,7 +858,7 @@ function TranslationReviewPageInner() {
   function renderNode(node: DocumentNode, side: "source" | "target") {
     if (node.type === "bullet_list") {
       return (
-        <ul className="list-disc space-y-3 pl-6 marker:text-slate-400">
+        <ul className="list-disc space-y-3 pl-6 marker:text-stone-400">
           {node.blocks.map((block) => {
             return (
               <li
@@ -868,7 +868,7 @@ function TranslationReviewPageInner() {
                   blockRefs.current[block.id] = el;
                 }}
               >
-                <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">
+                <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
                   {renderInlineSegments(block, side)}
                 </p>
               </li>
@@ -889,7 +889,7 @@ function TranslationReviewPageInner() {
           }}
           className="p-1"
         >
-          <H className="text-xl font-semibold leading-8 text-slate-900">{body}</H>
+          <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>{body}</H>
         </div>
       );
     }
@@ -900,7 +900,7 @@ function TranslationReviewPageInner() {
         }}
         className="p-1"
       >
-        <p className="text-[15px] leading-7 whitespace-pre-wrap text-slate-900">{body}</p>
+        <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>{body}</p>
       </div>
     );
   }
@@ -1273,9 +1273,9 @@ function TranslationReviewPageInner() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
-  if (error && !job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
-  if (!job) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Job not found</div>;
+  if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Loading…</div>;
+  if (error && !job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>{error}</div>;
+  if (!job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
   const reviewComplete = Boolean(reviewSummary?.review_complete);
@@ -1371,22 +1371,27 @@ function TranslationReviewPageInner() {
   const isPrimaryGuidanceDisabled = false;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
       <main className="mx-auto max-w-7xl px-6 py-12">
         <Link
           href={`/documents/${job.document_id}`}
-          className="mb-6 inline-block text-sm text-slate-600 hover:text-slate-900"
+          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-900"
         >
           ← Back to document
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Translation Review</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1
+            className="text-2xl font-semibold"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+          >
+            Translation Review
+          </h1>
+          <p className="mt-1 text-sm text-stone-500">
             {doc?.filename ?? `#${job.document_id}`} • {getLanguageDisplayName(job.source_language)} →{" "}
             {getLanguageDisplayName(job.target_language)}
           </p>
-          <p className="mt-2 text-sm text-slate-600">Follow the workflow below to review and export.</p>
+          <p className="mt-2 text-sm text-stone-500">Follow the workflow below to review and export.</p>
           {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
         </div>
 
@@ -1485,26 +1490,26 @@ function TranslationReviewPageInner() {
         </div>
         {/* Pagination controls */}
         {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+          <div className="mt-8 flex items-center justify-between border-t border-stone-200 pt-6">
             <button
               type="button"
               onClick={() => handlePageChange(page - 1)}
               disabled={page <= 1}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               ← Previous
             </button>
             <div className="text-center">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-stone-600">
                 Page {page} of {totalPages}
               </p>
-              <p className="text-xs text-slate-400">{totalBlocks} blocks total</p>
+              <p className="text-xs text-stone-400">{totalBlocks} blocks total</p>
             </div>
             <button
               type="button"
               onClick={() => handlePageChange(page + 1)}
               disabled={page >= totalPages}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next →
             </button>
@@ -1513,22 +1518,22 @@ function TranslationReviewPageInner() {
 
         {/* More blocks translating indicator — shown when on the last available page and job is still running */}
         {page >= totalPages && ["translation_queued", "translating"].includes(job.status) && (
-          <p className="mt-4 text-center text-xs text-slate-500">
+          <p className="mt-4 text-center text-xs text-stone-500">
             More blocks translating… page count will update as they complete.
           </p>
         )}
 
         {showExportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
-            <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-slate-900">Export settings</h3>
-              <p className="mt-1 text-sm text-slate-600">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4">
+            <div className="w-full max-w-lg border border-stone-200 bg-white p-6">
+              <h3 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Export settings</h3>
+              <p className="mt-1 text-sm text-stone-600">
                 Choose export options for this download.
               </p>
               <div className="mt-4 space-y-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Export format</p>
-                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Export format</p>
+                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -1539,12 +1544,12 @@ function TranslationReviewPageInner() {
                         className="mt-0.5"
                       />
                       <div>
-                        <p className="text-sm font-medium text-slate-900">DOCX</p>
-                        <p className="mt-1 text-xs text-slate-600">Best for sharing editable documents.</p>
+                        <p className="text-sm font-medium" style={{ color: "#1A110A" }}>DOCX</p>
+                        <p className="mt-1 text-xs text-stone-600">Best for sharing editable documents.</p>
                       </div>
                     </div>
                   </label>
-                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -1555,12 +1560,12 @@ function TranslationReviewPageInner() {
                         className="mt-0.5"
                       />
                       <div>
-                        <p className="text-sm font-medium text-slate-900">RTF</p>
-                        <p className="mt-1 text-xs text-slate-600">Rich text output compatible with many editors.</p>
+                        <p className="text-sm font-medium" style={{ color: "#1A110A" }}>RTF</p>
+                        <p className="mt-1 text-xs text-stone-600">Rich text output compatible with many editors.</p>
                       </div>
                     </div>
                   </label>
-                  <label className="mt-2 block rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -1571,16 +1576,16 @@ function TranslationReviewPageInner() {
                         className="mt-0.5"
                       />
                       <div>
-                        <p className="text-sm font-medium text-slate-900">TXT</p>
-                        <p className="mt-1 text-xs text-slate-600">Plain text export for simple delivery.</p>
+                        <p className="text-sm font-medium" style={{ color: "#1A110A" }}>TXT</p>
+                        <p className="mt-1 text-xs text-stone-600">Plain text export for simple delivery.</p>
                       </div>
                     </div>
                   </label>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formatting</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Formatting</p>
                 </div>
-                <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
+                <label className="block cursor-pointer border border-stone-200 bg-white px-3 py-3">
                   <div className="flex items-start gap-2">
                     <input
                       type="radio"
@@ -1591,14 +1596,14 @@ function TranslationReviewPageInner() {
                       className="mt-0.5"
                     />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">Preserve original formatting</p>
-                      <p className="mt-1 text-xs text-slate-600">
+                      <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Preserve original formatting</p>
+                      <p className="mt-1 text-xs text-stone-600">
                         Preserve original formatting: keeps headings, spacing, and structure where possible.
                       </p>
                     </div>
                   </div>
                 </label>
-                <label className="block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3">
+                <label className="block cursor-pointer border border-stone-200 bg-white px-3 py-3">
                   <div className="flex items-start gap-2">
                     <input
                       type="radio"
@@ -1609,15 +1614,15 @@ function TranslationReviewPageInner() {
                       className="mt-0.5"
                     />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">Clean text only</p>
-                      <p className="mt-1 text-xs text-slate-600">
+                      <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Clean text only</p>
+                      <p className="mt-1 text-xs text-stone-600">
                         Clean text only: removes formatting and exports plain reviewed text.
                       </p>
                     </div>
                   </div>
                 </label>
                 {lastExportTimestamp && (
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  <p className="border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
                     Last export: {new Date(lastExportTimestamp).toLocaleString()} • Format:{" "}
                     {lastExportFormat.toUpperCase()} • Last mode:{" "}
                     {lastExportMode === "preserve_formatting"
@@ -1632,7 +1637,7 @@ function TranslationReviewPageInner() {
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
                 >
                   Cancel
                 </button>
@@ -1640,7 +1645,8 @@ function TranslationReviewPageInner() {
                   type="button"
                   onClick={handleExportDocumentWorkflow}
                   disabled={actionLoading}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-emerald-300"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  style={{ backgroundColor: "#0D7B6E" }}
                 >
                   Export document
                 </button>
@@ -1649,26 +1655,26 @@ function TranslationReviewPageInner() {
           </div>
         )}
         {showPreviewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
-            <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-xl">
-              <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4">
+            <div className="w-full max-w-4xl border border-stone-200 bg-white">
+              <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Preview</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">{previewDocumentName || doc?.filename || "Document"}</p>
+                  <h3 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Preview</h3>
+                  <p className="mt-0.5 text-xs text-stone-500">{previewDocumentName || doc?.filename || "Document"}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => { void navigator.clipboard.writeText(previewContentDisplay); }}
                     disabled={previewLoading || Boolean(previewError) || !previewContentDisplay}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                    className="rounded-full border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
                   >
                     Copy to clipboard
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowPreviewModal(false)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="rounded-full border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
                   >
                     Close
                   </button>
@@ -1676,11 +1682,11 @@ function TranslationReviewPageInner() {
               </div>
               <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
                 {previewLoading ? (
-                  <p className="text-sm text-slate-600">Loading preview…</p>
+                  <p className="text-sm text-stone-600">Loading preview…</p>
                 ) : previewError ? (
                   <p className="text-sm text-red-600">{previewError}</p>
                 ) : (
-                  <article className="whitespace-pre-wrap text-[15px] leading-7 text-slate-900">{previewContentDisplay}</article>
+                  <article className="whitespace-pre-wrap text-[15px] leading-7" style={{ color: "#1A110A" }}>{previewContentDisplay}</article>
                 )}
               </div>
             </div>
@@ -1693,7 +1699,7 @@ function TranslationReviewPageInner() {
 
 export default function TranslationReviewPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 p-6">Loading…</div>}>
+    <Suspense fallback={<div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Loading…</div>}>
       <TranslationReviewPageInner />
     </Suspense>
   );

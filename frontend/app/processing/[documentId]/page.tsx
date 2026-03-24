@@ -343,27 +343,32 @@ export default function ProcessingPage() {
     return () => window.clearTimeout(timer);
   }, [latestJob, router, translationDone]);
 
-  if (loading) return <div className="min-h-screen bg-slate-50 p-6">Preparing translation pipeline...</div>;
-  if (!doc) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">Document not found.</div>;
+  if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Preparing translation pipeline...</div>;
+  if (!doc) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Document not found.</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-2xl font-bold text-slate-900">Preparing your translation review</h1>
-        <p className="mt-1 text-sm text-slate-600">{doc.filename}</p>
+        <h1
+          className="text-2xl font-semibold"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+        >
+          Preparing your translation review
+        </h1>
+        <p className="mt-1 text-sm text-stone-500">{doc.filename}</p>
 
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-lg font-semibold text-slate-900">{currentStatusHeading}</p>
-          <p className="mt-1 text-sm text-slate-600">{currentStatusSupport}</p>
+        <section className="mt-6 border border-stone-200 bg-white p-6">
+          <p className="text-lg font-semibold" style={{ color: "#1A110A" }}>{currentStatusHeading}</p>
+          <p className="mt-1 text-sm text-stone-500">{currentStatusSupport}</p>
 
           <div className="mt-4">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-2 w-full overflow-hidden bg-stone-100">
               <div
-                className={`h-full rounded-full transition-all ${hasFailure ? "bg-amber-500" : "bg-indigo-600"}`}
+                className={`h-full transition-all ${hasFailure ? "bg-amber-500" : "bg-[#0D7B6E]"}`}
                 style={{ width: `${Math.max(0, Math.min(100, displayProgress))}%` }}
               />
             </div>
-            <p className="mt-1 text-xs text-slate-600">{displayProgress}% complete</p>
+            <p className="mt-1 text-xs text-stone-400">{displayProgress}% complete</p>
           </div>
 
           <ol className="mt-5 space-y-3">
@@ -372,34 +377,39 @@ export default function ProcessingPage() {
                 <span
                   className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
                     step.status === "complete"
-                      ? "bg-emerald-100 text-emerald-700"
+                      ? "text-white"
                       : step.status === "current"
-                        ? "bg-indigo-100 text-indigo-700"
+                        ? "bg-stone-200 text-stone-700"
                         : step.status === "failed"
                           ? "bg-red-100 text-red-700"
-                          : "bg-slate-100 text-slate-500"
+                          : "bg-stone-100 text-stone-400"
                   }`}
+                  style={step.status === "complete" ? { backgroundColor: "#0D7B6E" } : undefined}
                 >
                   {step.status === "complete" ? "✓" : index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${step.status === "upcoming" ? "text-slate-500" : "text-slate-900"}`}>
+                  <p
+                    className="text-sm font-medium"
+                    style={step.status === "upcoming" ? { color: "#78716c" } : { color: "#1A110A" }}
+                  >
                     {step.title}
                   </p>
-                  <p className={`text-xs ${step.status === "upcoming" ? "text-slate-400" : "text-slate-600"}`}>{step.subtitle}</p>
+                  <p className={`text-xs ${step.status === "upcoming" ? "text-stone-400" : "text-stone-500"}`}>{step.subtitle}</p>
                 </div>
               </li>
             ))}
           </ol>
 
           {translationDone && latestJob && (
-            <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm font-medium text-emerald-800">Your document is ready for review.</p>
-              <p className="mt-1 text-xs text-emerald-700">Opening review automatically…</p>
+            <div className="mt-5 border border-stone-200 bg-stone-50 p-4">
+              <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Your document is ready for review.</p>
+              <p className="mt-1 text-xs text-stone-500">Opening review automatically…</p>
               <button
                 type="button"
                 onClick={() => router.replace(`/translation-jobs/${latestJob.id}`)}
-                className="mt-3 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500"
+                className="mt-3 rounded-full px-3 py-2 text-xs font-medium text-white"
+                style={{ backgroundColor: "#0D7B6E" }}
               >
                 Open review now
               </button>
@@ -407,7 +417,7 @@ export default function ProcessingPage() {
           )}
 
           {hasFailure && (
-            <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="mt-5 border border-red-200 bg-red-50 p-4">
               <p className="text-sm font-medium text-red-700">
                 {parseFailed ? "Parsing could not be completed" : "Translation could not be completed"}
               </p>
@@ -420,7 +430,8 @@ export default function ProcessingPage() {
                     type="button"
                     onClick={handleRetryDocument}
                     disabled={actionLoading}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                    className="rounded-full px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+                    style={{ backgroundColor: "#0D7B6E" }}
                   >
                     Retry this step
                   </button>
@@ -430,7 +441,8 @@ export default function ProcessingPage() {
                     type="button"
                     onClick={handleRetryTranslation}
                     disabled={actionLoading}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                    className="rounded-full px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+                    style={{ backgroundColor: "#0D7B6E" }}
                   >
                     Retry this step
                   </button>
@@ -443,7 +455,7 @@ export default function ProcessingPage() {
         </section>
 
         <div className="mt-4">
-          <Link href={`/documents/${documentId}`} className="text-sm text-slate-600 underline hover:text-slate-900">
+          <Link href={`/documents/${documentId}`} className="text-xs text-stone-400 hover:text-stone-900">
             Open advanced document controls
           </Link>
         </div>
