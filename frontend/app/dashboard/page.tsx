@@ -18,17 +18,10 @@ type TranslationJob = {
   document_name: string | null;
 };
 
-type DashboardStats = {
-  documents_this_month: number;
-  words_translated: number;
-  jobs_completed: number;
-};
-
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
 const QUERY_KEYS = {
   recentJobs: ["translation-jobs", "recent"] as const,
-  stats: ["dashboard", "stats"] as const,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,25 +56,6 @@ function getFirstName(fullName: string | null | undefined, email: string): strin
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-sm border border-stone-200 bg-white px-6 py-5">
-      <p
-        className="text-xs font-medium uppercase tracking-widest"
-        style={{ color: "#0D7B6E" }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-2 text-3xl font-semibold"
-        style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
 
 function JobRow({ job }: { job: TranslationJob }) {
   return (
@@ -132,13 +106,6 @@ export default function DashboardPage() {
     staleTime: 30_000,
   });
 
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: QUERY_KEYS.stats,
-    queryFn: () => apiFetch(`${API_URL}/translation-jobs/stats`) as Promise<DashboardStats>,
-    enabled: !!token,
-    staleTime: 60_000,
-  });
-
   if (!hasHydrated) return null;
   if (!token) return null;
 
@@ -179,15 +146,6 @@ export default function DashboardPage() {
             New translation
           </Link>
         </div>
-
-        {/* ── Stats ── */}
-        {stats && (
-          <div className="mb-8 grid grid-cols-3 gap-4">
-            <StatCard label="Docs this month" value={stats.documents_this_month} />
-            <StatCard label="Words translated" value={stats.words_translated.toLocaleString()} />
-            <StatCard label="Jobs completed" value={stats.jobs_completed} />
-          </div>
-        )}
 
         {/* ── Recent jobs ── */}
         <div className="rounded-sm border border-stone-200 bg-white">
