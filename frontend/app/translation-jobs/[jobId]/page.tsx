@@ -470,6 +470,7 @@ function TranslationReviewPageInner() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [translatingBannerDismissed, setTranslatingBannerDismissed] = useState(false);
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<number, HTMLElement | null>>({});
   const reviewGuidanceRef = useRef<HTMLElement>(null);
@@ -1413,6 +1414,23 @@ function TranslationReviewPageInner() {
           message={message || undefined}
           error={error || undefined}
         />
+
+        {/* Still-translating banner — shown while job is processing, auto-hides on in_review */}
+        {job.status === "translating" && !translatingBannerDismissed && (
+          <div className="flex items-center justify-between gap-3 rounded border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-800">
+              Still translating — more blocks will appear as they complete.
+            </p>
+            <button
+              type="button"
+              onClick={() => setTranslatingBannerDismissed(true)}
+              className="shrink-0 text-amber-600 hover:text-amber-900"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <DocumentDiffPane
