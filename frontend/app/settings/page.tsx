@@ -1,17 +1,357 @@
-export default function SettingsPage() {
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch, API_URL } from "../services/api";
+import { useAuthStore } from "../stores/authStore";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type UserMe = {
+  id: number;
+  email: string;
+  full_name: string | null;
+  is_admin: boolean;
+  created_at: string;
+};
+
+// ── Toggle component ───────────────────────────────────────────────────────
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="mt-2 text-slate-600">
-          Configure translation preferences and workspace defaults here as the app grows.
+    <div className="flex items-start justify-between gap-4 py-4">
+      <div className="flex-1">
+        <p className="text-sm font-medium" style={{ color: "#1A110A" }}>
+          {label}
         </p>
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-600">
-            No settings are available yet, but this route is now part of the main navigation.
-          </p>
-        </div>
+        {description && <p className="mt-0.5 text-xs text-stone-400">{description}</p>}
       </div>
-    </main>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
+          checked ? "bg-[#0D7B6E]" : "bg-stone-200"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ── Section wrapper ────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`border border-stone-200 bg-white px-6 py-6 ${className ?? ""}`}>
+      <h2
+        className="mb-5 text-base font-semibold"
+        style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+      >
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  // Profile state
+  const [profile, setProfile] = useState<UserMe | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [fullName, setFullName] = useState("");
+  // PATCH /auth/me does not exist — save is disabled until backend implements it
+  const [profileMessage, setProfileMessage] = useState("");
+  const [profileError, setProfileError] = useState("");
+
+  // Email preferences state
+  // TODO: no API endpoint for email preferences yet — toggles are non-functional
+  const [notifyCompletion, setNotifyCompletion] = useState(true);
+  const [notifyDigest, setNotifyDigest] = useState(false);
+  const [notifyProduct, setNotifyProduct] = useState(true);
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  // Fetch profile on mount
+  useEffect(() => {
+    void apiFetch<UserMe>(`${API_URL}/auth/me`)
+      .then((me) => {
+        setProfile(me);
+        setFullName(me.full_name ?? "");
+      })
+      .catch(() => {
+        // Redirect if unauthenticated
+        router.replace("/login");
+      })
+      .finally(() => setProfileLoading(false));
+  }, [router]);
+
+  async function handleDeleteAccount() {
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      // DELETE /auth/me — soft-anonymises the account (GDPR right-to-erasure)
+      await apiFetch<unknown>(`${API_URL}/auth/me`, { method: "DELETE" });
+      clearAuth();
+      router.replace("/");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+      setDeleteLoading(false);
+    }
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>
+        Loading…
+      </div>
+    );
+  }
+
+  const deleteConfirmValid = deleteConfirmText === "DELETE";
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
+      <main className="mx-auto max-w-2xl px-6 py-12">
+        <h1
+          className="mb-1 text-2xl font-semibold"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+        >
+          Settings
+        </h1>
+        <p className="mb-8 text-sm text-stone-500">Manage your account and preferences.</p>
+
+        <div className="space-y-6">
+          {/* ════════════════════════════════════════════════════════════
+              Section 1 — Personal information
+          ════════════════════════════════════════════════════════════ */}
+          <Section title="Personal information">
+            <div className="space-y-4">
+              {/* Full name — editable */}
+              <div>
+                <label
+                  htmlFor="full-name"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400"
+                >
+                  Full name
+                </label>
+                <input
+                  id="full-name"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-300 focus:border-[#0D7B6E] focus:outline-none"
+                />
+              </div>
+
+              {/* Email — read-only */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400">
+                  Email
+                </label>
+                <div className="flex items-center gap-2 border border-stone-200 bg-stone-50 px-3 py-2">
+                  <span className="flex-1 text-sm text-stone-500">{profile?.email}</span>
+                  <span className="text-xs text-stone-400">read-only</span>
+                </div>
+              </div>
+
+              {/* Member since */}
+              {profile?.created_at && (
+                <p className="text-xs text-stone-400">
+                  Member since {new Date(profile.created_at).toLocaleDateString("en-AU", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              )}
+            </div>
+
+            {/* PATCH /auth/me does not exist — save button disabled until backend implements it */}
+            <div className="mt-5">
+              <button
+                type="button"
+                disabled
+                title="Profile editing is not yet available"
+                className="rounded-full px-4 py-2 text-sm font-medium text-white opacity-40 cursor-not-allowed"
+                style={{ backgroundColor: "#0D7B6E" }}
+              >
+                Save changes
+              </button>
+              <p className="mt-1.5 text-xs text-stone-400">
+                Profile editing coming soon.
+              </p>
+              {profileMessage && (
+                <p className="mt-2 text-sm text-[#0D7B6E]">{profileMessage}</p>
+              )}
+              {profileError && (
+                <p className="mt-2 text-sm text-red-600">{profileError}</p>
+              )}
+            </div>
+          </Section>
+
+          {/* ════════════════════════════════════════════════════════════
+              Section 2 — Email preferences
+          ════════════════════════════════════════════════════════════ */}
+          <Section title="Email preferences">
+            <div className="divide-y divide-stone-100">
+              <Toggle
+                label="Translation completion notifications"
+                description="Get notified when a translation job finishes."
+                checked={notifyCompletion}
+                onChange={setNotifyCompletion}
+                disabled
+              />
+              <Toggle
+                label="Weekly usage digest"
+                description="A summary of your translation activity each week."
+                checked={notifyDigest}
+                onChange={setNotifyDigest}
+                disabled
+              />
+              <Toggle
+                label="Product updates"
+                description="News about new features and improvements."
+                checked={notifyProduct}
+                onChange={setNotifyProduct}
+                disabled
+              />
+            </div>
+
+            {/* TODO: no API endpoint for email preferences yet — save disabled */}
+            <div className="mt-5">
+              <button
+                type="button"
+                disabled
+                title="Email preference saving is not yet available"
+                className="rounded-full px-4 py-2 text-sm font-medium text-white opacity-40 cursor-not-allowed"
+                style={{ backgroundColor: "#0D7B6E" }}
+              >
+                Save preferences
+              </button>
+              <p className="mt-1.5 text-xs text-stone-400">
+                Email preferences coming soon.
+              </p>
+            </div>
+          </Section>
+
+          {/* ════════════════════════════════════════════════════════════
+              Section 3 — Danger zone
+          ════════════════════════════════════════════════════════════ */}
+          <section className="border border-red-200 bg-white px-6 py-6">
+            <h2 className="mb-1 text-base font-semibold text-red-600">Delete account</h2>
+            <p className="mb-5 text-sm text-stone-500">
+              Permanently anonymises your account and removes you from your organisation. This
+              action cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteConfirmText("");
+                setDeleteError("");
+                setShowDeleteModal(true);
+              }}
+              className="border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete account
+            </button>
+          </section>
+        </div>
+      </main>
+
+      {/* ── Delete confirmation modal ── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 px-4">
+          <div className="w-full max-w-md border border-stone-200 bg-white px-6 py-6">
+            <h3
+              className="mb-1 text-lg font-semibold"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+            >
+              Delete your account?
+            </h3>
+            <p className="mb-5 text-sm text-stone-500">
+              This will anonymise your account and remove you from your organisation. All your
+              data remains on record for compliance purposes but will no longer be linked to
+              your identity.
+            </p>
+
+            <label
+              htmlFor="delete-confirm"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400"
+            >
+              Type <span className="font-semibold text-stone-700">DELETE</span> to confirm
+            </label>
+            <input
+              id="delete-confirm"
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="mb-5 w-full border border-stone-300 bg-white px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
+            />
+
+            {deleteError && (
+              <p className="mb-3 text-sm text-red-600">{deleteError}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={!deleteConfirmValid || deleteLoading}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-40"
+              >
+                {deleteLoading ? "Deleting…" : "Delete account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
