@@ -1516,7 +1516,9 @@ def get_translation_job(
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
-    return job
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    response = TranslationJobResponse.model_validate(job)
+    return response.model_copy(update={"document_name": doc.filename if doc else None})
 
 
 @router.get("/translation-jobs/{job_id}/progress", response_model=TranslationProgressResponse)
@@ -2198,4 +2200,15 @@ def list_translation_jobs(
         .limit(limit)
         .all()
     )
-    return jobs
+    doc_ids = [j.document_id for j in jobs]
+    docs = (
+        {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
+        if doc_ids
+        else {}
+    )
+    return [
+        TranslationJobResponse.model_validate(job).model_copy(
+            update={"document_name": docs[job.document_id].filename if job.document_id in docs else None}
+        )
+        for job in jobs
+    ]

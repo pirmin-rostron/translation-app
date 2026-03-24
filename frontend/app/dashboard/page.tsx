@@ -15,7 +15,7 @@ type TranslationJob = {
   source_language: string;
   target_language: string;
   created_at: string;
-  document_name?: string;
+  document_name: string | null;
 };
 
 type DashboardStats = {

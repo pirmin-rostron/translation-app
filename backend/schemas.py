@@ -105,6 +105,7 @@ class TranslationJobResponse(BaseModel):
     translation_batch_size: int | None
     created_at: datetime
     deleted_at: datetime | None = None
+    document_name: str | None = None
 
     class Config:
         from_attributes = True
