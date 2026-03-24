@@ -94,72 +94,91 @@ export default function AllTranslationsPage() {
   const error = errorMessage || actionError;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
       <main className="mx-auto max-w-6xl px-6 py-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">All Translations</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1
+              className="text-2xl font-semibold"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+            >
+              All Translations
+            </h1>
+            <p className="mt-1 text-sm text-stone-500">
               Your main workspace for imported documents, translation jobs, and review.
             </p>
           </div>
           <Link
             href="/upload"
-            className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="inline-flex rounded-full px-4 py-2 text-sm font-medium text-white"
+            style={{ backgroundColor: "#0D7B6E" }}
           >
             New translation
           </Link>
         </div>
 
-        {loading && <p className="text-slate-600">Loading…</p>}
+        {loading && <p className="text-stone-600">Loading…</p>}
         {error && <p className="mb-4 text-red-600">{error}</p>}
         {!loading && !errorMessage && docs.length === 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-600 shadow-sm">
+          <div className="border border-stone-200 bg-white p-8 text-stone-600">
             No translations yet. Import a document to get started.
           </div>
         )}
         {!loading && docs.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <table className="min-w-full divide-y divide-slate-200">
+          <div className="overflow-hidden border border-stone-200 bg-white">
+            <table className="min-w-full divide-y divide-stone-100">
               <thead>
-                <tr className="bg-slate-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                <tr className="bg-stone-50">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Filename
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Source
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Target
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Industry
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Domain
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-slate-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-stone-100">
                 {docs.map((doc) => {
                   const latestJob = latestJobsByDocumentId[doc.id];
                   const workflowStatus = latestJob?.status ?? doc.status;
                   const workflowError = latestJob?.error_message ?? doc.error_message;
+                  const statusBadgeClass =
+                    workflowStatus === "in_review" || workflowStatus === "draft_saved" || workflowStatus === "review_complete" || workflowStatus === "ready_for_export"
+                      ? "bg-teal-50 text-[#0D7B6E]"
+                      : workflowStatus === "exported"
+                        ? "bg-stone-100 text-stone-600"
+                        : workflowStatus === "translation_queued" || workflowStatus === "translating" || workflowStatus === "parsing"
+                          ? "bg-amber-50 text-amber-700"
+                          : workflowStatus === "failed" || workflowStatus === "parse_failed"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-stone-50 text-stone-500";
+                  const statusLabel = workflowStatus
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (c) => c.toUpperCase());
                   return (
-                  <tr key={doc.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                  <tr key={doc.id} className="hover:bg-stone-50">
+                    <td className="px-6 py-4 text-sm font-medium">
                       <Link
                         href={
                           latestJob && REVIEW_STATUSES.has(workflowStatus)
@@ -168,33 +187,34 @@ export default function AllTranslationsPage() {
                               ? `/processing/${doc.id}`
                               : `/documents/${doc.id}`
                         }
-                        className="text-slate-900 hover:underline"
+                        className="hover:text-[#0D7B6E]"
+                        style={{ color: "#1A110A" }}
                       >
                         {doc.filename}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{doc.file_type}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-stone-600">{doc.file_type}</td>
+                    <td className="px-6 py-4 text-sm text-stone-600">
                       {getLanguageDisplayName(doc.source_language)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-stone-600">
                       {getLanguageDisplayName(doc.target_language)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{doc.industry ?? "—"}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{doc.domain ?? "—"}</td>
+                    <td className="px-6 py-4 text-sm text-stone-600">{doc.industry ?? <span className="text-stone-300">—</span>}</td>
+                    <td className="px-6 py-4 text-sm text-stone-600">{doc.domain ?? <span className="text-stone-300">—</span>}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-800">
-                        {workflowStatus}
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium ${statusBadgeClass}`}>
+                        {statusLabel}
                       </span>
                       {workflowError && <p className="mt-1 text-xs text-red-600">{workflowError}</p>}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{formatDate(doc.created_at)}</td>
+                    <td className="px-6 py-4 text-sm text-stone-600">{formatDate(doc.created_at)}</td>
                     <td className="px-6 py-4 flex gap-2">
                       <button
                         type="button"
                         onClick={() => void handleOpenWorkflow(doc)}
                         disabled={openingDocId === doc.id}
-                        className="text-sm text-slate-600 hover:text-slate-900"
+                        className={`text-sm hover:underline disabled:opacity-50 ${REVIEW_STATUSES.has(workflowStatus) ? "text-[#0D7B6E]" : "text-stone-600 hover:text-stone-900"}`}
                       >
                         {openingDocId === doc.id
                           ? "Opening…"
@@ -208,7 +228,7 @@ export default function AllTranslationsPage() {
                         <button
                           onClick={() => handleParse(doc.id)}
                           disabled={parsingId === doc.id}
-                          className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                          className="text-sm text-stone-600 hover:text-stone-900 disabled:opacity-50"
                         >
                           {parsingId === doc.id ? "Processing…" : doc.status === "uploaded" ? "Parse" : "Retry parse"}
                         </button>
