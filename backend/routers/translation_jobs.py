@@ -2180,6 +2180,7 @@ def list_document_translation_jobs(
     return jobs
 
 
+@router.get("", response_model=list[TranslationJobResponse])
 @router.get("/", response_model=list[TranslationJobResponse])
 def list_translation_jobs(
     limit: int = Query(default=10, ge=1, le=50),
