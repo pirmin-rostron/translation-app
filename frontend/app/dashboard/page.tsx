@@ -126,7 +126,7 @@ export default function DashboardPage() {
   const { data: jobs, isLoading: jobsLoading } = useQuery<TranslationJob[]>({
     queryKey: QUERY_KEYS.recentJobs,
     queryFn: () =>
-      apiFetch("/translation-jobs?limit=5&order=desc") as Promise<TranslationJob[]>,
+      apiFetch("/translation-jobs?limit=10&order=desc") as Promise<TranslationJob[]>,
     enabled: !!token,
     staleTime: 30_000,
   });
@@ -243,6 +243,9 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        <Link href="/documents" className="mt-3 inline-block text-sm font-medium hover:underline" style={{ color: "#0D7B6E" }}>
+          View all translations →
+        </Link>
 
         {/* ── Quick actions ── */}
         <div className="mt-6 grid grid-cols-3 gap-4">

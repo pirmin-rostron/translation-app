@@ -12,12 +12,9 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    label: "All Translations",
-    href: "/documents",
-    match: (pathname) =>
-      pathname.startsWith("/documents") ||
-      pathname.startsWith("/processing") ||
-      pathname.startsWith("/translation-jobs"),
+    label: "Dashboard",
+    href: "/dashboard",
+    match: (pathname) => pathname === "/dashboard",
   },
   {
     label: "Upload",
