@@ -75,8 +75,8 @@ export default function Nav() {
                 className={[
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-[#1A110A] text-white"
-                    : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
+                    ? "bg-[#0D7B6E] text-white"
+                    : "text-stone-600 hover:bg-stone-200 hover:text-stone-900",
                 ].join(" ")}
               >
                 {item.label}
