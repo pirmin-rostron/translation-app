@@ -93,7 +93,7 @@ export default function Nav() {
         <div className="flex items-center gap-3">
           {user && (
             <Link
-              href="/dashboard"
+              href="/settings"
               className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
             >
               {user.full_name ?? user.email}

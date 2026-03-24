@@ -113,6 +113,10 @@ class OrgCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
 
 
+class UpdateMeRequest(BaseModel):
+    full_name: Optional[str] = None
+
+
 class InviteRequest(BaseModel):
     email: str
     role: str
@@ -285,6 +289,24 @@ def login(
 @router.get("/me", response_model=UserMe)
 def me(current_user: User = Depends(get_current_active_user)):
     """Return the profile of the currently authenticated user."""
+    return current_user
+
+
+@router.patch("/me", response_model=UserMe)
+def update_me(
+    data: UpdateMeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update mutable profile fields for the currently authenticated user.
+
+    Currently supports: full_name. Fields omitted from the request body are
+    left unchanged. Returns the updated user object.
+    """
+    if data.full_name is not None:
+        current_user.full_name = data.full_name
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

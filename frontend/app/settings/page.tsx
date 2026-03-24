@@ -87,12 +87,15 @@ function Section({
 export default function SettingsPage() {
   const router = useRouter();
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const storeToken = useAuthStore((s) => s.token);
+  const storeUser = useAuthStore((s) => s.user);
 
   // Profile state
   const [profile, setProfile] = useState<UserMe | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [fullName, setFullName] = useState("");
-  // PATCH /auth/me does not exist — save is disabled until backend implements it
+  const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
 
@@ -121,6 +124,29 @@ export default function SettingsPage() {
       })
       .finally(() => setProfileLoading(false));
   }, [router]);
+
+  async function handleSaveProfile() {
+    setProfileSaving(true);
+    setProfileMessage("");
+    setProfileError("");
+    try {
+      const updated = await apiFetch<UserMe>(`${API_URL}/auth/me`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: fullName }),
+      });
+      setProfile(updated);
+      // Update the nav immediately — reuse existing token, replace user object
+      if (storeToken && storeUser) {
+        setAuth(storeToken, { id: storeUser.id, email: storeUser.email, full_name: updated.full_name });
+      }
+      setProfileMessage("Saved");
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function handleDeleteAccount() {
     setDeleteLoading(true);
@@ -204,20 +230,16 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* PATCH /auth/me does not exist — save button disabled until backend implements it */}
             <div className="mt-5">
               <button
                 type="button"
-                disabled
-                title="Profile editing is not yet available"
-                className="rounded-full px-4 py-2 text-sm font-medium text-white opacity-40 cursor-not-allowed"
+                onClick={() => void handleSaveProfile()}
+                disabled={profileSaving}
+                className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "#0D7B6E" }}
               >
-                Save changes
+                {profileSaving ? "Saving…" : "Save changes"}
               </button>
-              <p className="mt-1.5 text-xs text-stone-400">
-                Profile editing coming soon.
-              </p>
               {profileMessage && (
                 <p className="mt-2 text-sm text-[#0D7B6E]">{profileMessage}</p>
               )}
