@@ -91,115 +91,140 @@ export default function GlossaryPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <main className="mx-auto max-w-5xl px-6 py-12">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">Glossary</h1>
+  const INPUT = "w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[#0D7B6E] focus:outline-none";
 
-        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Bulk CSV import</h2>
-          <p className="mt-1 text-sm text-slate-600">
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
+      <main className="mx-auto max-w-5xl px-6 py-12">
+        <h1
+          className="mb-6 text-2xl font-semibold"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+        >
+          Glossary
+        </h1>
+
+        {/* Bulk CSV import */}
+        <div className="mb-6 border border-stone-200 bg-white p-6">
+          <h2 className="text-base font-semibold" style={{ color: "#1A110A" }}>
+            Bulk CSV import
+          </h2>
+          <p className="mt-1 text-sm text-stone-500">
             Use bulk import to seed terminology quickly, then manage terms here with create/delete actions.
           </p>
           <Link
             href="/imports"
-            className="mt-4 inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="mt-4 inline-flex border border-stone-300 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             Open glossary CSV import
           </Link>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Add term</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Add term */}
+        <div className="mb-6 border border-stone-200 bg-white p-6">
+          <h2 className="mb-4 text-base font-semibold" style={{ color: "#1A110A" }}>
+            Add term
+          </h2>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <input
               value={form.source_term}
               onChange={(e) => setForm((current) => ({ ...current, source_term: e.target.value }))}
               placeholder="Source term"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
               required
             />
             <input
               value={form.target_term}
               onChange={(e) => setForm((current) => ({ ...current, target_term: e.target.value }))}
               placeholder="Target term"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
               required
             />
             <input
               value={form.source_language}
               onChange={(e) => setForm((current) => ({ ...current, source_language: e.target.value }))}
               placeholder="Source language"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
               required
             />
             <input
               value={form.target_language}
               onChange={(e) => setForm((current) => ({ ...current, target_language: e.target.value }))}
               placeholder="Target language"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
               required
             />
             <input
               value={form.industry}
               onChange={(e) => setForm((current) => ({ ...current, industry: e.target.value }))}
               placeholder="Industry (optional)"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
             />
             <input
               value={form.domain}
               onChange={(e) => setForm((current) => ({ ...current, domain: e.target.value }))}
               placeholder="Domain (optional)"
-              className="rounded border border-slate-300 px-3 py-2 text-sm"
+              className={INPUT}
             />
-            <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 md:col-span-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-400"
+                className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "#0D7B6E" }}
               >
-                {saving ? "Saving..." : "Save glossary term"}
+                {saving ? "Saving…" : "Save glossary term"}
               </button>
-              {message && <span className="text-sm text-green-600">{message}</span>}
+              {message && <span className="text-sm" style={{ color: "#0D7B6E" }}>{message}</span>}
               {error && <span className="text-sm text-red-600">{error}</span>}
             </div>
           </form>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Glossary terms</h2>
+        {/* Terms list */}
+        <div className="border border-stone-200 bg-white">
+          <div className="border-b border-stone-100 px-6 py-4">
+            <h2 className="text-base font-semibold" style={{ color: "#1A110A" }}>
+              Glossary terms
+            </h2>
+          </div>
           {loading ? (
-            <p className="text-slate-600">Loading...</p>
+            <p className="px-6 py-8 text-sm text-stone-400">Loading…</p>
           ) : terms.length === 0 ? (
-            <p className="text-slate-600">No glossary terms yet.</p>
+            <p className="px-6 py-8 text-sm text-stone-400">No glossary terms yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-slate-500">
-                    <th className="py-2 pr-4 font-medium">Source</th>
-                    <th className="py-2 pr-4 font-medium">Target</th>
-                    <th className="py-2 pr-4 font-medium">Languages</th>
-                    <th className="py-2 pr-4 font-medium">Industry</th>
-                    <th className="py-2 pr-4 font-medium">Domain</th>
-                    <th className="py-2 font-medium">Action</th>
+              <table className="min-w-full divide-y divide-stone-100 text-sm">
+                <thead className="bg-stone-50">
+                  <tr>
+                    {["Source", "Target", "Languages", "Industry", "Domain", "Action"].map((col) => (
+                      <th
+                        key={col}
+                        className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400"
+                      >
+                        {col}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-stone-100">
                   {terms.map((term) => (
-                    <tr key={term.id} className="border-b border-slate-100">
-                      <td className="py-3 pr-4 text-slate-900">{term.source_term}</td>
-                      <td className="py-3 pr-4 text-slate-900">{term.target_term}</td>
-                      <td className="py-3 pr-4 text-slate-600">
-                        {term.source_language} -&gt; {term.target_language}
+                    <tr key={term.id} className="hover:bg-stone-50">
+                      <td className="px-4 py-3 font-medium" style={{ color: "#1A110A" }}>
+                        {term.source_term}
                       </td>
-                      <td className="py-3 pr-4 text-slate-600">{term.industry ?? "—"}</td>
-                      <td className="py-3 pr-4 text-slate-600">{term.domain ?? "—"}</td>
-                      <td className="py-3">
+                      <td className="px-4 py-3 font-medium" style={{ color: "#1A110A" }}>
+                        {term.target_term}
+                      </td>
+                      <td className="px-4 py-3 text-stone-500">
+                        {term.source_language} → {term.target_language}
+                      </td>
+                      <td className="px-4 py-3 text-stone-500">{term.industry ?? <span className="text-stone-300">—</span>}</td>
+                      <td className="px-4 py-3 text-stone-500">{term.domain ?? <span className="text-stone-300">—</span>}</td>
+                      <td className="px-4 py-3">
                         <button
                           type="button"
                           onClick={() => handleDelete(term.id)}
-                          className="rounded border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+                          className="text-sm text-red-500 hover:text-red-700"
                         >
                           Delete
                         </button>
