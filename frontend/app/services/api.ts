@@ -13,7 +13,7 @@ function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
-async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const authHeaders = getAuthHeaders();
   const mergedHeaders: Record<string, string> = {
     ...authHeaders,

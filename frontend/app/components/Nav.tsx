@@ -13,9 +13,8 @@ type NavItem = {
 const navItems: NavItem[] = [
   {
     label: "All Translations",
-    href: "/",
+    href: "/documents",
     match: (pathname) =>
-      pathname === "/" ||
       pathname.startsWith("/documents") ||
       pathname.startsWith("/processing") ||
       pathname.startsWith("/translation-jobs"),
@@ -42,15 +41,17 @@ const navItems: NavItem[] = [
   },
 ];
 
+// Routes that manage their own header — suppress the app nav here
+const NAV_SUPPRESSED_ROUTES = ["/", "/login", "/register", "/dashboard"];
+
 export default function Nav() {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
-  // Landing page renders its own header — suppress the app nav there.
-  // All hooks must be called unconditionally above this point.
-  if (pathname === "/") return null;
+  // All hooks must be called unconditionally above this point
+  if (NAV_SUPPRESSED_ROUTES.includes(pathname)) return null;
 
   function handleLogout() {
     clearAuth();
@@ -60,8 +61,15 @@ export default function Nav() {
   return (
     <nav className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-        <Link href="/" className="text-lg font-semibold text-slate-900 hover:text-slate-700">
-          Translation Workspace
+        <Link
+          href="/dashboard"
+          className="text-lg font-semibold"
+          style={{
+            fontFamily: "'Playfair Display', Georgia, serif",
+            color: "#1A110A",
+          }}
+        >
+          Helvara
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -75,8 +83,8 @@ export default function Nav() {
                 className={[
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                    ? "bg-stone-900 text-white"
+                    : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
                 ].join(" ")}
               >
                 {item.label}
@@ -87,14 +95,17 @@ export default function Nav() {
 
         <div className="flex items-center gap-3">
           {user && (
-            <span className="text-sm text-slate-500">
+            <Link
+              href="/dashboard"
+              className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+            >
               {user.full_name ?? user.email}
-            </span>
+            </Link>
           )}
           <button
             type="button"
             onClick={handleLogout}
-            className="text-sm text-slate-500 hover:text-slate-900"
+            className="text-sm text-stone-400 hover:text-stone-900 transition-colors"
           >
             Logout
           </button>

@@ -18,6 +18,7 @@ function LoginPageContent() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get("reason") === "session_expired";
+  const from = searchParams.get("from");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +31,6 @@ function LoginPageContent() {
     setLoading(true);
 
     try {
-      // OAuth2PasswordRequestForm expects form-encoded username + password
       const body = new URLSearchParams();
       body.set("username", email.trim().toLowerCase());
       body.set("password", password);
@@ -48,7 +48,9 @@ function LoginPageContent() {
 
       const data = (await res.json()) as LoginResponse;
       setAuth(data.access_token, data.user);
-      router.push("/");
+
+      // Respect ?from= redirect, else go to personal dashboard
+      router.push(from ?? "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -57,71 +59,114 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-500">Translation App</p>
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{ backgroundColor: "#F5F2EC" }}
+    >
+      <div className="w-full max-w-sm">
 
-        {sessionExpired && (
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Your session has expired. Please log in again.
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <Link
+            href="/"
+            className="text-2xl font-semibold"
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              color: "#1A110A",
+            }}
+          >
+            Helvara
+          </Link>
+        </div>
+
+        <div className="rounded-sm border border-stone-200 bg-white px-8 py-8">
+          <h1
+            className="text-xl font-semibold"
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              color: "#1A110A",
+            }}
+          >
+            Sign in
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "#0D7B6E" }}>
+            Welcome back
           </p>
-        )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              placeholder="you@example.com"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
+          {sessionExpired && (
+            <p className="mt-4 rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Your session has expired. Please sign in again.
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-xs font-medium uppercase tracking-wider"
+                style={{ color: "#1A110A" }}
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1.5 w-full border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder-stone-300 focus:border-stone-900 focus:outline-none"
+                placeholder="you@company.com"
+              />
+            </div>
 
-        <p className="mt-5 text-center text-sm text-slate-500">
-          No account?{" "}
-          <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Create one
-          </Link>
-        </p>
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-xs font-medium uppercase tracking-wider"
+                style={{ color: "#1A110A" }}
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1.5 w-full border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder-stone-300 focus:border-stone-900 focus:outline-none"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <p className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-2 w-full rounded-full px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              style={{ backgroundColor: "#0D7B6E" }}
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-stone-400">
+            No account?{" "}
+            <Link
+              href="/register"
+              className="font-medium transition-colors hover:underline"
+              style={{ color: "#0D7B6E" }}
+            >
+              Create one
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
