@@ -32,7 +32,7 @@ from limiter import limiter
 
 
 router = APIRouter(
-    prefix="/api/documents",
+    prefix="/documents",
     tags=["documents"],
     dependencies=[Depends(get_current_active_user)],
 )

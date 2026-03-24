@@ -12,7 +12,7 @@ from services.auth import get_current_active_user, get_current_org
 from services.glossary import normalize_optional
 
 router = APIRouter(
-    prefix="/api/glossary-terms",
+    prefix="/glossary-terms",
     tags=["glossary-terms"],
     dependencies=[Depends(get_current_active_user)],
 )

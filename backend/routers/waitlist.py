@@ -10,7 +10,7 @@ from limiter import limiter
 from models import OrgMembership, WaitlistEntry
 from services.auth import require_org_role
 
-router = APIRouter(prefix="/api/waitlist", tags=["waitlist"])
+router = APIRouter(prefix="/waitlist", tags=["waitlist"])
 
 
 # --- Schemas ---

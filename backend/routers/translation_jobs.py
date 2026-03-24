@@ -59,7 +59,7 @@ from limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
-    prefix="/api",
+    prefix="/translation-jobs",
     tags=["translation-jobs"],
     dependencies=[Depends(get_current_active_user)],
 )
@@ -992,7 +992,7 @@ def _list_export_files(job: TranslationJob, doc: Document) -> list[ExportFileRes
         parsed.append(
             ExportFileResponse(
                 filename=path.name,
-                download_url=f"/api/translation-jobs/{job.id}/exports/{path.name}",
+                download_url=f"/translation-jobs/{job.id}/exports/{path.name}",
                 generated_at=generated_at,
                 version=version,
                 export_format=export_format,
@@ -1904,7 +1904,7 @@ def export_translation_job(
         export_format=normalized_export_format,
         export_mode=effective_export_mode,
         filename=filename,
-        download_url=f"/api/translation-jobs/{job.id}/exports/{filename}",
+        download_url=f"/translation-jobs/{job.id}/exports/{filename}",
         generated_at=exported_at,
         version=version,
     )
