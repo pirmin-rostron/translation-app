@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { documentsApi, translationJobsApi } from "../services/api";
 
@@ -42,6 +42,10 @@ const REVIEW_READY_STATUSES = new Set([
   "exported",
 ]);
 
+const MAX_FILES = 20;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_EXTS = new Set(["docx", "txt", "rtf", "zip"]);
+
 // ─── types ────────────────────────────────────────────────────────────────────
 
 type TranslationStyle = "natural" | "formal" | "literal";
@@ -50,6 +54,7 @@ type FileStatus = "queued" | "uploading" | "translating" | "ready" | "error";
 type FileEntry = {
   id: string;
   file: File;
+  kind: "file" | "zip";
   targetLanguage: string;
   translationStyle: TranslationStyle;
   industry: string;
@@ -57,15 +62,19 @@ type FileEntry = {
   status: FileStatus;
   jobId: number | null;
   error: string;
+  zipSkipped?: string[];
 };
 
 type JobStub = { id: number; status: string; error_message: string | null };
+type ZipUploadResponse = {
+  documents: { id: number; filename: string }[];
+  skipped_files: string[];
+};
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function isValidFile(f: File): boolean {
-  const ext = f.name.toLowerCase().split(".").pop();
-  return ext === "docx" || ext === "txt" || ext === "rtf";
+function getExt(f: File): string {
+  return f.name.toLowerCase().split(".").pop() ?? "";
 }
 
 function sleep(ms: number): Promise<void> {
@@ -80,10 +89,12 @@ function makeEntryId(f: File): string {
 
 export default function UploadPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Shared "Apply to all" defaults
   const [sharedTargetLanguage, setSharedTargetLanguage] = useState("German");
-  const [sharedTranslationStyle, setSharedTranslationStyle] = useState<TranslationStyle>("natural");
+  const [sharedTranslationStyle, setSharedTranslationStyle] =
+    useState<TranslationStyle>("natural");
   const [sharedIndustry, setSharedIndustry] = useState("");
   const [sharedDomain, setSharedDomain] = useState("");
 
@@ -93,6 +104,7 @@ export default function UploadPage() {
   // UI state
   const [isProcessing, setIsProcessing] = useState(false);
   const [globalError, setGlobalError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
 
   // ── derived ────────────────────────────────────────────────────────────────
 
@@ -110,29 +122,32 @@ export default function UploadPage() {
     );
   }
 
-  // ── file selection ─────────────────────────────────────────────────────────
+  // ── file processing ────────────────────────────────────────────────────────
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []);
-    e.target.value = ""; // allow re-selecting the same file later
-
-    if (selected.length === 0) return;
+  function processFiles(files: File[]) {
+    if (files.length === 0) return;
 
     const errors: string[] = [];
     const newEntries: FileEntry[] = [];
 
-    for (const f of selected) {
-      if (!isValidFile(f)) {
-        errors.push(`${f.name}: only DOCX, TXT, RTF allowed`);
+    for (const f of files) {
+      const ext = getExt(f);
+      if (!ALLOWED_EXTS.has(ext)) {
+        errors.push(`${f.name}: only DOCX, TXT, RTF, ZIP allowed`);
         continue;
       }
-      if (f.size > 10 * 1024 * 1024) {
+      if (f.size > MAX_FILE_SIZE_BYTES) {
         errors.push(`${f.name}: must be under 10 MB`);
+        continue;
+      }
+      if (fileList.length + newEntries.length >= MAX_FILES) {
+        errors.push(`Maximum ${MAX_FILES} files reached — ${f.name} skipped`);
         continue;
       }
       newEntries.push({
         id: makeEntryId(f),
         file: f,
+        kind: ext === "zip" ? "zip" : "file",
         targetLanguage: sharedTargetLanguage,
         translationStyle: sharedTranslationStyle,
         industry: sharedIndustry,
@@ -143,8 +158,36 @@ export default function UploadPage() {
       });
     }
 
-    setGlobalError(errors.join(" • "));
-    setFileList((prev) => [...prev, ...newEntries]);
+    if (errors.length > 0) setGlobalError(errors.join(" · "));
+    if (newEntries.length > 0) setFileList((prev) => [...prev, ...newEntries]);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setGlobalError("");
+    processFiles(Array.from(e.target.files ?? []));
+    e.target.value = "";
+  }
+
+  // ── drag and drop ──────────────────────────────────────────────────────────
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    setGlobalError("");
+    processFiles(Array.from(e.dataTransfer.files));
   }
 
   function handleRemoveFile(id: string) {
@@ -165,11 +208,7 @@ export default function UploadPage() {
 
   // ── polling ────────────────────────────────────────────────────────────────
 
-  // Returns the jobId once the document is uploaded, a job exists, and that
-  // job reaches a review-ready status.  Updates the entry's status to
-  // "translating" as soon as the job ID is known.
   async function pollUntilReady(docId: number, entryId: string): Promise<number> {
-    // Step 1: wait for the translation job to be created (max 90 s)
     let jobId: number | null = null;
     for (let attempt = 0; attempt < 30 && jobId === null; attempt++) {
       await sleep(3000);
@@ -185,7 +224,6 @@ export default function UploadPage() {
     }
     if (jobId === null) throw new Error("Translation job did not start within 90 s");
 
-    // Step 2: wait for job to reach a review-ready status (max 10 min)
     for (let attempt = 0; attempt < 200; attempt++) {
       await sleep(3000);
       const job = await translationJobsApi.getById<JobStub>(jobId);
@@ -197,6 +235,50 @@ export default function UploadPage() {
     throw new Error("Translation timed out");
   }
 
+  async function pollZipDocs(
+    docs: { id: number; filename: string }[],
+    entryId: string
+  ): Promise<void> {
+    updateEntry(entryId, { status: "translating" });
+
+    const results = await Promise.allSettled(
+      docs.map(async ({ id: docId }) => {
+        let jobId: number | null = null;
+        for (let attempt = 0; attempt < 30 && jobId === null; attempt++) {
+          await sleep(3000);
+          try {
+            const jobs = await documentsApi.getTranslationJobs<JobStub[]>(docId);
+            if (jobs.length > 0) jobId = jobs[0].id;
+          } catch {
+            // transient — retry
+          }
+        }
+        if (jobId === null) throw new Error("Translation job did not start within 90 s");
+
+        for (let attempt = 0; attempt < 200; attempt++) {
+          await sleep(3000);
+          const job = await translationJobsApi.getById<JobStub>(jobId);
+          if (REVIEW_READY_STATUSES.has(job.status)) return;
+          if (job.status === "failed") {
+            throw new Error(job.error_message ?? "Translation failed");
+          }
+        }
+        throw new Error("Translation timed out");
+      })
+    );
+
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      const reason = (failures[0] as PromiseRejectedResult).reason;
+      updateEntry(entryId, {
+        status: "error",
+        error: reason instanceof Error ? reason.message : "One or more files failed",
+      });
+    } else {
+      updateEntry(entryId, { status: "ready" });
+    }
+  }
+
   // ── submit ─────────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
@@ -204,21 +286,21 @@ export default function UploadPage() {
     setGlobalError("");
 
     if (fileList.length === 0) {
-      setGlobalError("Please select at least one file");
+      setGlobalError("Please add at least one file");
       return;
     }
 
     setIsProcessing(true);
 
-    // ── single-file: preserve original redirect-to-processing behaviour ──
-    if (fileList.length === 1) {
+    // Single non-ZIP file: preserve original redirect behaviour
+    if (fileList.length === 1 && fileList[0].kind === "file") {
       const entry = fileList[0];
       updateEntry(entry.id, { status: "uploading" });
       try {
         const formData = buildFormData(entry);
         const created = await documentsApi.uploadAndTranslate<{ id: number }>(formData);
         router.push(`/processing/${created.id}`);
-        // component will unmount on navigation — no further state updates needed
+        // Component will unmount on navigation — no further state updates needed
       } catch (err) {
         updateEntry(entry.id, {
           status: "error",
@@ -229,23 +311,38 @@ export default function UploadPage() {
       return;
     }
 
-    // ── multi-file: sequential queue ──
-    // Snapshot the list so the loop is stable even if setFileList fires.
+    // Multi-file / ZIP sequential queue
     const snapshot = [...fileList];
 
     for (const entry of snapshot) {
       updateEntry(entry.id, { status: "uploading" });
       try {
         const formData = buildFormData(entry);
-        const created = await documentsApi.uploadAndTranslate<{ id: number }>(formData);
-        const jobId = await pollUntilReady(created.id, entry.id);
-        updateEntry(entry.id, { status: "ready", jobId });
+        if (entry.kind === "zip") {
+          const result =
+            await documentsApi.uploadAndTranslate<ZipUploadResponse>(formData);
+          const skipped = result.skipped_files ?? [];
+          if (skipped.length > 0) updateEntry(entry.id, { zipSkipped: skipped });
+          if (result.documents.length === 0) {
+            updateEntry(entry.id, {
+              status: "error",
+              error: "ZIP contained no valid documents",
+            });
+            continue;
+          }
+          await pollZipDocs(result.documents, entry.id);
+        } else {
+          const created =
+            await documentsApi.uploadAndTranslate<{ id: number }>(formData);
+          const jobId = await pollUntilReady(created.id, entry.id);
+          updateEntry(entry.id, { status: "ready", jobId });
+        }
       } catch (err) {
         updateEntry(entry.id, {
           status: "error",
           error: err instanceof Error ? err.message : "Failed",
         });
-        // continue with remaining files
+        // Continue with remaining files
       }
     }
 
@@ -265,57 +362,129 @@ export default function UploadPage() {
   // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="mb-2 text-2xl font-bold text-slate-900">Upload Documents</h1>
-        <p className="mb-6 text-sm text-slate-600">
-          Select one or more files. Each will be parsed, translated, and queued for review.
-        </p>
+
+        {/* ── Header ── */}
+        <div className="mb-8">
+          <p
+            className="mb-1 text-xs font-medium uppercase tracking-widest"
+            style={{ color: "#0D7B6E" }}
+          >
+            New translation
+          </p>
+          <h1
+            className="text-3xl font-semibold"
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              color: "#1A110A",
+            }}
+          >
+            Upload Documents
+          </h1>
+          <p className="mt-2 text-sm text-stone-500">
+            DOCX, TXT, RTF, or ZIP · max 10 MB per file · max {MAX_FILES} files
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ── file picker ── */}
+
+          {/* ── Drop zone ── */}
           {!isProcessing && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <label
-                htmlFor="files"
-                className="mb-1 block text-sm font-medium text-slate-700"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Drop zone — click or drag files here"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ")
+                  fileInputRef.current?.click();
+              }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={[
+                "cursor-pointer border-2 border-dashed px-8 py-16 text-center transition-colors",
+                isDragging
+                  ? "border-[#0D7B6E] bg-teal-50"
+                  : "border-stone-300 bg-white hover:border-stone-400 hover:bg-stone-50",
+              ].join(" ")}
+            >
+              <div className="flex justify-center">
+                <svg
+                  width="36"
+                  height="36"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDragging ? "#0D7B6E" : "#9ca3af"}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              <p
+                className={[
+                  "mt-3 text-sm font-medium",
+                  isDragging ? "text-[#0D7B6E]" : "text-stone-700",
+                ].join(" ")}
               >
-                Files <span className="font-normal text-slate-400">(DOCX, TXT, RTF — max 10 MB each)</span>
-              </label>
-              <input
-                id="files"
-                type="file"
-                accept=".docx,.txt,.rtf"
-                multiple
-                onChange={handleFileChange}
-                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-slate-800 hover:file:bg-slate-200"
-              />
+                Drop documents here
+              </p>
+              <p className="mt-1 text-xs text-stone-400">or click to browse</p>
             </div>
           )}
 
-          {/* ── apply-to-all defaults (only shown while configuring) ── */}
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx,.txt,.rtf,.zip"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          {/* ── Apply to all (multi-file, pre-processing) ── */}
           {fileList.length > 1 && !isProcessing && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="mb-3 text-sm font-semibold text-slate-700">Apply defaults to all files</p>
+            <div className="border border-stone-200 bg-white px-5 py-5">
+              <p
+                className="mb-3 text-sm font-semibold"
+                style={{ color: "#1A110A" }}
+              >
+                Apply defaults to all files
+              </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Target language</label>
+                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                    Target language
+                  </label>
                   <select
                     value={sharedTargetLanguage}
                     onChange={(e) => setSharedTargetLanguage(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {TARGET_LANGUAGE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Style</label>
+                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                    Style
+                  </label>
                   <select
                     value={sharedTranslationStyle}
-                    onChange={(e) => setSharedTranslationStyle(e.target.value as TranslationStyle)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    onChange={(e) =>
+                      setSharedTranslationStyle(e.target.value as TranslationStyle)
+                    }
+                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                   >
                     <option value="natural">Natural</option>
                     <option value="formal">Formal</option>
@@ -323,26 +492,34 @@ export default function UploadPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Industry</label>
+                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                    Industry
+                  </label>
                   <select
                     value={sharedIndustry}
                     onChange={(e) => setSharedIndustry(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {INDUSTRY_OPTIONS.map((o) => (
-                      <option key={o.value || "none"} value={o.value}>{o.label}</option>
+                      <option key={o.value || "none"} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Domain</label>
+                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                    Domain
+                  </label>
                   <select
                     value={sharedDomain}
                     onChange={(e) => setSharedDomain(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {DOMAIN_OPTIONS.map((o) => (
-                      <option key={o.value || "none"} value={o.value}>{o.label}</option>
+                      <option key={o.value || "none"} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -350,65 +527,101 @@ export default function UploadPage() {
               <button
                 type="button"
                 onClick={handleApplyToAll}
-                className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                className="mt-3 border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
               >
                 Apply to all files
               </button>
             </div>
           )}
 
-          {/* ── file list ── */}
+          {/* ── File list ── */}
           {fileList.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 px-5 py-3">
-                <p className="text-sm font-semibold text-slate-700">
+            <div className="border border-stone-200 bg-white">
+              <div className="border-b border-stone-100 px-5 py-3">
+                <p className="text-sm font-semibold" style={{ color: "#1A110A" }}>
                   {fileList.length} {fileList.length === 1 ? "file" : "files"} selected
                 </p>
               </div>
 
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-stone-100">
                 {fileList.map((entry) => (
                   <li key={entry.id} className="px-5 py-4">
-                    {/* ── status row (during / after processing) ── */}
+                    {/* ZIP skipped warning */}
+                    {entry.zipSkipped && entry.zipSkipped.length > 0 && (
+                      <div className="mb-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        Skipped from ZIP: {entry.zipSkipped.join(", ")}
+                      </div>
+                    )}
+
+                    {/* Status row — shown while processing or once started */}
                     {isProcessing || entry.status !== "queued" ? (
                       <div className="flex items-start gap-3">
                         <StatusIcon status={entry.status} />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900">{entry.file.name}</p>
+                          <p
+                            className="truncate text-sm font-medium"
+                            style={{ color: "#1A110A" }}
+                          >
+                            {entry.file.name}
+                          </p>
+                          {entry.kind === "zip" && entry.status === "queued" && (
+                            <p className="mt-0.5 text-xs text-stone-400">
+                              ZIP — contents will be extracted
+                            </p>
+                          )}
                           <StatusLabel entry={entry} />
                         </div>
                       </div>
                     ) : (
-                      /* ── config row (before processing) ── */
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-medium text-slate-900">{entry.file.name}</p>
+                      /* Config row — shown before processing */
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p
+                              className="truncate text-sm font-medium"
+                              style={{ color: "#1A110A" }}
+                            >
+                              {entry.file.name}
+                            </p>
+                            {entry.kind === "zip" && (
+                              <p className="mt-0.5 text-xs text-stone-400">
+                                ZIP — contents will be extracted
+                              </p>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleRemoveFile(entry.id)}
-                            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                            className="shrink-0 px-1.5 py-0.5 text-xs text-stone-400 hover:bg-stone-100 hover:text-stone-600"
                             aria-label={`Remove ${entry.file.name}`}
                           >
                             ×
                           </button>
                         </div>
+
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div>
-                            <label className="mb-0.5 block text-xs text-slate-500">Language</label>
+                            <label className="mb-0.5 block text-xs text-stone-500">
+                              Language
+                            </label>
                             <select
                               value={entry.targetLanguage}
                               onChange={(e) =>
                                 updateEntry(entry.id, { targetLanguage: e.target.value })
                               }
-                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              className="w-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                             >
                               {TARGET_LANGUAGE_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
                               ))}
                             </select>
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-slate-500">Style</label>
+                            <label className="mb-0.5 block text-xs text-stone-500">
+                              Style
+                            </label>
                             <select
                               value={entry.translationStyle}
                               onChange={(e) =>
@@ -416,7 +629,7 @@ export default function UploadPage() {
                                   translationStyle: e.target.value as TranslationStyle,
                                 })
                               }
-                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              className="w-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
                             >
                               <option value="natural">Natural</option>
                               <option value="formal">Formal</option>
@@ -424,7 +637,9 @@ export default function UploadPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-slate-500">Industry</label>
+                            <label className="mb-0.5 block text-xs text-stone-500">
+                              Industry
+                            </label>
                             <input
                               type="text"
                               value={entry.industry}
@@ -432,11 +647,13 @@ export default function UploadPage() {
                                 updateEntry(entry.id, { industry: e.target.value })
                               }
                               placeholder="Optional"
-                              className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              className="w-full border border-stone-300 px-2 py-1 text-xs text-stone-900 placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-slate-500">Domain</label>
+                            <label className="mb-0.5 block text-xs text-stone-500">
+                              Domain
+                            </label>
                             <input
                               type="text"
                               value={entry.domain}
@@ -444,7 +661,7 @@ export default function UploadPage() {
                                 updateEntry(entry.id, { domain: e.target.value })
                               }
                               placeholder="Optional"
-                              className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              className="w-full border border-stone-300 px-2 py-1 text-xs text-stone-900 placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
                             />
                           </div>
                         </div>
@@ -454,12 +671,12 @@ export default function UploadPage() {
                 ))}
               </ul>
 
-              {/* ── summary row when all done ── */}
+              {/* Summary row when all done */}
               {allDone && (
-                <div className="border-t border-slate-100 px-5 py-4">
-                  <p className="text-sm font-medium text-slate-700">
+                <div className="border-t border-stone-100 px-5 py-4">
+                  <p className="text-sm font-medium" style={{ color: "#1A110A" }}>
                     All done —{" "}
-                    <span className="text-emerald-700">{readyCount} ready</span>
+                    <span style={{ color: "#0D7B6E" }}>{readyCount} ready</span>
                     {errorCount > 0 && (
                       <span className="text-red-600"> · {errorCount} failed</span>
                     )}
@@ -469,43 +686,47 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* ── global error ── */}
+          {/* ── Global error ── */}
           {globalError && (
-            <p className="text-sm text-red-600">{globalError}</p>
+            <p className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {globalError}
+            </p>
           )}
 
-          {/* ── actions ── */}
+          {/* ── Actions ── */}
           {!allDone && (
-            <div className="flex gap-3">
+            <div className="flex items-center gap-4">
               <button
                 type="submit"
                 disabled={isProcessing || fileList.length === 0}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: "#0D7B6E" }}
               >
                 {isProcessing
                   ? "Translating…"
                   : fileList.length === 1
                     ? "Translate document"
-                    : `Translate all ${fileList.length > 0 ? `(${fileList.length})` : ""}`}
+                    : `Translate all${fileList.length > 0 ? ` (${fileList.length})` : ""}`}
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/")}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => router.push("/documents")}
+                className="text-sm text-stone-500 transition-colors hover:text-stone-900"
               >
-                Back to All Translations
+                Cancel
               </button>
             </div>
           )}
 
           {allDone && (
-            <div className="flex gap-3">
+            <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={() => router.push("/")}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                onClick={() => router.push("/documents")}
+                className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "#0D7B6E" }}
               >
-                Back to All Translations
+                View all translations
               </button>
               <button
                 type="button"
@@ -514,7 +735,7 @@ export default function UploadPage() {
                   setIsProcessing(false);
                   setGlobalError("");
                 }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="text-sm text-stone-500 transition-colors hover:text-stone-900"
               >
                 Upload more
               </button>
@@ -531,25 +752,27 @@ export default function UploadPage() {
 function StatusIcon({ status }: { status: FileStatus }) {
   if (status === "ready")
     return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-green-700">
         ✓
       </span>
     );
   if (status === "error")
     return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-bold text-red-600">
         ✗
       </span>
     );
   if (status === "uploading" || status === "translating")
     return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs text-indigo-600">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs"
+        style={{ color: "#0D7B6E" }}
+      >
         ⟳
       </span>
     );
   // queued
   return (
-    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">
+    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs text-stone-400">
       ·
     </span>
   );
@@ -557,20 +780,43 @@ function StatusIcon({ status }: { status: FileStatus }) {
 
 function StatusLabel({ entry }: { entry: FileEntry }) {
   if (entry.status === "queued")
-    return <p className="mt-0.5 text-xs text-slate-400">Queued</p>;
+    return <p className="mt-0.5 text-xs text-stone-400">Queued</p>;
   if (entry.status === "uploading")
-    return <p className="mt-0.5 text-xs text-indigo-600">Uploading…</p>;
+    return (
+      <p className="mt-0.5 text-xs" style={{ color: "#0D7B6E" }}>
+        Uploading…
+      </p>
+    );
   if (entry.status === "translating")
-    return <p className="mt-0.5 text-xs text-indigo-600">Translating…</p>;
+    return (
+      <p className="mt-0.5 text-xs" style={{ color: "#0D7B6E" }}>
+        Translating…
+      </p>
+    );
   if (entry.status === "error")
-    return <p className="mt-0.5 text-xs text-red-600">{entry.error || "Failed"}</p>;
+    return (
+      <p className="mt-0.5 text-xs text-red-600">{entry.error || "Failed"}</p>
+    );
   // ready
+  if (entry.kind === "zip") {
+    return (
+      <p className="mt-0.5 text-xs text-green-700">
+        Ready —{" "}
+        <Link
+          href="/documents"
+          className="font-medium underline hover:text-green-900"
+        >
+          View all translations
+        </Link>
+      </p>
+    );
+  }
   return (
-    <p className="mt-0.5 text-xs text-emerald-700">
+    <p className="mt-0.5 text-xs text-green-700">
       Ready —{" "}
       <Link
         href={`/translation-jobs/${entry.jobId}?page=1`}
-        className="font-medium underline hover:text-emerald-900"
+        className="font-medium underline hover:text-green-900"
       >
         Open review
       </Link>

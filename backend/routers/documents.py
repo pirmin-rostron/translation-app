@@ -20,11 +20,13 @@ from schemas import (
     ProcessingStageJobResponse,
     SegmentResponse,
 )
+from fastapi.responses import JSONResponse
 from services.auth import get_current_active_user, get_current_org
 from services.language_detection import detect_language
 from services.parser import parse_document, split_block_into_segments
 from services.storage import get_storage
 from services.usage import DOCUMENT_INGESTED, record_event
+from services.zip_handler import unpack_zip
 from tasks import run_document_pipeline
 from limiter import limiter
 
@@ -37,6 +39,7 @@ router = APIRouter(
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf"}
+ALLOWED_EXTENSIONS_WITH_ZIP = ALLOWED_EXTENSIONS | {".zip"}
 ALLOWED_SOURCE_LANGUAGES = {"en", "de", "fr", "es", "it", "nl", "pt", "zh", "ja", "ko", "ar"}
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -513,10 +516,85 @@ def upload_and_translate_document(
     current_user=Depends(get_current_active_user),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Upload document and automatically run parse + translation for the default flow."""
+    """Upload document and automatically run parse + translation for the default flow.
+
+    Accepts DOCX, TXT, and RTF files (returns a single DocumentResponse) or a
+    ZIP archive (returns ``{"documents": [...], "skipped_files": [...]}``).  The
+    ZIP path creates one Document and one TranslationJob per valid inner file and
+    returns a JSONResponse that bypasses the declared response_model.  Existing
+    non-ZIP callers are unaffected — the response still contains an ``id`` field.
+    """
     style_value = translation_style.strip().lower()
     if style_value not in {"natural", "formal", "literal"}:
         raise HTTPException(status_code=400, detail="translation_style must be one of: formal, literal, natural")
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    ext = Path(file.filename).suffix.lower()
+
+    # ── ZIP upload path ──────────────────────────────────────────────────────
+    if ext == ".zip":
+        contents = file.file.read()
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+
+        try:
+            inner_files, skipped = unpack_zip(contents)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        if not inner_files:
+            raise HTTPException(status_code=400, detail="ZIP contains no valid documents (supported: DOCX, TXT, RTF)")
+
+        uid = current_user.id if current_user is not None else None
+        industry_val = (industry.strip() or None) if industry else None
+        domain_val = (domain.strip() or None) if domain else None
+        customer_id_val = (customer_id.strip() or DEFAULT_CUSTOMER_ID) if customer_id else DEFAULT_CUSTOMER_ID
+        storage = get_storage()
+        created_docs: list[dict] = []
+
+        for inner_filename, inner_bytes in inner_files:
+            inner_ext = Path(inner_filename).suffix.lower()
+            inner_file_type = "docx" if inner_ext == ".docx" else "rtf" if inner_ext == ".rtf" else "txt"
+
+            content_hash = _compute_file_hash(inner_bytes)
+            stored_filename = f"{uuid.uuid4().hex}_{inner_filename}"
+            storage.save(stored_filename, inner_bytes, "application/octet-stream")
+
+            tmp = tempfile.NamedTemporaryFile(suffix=inner_ext, delete=False)
+            try:
+                tmp.write(inner_bytes)
+                tmp.flush()
+                detected = detect_language(Path(tmp.name), inner_file_type)
+            finally:
+                tmp.close()
+                Path(tmp.name).unlink(missing_ok=True)
+            source_language = detected if detected else "unknown"
+
+            doc = Document(
+                filename=inner_filename,
+                stored_filename=stored_filename,
+                file_type=inner_file_type,
+                source_language=source_language,
+                target_language=target_language.strip(),
+                customer_id=customer_id_val,
+                industry=industry_val,
+                domain=domain_val,
+                org_id=current_org.id,
+                content_hash=content_hash,
+                status="uploaded",
+            )
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+
+            run_document_pipeline.delay(doc.id, uid, current_org.id, style_value)
+            created_docs.append({"id": doc.id, "filename": inner_filename})
+
+        return JSONResponse(content={"documents": created_docs, "skipped_files": skipped})
+
+    # ── Non-ZIP path (unchanged behaviour) ───────────────────────────────────
     doc = upload_document(
         request=request,
         file=file,
