@@ -1506,7 +1506,7 @@ def create_translation_job(
     return job
 
 
-@router.get("/translation-jobs/{job_id}", response_model=TranslationJobResponse)
+@router.get("/{job_id}", response_model=TranslationJobResponse)
 def get_translation_job(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1521,7 +1521,7 @@ def get_translation_job(
     return response.model_copy(update={"document_name": doc.filename if doc else None})
 
 
-@router.get("/translation-jobs/{job_id}/progress", response_model=TranslationProgressResponse)
+@router.get("/{job_id}/progress", response_model=TranslationProgressResponse)
 def get_translation_progress(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1533,7 +1533,7 @@ def get_translation_progress(
     return _calculate_translation_progress(db, job)
 
 
-@router.get("/translation-jobs/{job_id}/results", response_model=list[TranslationResultResponse])
+@router.get("/{job_id}/results", response_model=list[TranslationResultResponse])
 def list_translation_results(
     job_id: int,
     filter: str = Query(default="all"),
@@ -1579,7 +1579,7 @@ def list_translation_results(
     return out
 
 
-@router.get("/translation-jobs/{job_id}/review-blocks", response_model=ReviewBlocksPageResponse)
+@router.get("/{job_id}/review-blocks", response_model=ReviewBlocksPageResponse)
 def list_review_blocks(
     job_id: int,
     page: int = Query(default=1, ge=1),
@@ -1713,7 +1713,7 @@ def list_review_blocks(
     )
 
 
-@router.get("/translation-jobs/{job_id}/review-summary", response_model=ReviewSummaryResponse)
+@router.get("/{job_id}/review-summary", response_model=ReviewSummaryResponse)
 def get_review_summary(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1725,7 +1725,7 @@ def get_review_summary(
     return _calculate_review_summary(db, job)
 
 
-@router.post("/translation-jobs/{job_id}/save-draft", response_model=ReviewSummaryResponse)
+@router.post("/{job_id}/save-draft", response_model=ReviewSummaryResponse)
 def save_review_draft(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1744,7 +1744,7 @@ def save_review_draft(
     return _calculate_review_summary(db, job)
 
 
-@router.post("/translation-jobs/{job_id}/approve-safe-segments", response_model=ReviewSummaryResponse)
+@router.post("/{job_id}/approve-safe-segments", response_model=ReviewSummaryResponse)
 def approve_safe_segments(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1779,7 +1779,7 @@ def approve_safe_segments(
     return _calculate_review_summary(db, job)
 
 
-@router.post("/translation-jobs/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
+@router.post("/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
 def mark_ready_for_export(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1812,7 +1812,7 @@ def mark_ready_for_export(
     return _calculate_review_summary(db, job)
 
 
-@router.post("/translation-jobs/{job_id}/mark-ready", response_model=ReviewSummaryResponse)
+@router.post("/{job_id}/mark-ready", response_model=ReviewSummaryResponse)
 def mark_ready_for_export_alias(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1821,7 +1821,7 @@ def mark_ready_for_export_alias(
     return mark_ready_for_export(job_id=job_id, db=db, current_org=current_org)
 
 
-@router.post("/translation-jobs/{job_id}/reopen-review", response_model=ReviewSummaryResponse)
+@router.post("/{job_id}/reopen-review", response_model=ReviewSummaryResponse)
 def reopen_review(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1838,7 +1838,7 @@ def reopen_review(
     return _calculate_review_summary(db, job)
 
 
-@router.post("/translation-jobs/{job_id}/export", response_model=ExportResponse)
+@router.post("/{job_id}/export", response_model=ExportResponse)
 def export_translation_job(
     job_id: int,
     file_type: str | None = Query(default=None),
@@ -1910,7 +1910,7 @@ def export_translation_job(
     )
 
 
-@router.get("/translation-jobs/{job_id}/preview", response_model=PreviewResponse)
+@router.get("/{job_id}/preview", response_model=PreviewResponse)
 def preview_translation_job(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1935,7 +1935,7 @@ def preview_translation_job(
     )
 
 
-@router.get("/translation-jobs/{job_id}/exports", response_model=list[ExportFileResponse])
+@router.get("/{job_id}/exports", response_model=list[ExportFileResponse])
 def list_exports(
     job_id: int,
     db: Session = Depends(get_db),
@@ -1951,7 +1951,7 @@ def list_exports(
     return _list_export_files(job, doc)
 
 
-@router.get("/translation-jobs/{job_id}/exports/{filename}")
+@router.get("/{job_id}/exports/{filename}")
 def download_export(
     job_id: int,
     filename: str,
@@ -2087,7 +2087,7 @@ def update_translation_result(
     )
 
 
-@router.get("/translation-jobs/{job_id}/stages", response_model=list[ProcessingStageJobResponse])
+@router.get("/{job_id}/stages", response_model=list[ProcessingStageJobResponse])
 def list_translation_stage_jobs(
     job_id: int,
     db: Session = Depends(get_db),
@@ -2104,7 +2104,7 @@ def list_translation_stage_jobs(
     )
 
 
-@router.post("/translation-jobs/{job_id}/retry", response_model=TranslationJobResponse)
+@router.post("/{job_id}/retry", response_model=TranslationJobResponse)
 def retry_translation_job(
     job_id: int,
     background_tasks: BackgroundTasks,
@@ -2145,7 +2145,7 @@ def retry_translation_job(
     return job
 
 
-@router.delete("/translation-jobs/{job_id}", status_code=204)
+@router.delete("/{job_id}", status_code=204)
 def delete_translation_job(
     job_id: int,
     db: Session = Depends(get_db),
@@ -2180,7 +2180,7 @@ def list_document_translation_jobs(
     return jobs
 
 
-@router.get("/translation-jobs", response_model=list[TranslationJobResponse])
+@router.get("/", response_model=list[TranslationJobResponse])
 def list_translation_jobs(
     limit: int = Query(default=10, ge=1, le=50),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
