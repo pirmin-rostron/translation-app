@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { RefObject, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { DM_Sans } from "next/font/google";
+import Link from "next/link";
 import "./landing.css";
-
-const dmSans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { Card } from "./components/ui/Card";
 
 type FormState = "idle" | "loading" | "success" | "error";
+
+// ─── Static data ──────────────────────────────────────────────────────────────
 
 const features = [
   {
@@ -20,8 +20,8 @@ const features = [
         <path d="M2 12l10 5 10-5" />
       </svg>
     ),
-    title: "AI-powered translation",
-    body: "Anthropic-grade models translate your documents with full contextual awareness — not word-by-word.",
+    title: "AI Translation",
+    body: "Claude-powered models translate with full contextual awareness — not word by word.",
   },
   {
     icon: (
@@ -30,20 +30,117 @@ const features = [
         <circle cx="12" cy="12" r="3" />
       </svg>
     ),
-    title: "Human review workflow",
-    body: "Every translation passes through a structured review stage. Approve, edit, or flag segments before export.",
+    title: "Human Review",
+    body: "Every translation passes through structured block-by-block review before export.",
   },
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8M12 17v4" />
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       </svg>
     ),
-    title: "Team glossaries",
-    body: "Define terminology once. Helvara enforces your glossary across every document, every language pair.",
+    title: "Team Glossaries",
+    body: "Define terminology once. Helvara enforces it consistently across every document.",
   },
 ];
+
+const stats = [
+  { value: "10M+", label: "words translated" },
+  { value: "500+", label: "documents processed" },
+  { value: "20+",  label: "language pairs" },
+];
+
+const steps = [
+  { n: "1", title: "Upload", body: "Drop your document. Helvara parses and segments it automatically." },
+  { n: "2", title: "Review", body: "AI translates block by block. You review, edit, and approve." },
+  { n: "3", title: "Export", body: "Download your translated document in DOCX, RTF, or TXT." },
+];
+
+// ─── WaitlistForm ─────────────────────────────────────────────────────────────
+
+type WaitlistFormProps = {
+  name: string;
+  email: string;
+  formState: FormState;
+  message: string;
+  nameRef?: RefObject<HTMLInputElement>;
+  onNameChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  dark?: boolean;
+};
+
+function WaitlistForm({
+  name,
+  email,
+  formState,
+  message,
+  nameRef,
+  onNameChange,
+  onEmailChange,
+  onSubmit,
+  dark = false,
+}: WaitlistFormProps) {
+  const isLoading = formState === "loading";
+  const labelClass = `mb-1.5 block text-xs font-medium ${dark ? "text-[#9E9189]" : "text-[#6B6158]"}`;
+  const inputClass = `w-full py-2 text-sm disabled:opacity-50 ${dark ? "input-underline-dark" : "input-underline"}`;
+
+  if (formState === "success") {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-[#0D7B6E]/30 bg-[#E6F4F2] px-6 py-5">
+        <svg className="mt-0.5 shrink-0 text-[#0D7B6E]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <p className="text-sm font-medium text-[#0D7B6E]">{message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className={labelClass}>Your name</label>
+          <input
+            ref={nameRef}
+            type="text"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Ada Lovelace"
+            required
+            disabled={isLoading}
+            className={inputClass}
+          />
+        </div>
+        <div className="flex-1">
+          <label className={labelClass}>Work email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            placeholder="ada@company.com"
+            required
+            disabled={isLoading}
+            className={inputClass}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isLoading || !name.trim() || !email.trim()}
+          className="shrink-0 rounded-full bg-[#0D7B6E] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A6459] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? "Joining…" : "Join the waitlist"}
+        </button>
+      </div>
+      {formState === "error" && (
+        <p className="mt-3 text-xs text-[#B91C1C]">{message}</p>
+      )}
+    </form>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
   const router = useRouter();
@@ -61,7 +158,7 @@ export default function LandingPage() {
     }
   }, [router]);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormState("loading");
     setMessage("");
@@ -89,131 +186,129 @@ export default function LandingPage() {
     }
   }
 
-  const isLoading = formState === "loading";
-
   return (
-    <>
+    <div className="font-sans bg-[#F5F2EC] text-[#1A110A]">
 
-      <main className={`${dmSans.className} min-h-screen bg-[#FAFAFA] text-gray-900`}>
+      {/* ── Nav ───────────────────────────────────────────────────── */}
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-[#E5E0D8] bg-[#F5F2EC]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <span className="font-display text-xl font-semibold text-[#1A110A]">Helvara</span>
+          <Link
+            href="/login"
+            className="rounded-full px-4 py-1.5 text-sm font-medium text-[#0D7B6E] transition-colors hover:bg-[#E6F4F2]"
+          >
+            Log in
+          </Link>
+        </div>
+      </header>
 
-        {/* ── Hero ─────────────────────────────────────────────── */}
-        <section className="grain-hero relative flex min-h-screen flex-col px-6 pt-10 pb-24">
-
-          {/* Brand */}
-          <header className="relative z-10 fade-up fade-up-1">
-            <span className="text-xl font-semibold tracking-tight text-gray-900">
-              Helvara
-            </span>
-          </header>
-
-          {/* Copy + form */}
-          <div className="relative z-10 mx-auto mt-16 w-full max-w-2xl pb-8 pt-10">
-
-            <p className="fade-up fade-up-2 mb-5 text-xs font-semibold uppercase tracking-widest text-teal-600">
-              Coming soon
-            </p>
-
-            <h1 className="fade-up fade-up-2 mb-6 text-[clamp(2.6rem,7vw,4.75rem)] font-bold leading-[1.08] tracking-tight text-gray-900">
-              Intelligent document{" "}
-              <span className="text-teal-600">translation.</span>
-            </h1>
-
-            <p className="fade-up fade-up-3 mb-12 max-w-lg text-lg font-normal leading-relaxed text-gray-500">
-              AI-powered translation with human review. Built for teams that care
-              about precision.
-            </p>
-
-            {/* Waitlist form */}
-            {formState === "success" ? (
-              <div className="fade-up fade-up-3 flex items-start gap-3 rounded-xl border border-teal-200 bg-teal-50 px-6 py-5">
-                <svg className="mt-0.5 shrink-0 text-teal-600" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <p className="text-sm font-medium text-teal-800">{message}</p>
-              </div>
-            ) : (
-              <form
-                onSubmit={handleSubmit}
-                className="fade-up fade-up-3"
-                noValidate
-              >
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className="mb-1.5 block text-xs font-medium text-gray-400">
-                      Your name
-                    </label>
-                    <input
-                      ref={nameRef}
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Ada Lovelace"
-                      required
-                      disabled={isLoading}
-                      className="input-underline w-full py-2 text-sm text-gray-900 disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="mb-1.5 block text-xs font-medium text-gray-400">
-                      Work email
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="ada@company.com"
-                      required
-                      disabled={isLoading}
-                      className="input-underline w-full py-2 text-sm text-gray-900 disabled:opacity-50"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isLoading || !name.trim() || !email.trim()}
-                    className="shrink-0 rounded-lg bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? "Joining…" : "Join the waitlist"}
-                  </button>
-                </div>
-
-                {formState === "error" && (
-                  <p className="mt-3 text-xs text-red-500">{message}</p>
-                )}
-              </form>
-            )}
+      {/* ── Hero ──────────────────────────────────────────────────── */}
+      <section className="grain-hero relative flex min-h-screen items-center justify-center px-6 pt-16">
+        <div className="relative z-10 mx-auto w-full max-w-2xl py-24 text-center">
+          <p className="fade-up fade-up-1 mb-5 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
+            AI-powered document translation
+          </p>
+          <h1 className="fade-up fade-up-2 mb-6 font-display text-[clamp(2.8rem,7vw,4.5rem)] font-bold leading-[1.1] tracking-tight text-[#1A110A]">
+            Precision in every translation.
+          </h1>
+          <p className="fade-up fade-up-3 mb-12 text-lg leading-relaxed text-[#6B6158]">
+            AI-powered translation with human review. Built for teams that care about accuracy.
+          </p>
+          <div className="fade-up fade-up-4">
+            <WaitlistForm
+              name={name}
+              email={email}
+              formState={formState}
+              message={message}
+              nameRef={nameRef}
+              onNameChange={setName}
+              onEmailChange={setEmail}
+              onSubmit={handleSubmit}
+            />
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ── Features ─────────────────────────────────────────── */}
-        <section className="border-t border-gray-100 px-6 py-24">
-          <div className="mx-auto max-w-4xl">
-            <div className="grid gap-10 sm:grid-cols-3">
-              {features.map((f) => (
-                <div key={f.title} className="flex flex-col gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
-                    {f.icon}
-                  </div>
-                  <div>
-                    <h3 className="mb-1.5 text-sm font-semibold text-gray-900">
-                      {f.title}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-gray-500">{f.body}</p>
-                  </div>
-                </div>
-              ))}
+      {/* ── Stats ─────────────────────────────────────────────────── */}
+      {/* Placeholder numbers — will be replaced with live data (PIR-30) */}
+      <section className="border-y border-[#E5E0D8] bg-white px-6 py-14">
+        <div className="mx-auto grid max-w-3xl grid-cols-3 gap-8 text-center">
+          {stats.map((s) => (
+            <div key={s.label}>
+              <p className="text-4xl font-bold text-[#1A110A]">{s.value}</p>
+              <p className="mt-1 text-sm text-[#6B6158]">{s.label}</p>
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+      </section>
 
-        {/* ── Footer ───────────────────────────────────────────── */}
-        <footer className="border-t border-gray-100 px-6 py-8">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
-            <span className="text-xs text-gray-400">© 2026 Helvara</span>
-            <span className="text-xs text-gray-400">Built for precision.</span>
-          </div>
-        </footer>
+      {/* ── Feature cards ─────────────────────────────────────────── */}
+      <section className="px-6 py-24">
+        <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-3">
+          {features.map((f) => (
+            <Card key={f.title} className="flex flex-col gap-5 p-7">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#E6F4F2] text-[#0D7B6E]">
+                {f.icon}
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-[#1A110A]">{f.title}</h3>
+                <p className="text-sm leading-relaxed text-[#6B6158]">{f.body}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
 
-      </main>
-    </>
+      {/* ── How it works ──────────────────────────────────────────── */}
+      <section className="border-t border-[#E5E0D8] bg-white px-6 py-24">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="mb-16 text-center font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
+            From document to delivery in three steps.
+          </h2>
+          <div className="grid gap-10 sm:grid-cols-3">
+            {steps.map((step) => (
+              <div key={step.n} className="flex flex-col gap-4">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6F4F2] text-sm font-bold text-[#0D7B6E]">
+                  {step.n}
+                </span>
+                <div>
+                  <h3 className="mb-1.5 text-sm font-semibold text-[#1A110A]">{step.title}</h3>
+                  <p className="text-sm leading-relaxed text-[#6B6158]">{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ───────────────────────────────────────────────────── */}
+      <section className="bg-[#1A110A] px-6 py-28">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="mb-4 font-display text-[clamp(2rem,5vw,3rem)] font-bold text-white">
+            Ready to translate with confidence?
+          </h2>
+          <p className="mb-10 text-lg text-[#9E9189]">Join the waitlist for early access.</p>
+          <WaitlistForm
+            name={name}
+            email={email}
+            formState={formState}
+            message={message}
+            onNameChange={setName}
+            onEmailChange={setEmail}
+            onSubmit={handleSubmit}
+            dark
+          />
+        </div>
+      </section>
+
+      {/* ── Footer ────────────────────────────────────────────────── */}
+      <footer className="bg-[#1A110A] px-6 pb-10">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 border-t border-white/10 pt-8">
+          <span className="text-xs text-[#9E9189]">© 2026 Helvara</span>
+          <span className="text-xs text-[#9E9189]">Built for precision.</span>
+        </div>
+      </footer>
+
+    </div>
   );
 }

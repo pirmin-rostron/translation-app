@@ -33,3 +33,19 @@
 .input-underline::placeholder {
   color: #9ca3af;
 }
+
+.input-underline-dark {
+  border: none;
+  border-bottom: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  color: #ffffff;
+  transition: border-color 0.15s;
+}
+.input-underline-dark:focus {
+  border-bottom-color: #0D7B6E;
+}
+.input-underline-dark::placeholder {
+  color: rgba(255,255,255,0.35);
+}
