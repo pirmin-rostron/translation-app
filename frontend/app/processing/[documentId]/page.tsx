@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -433,11 +432,6 @@ export default function ProcessingPage() {
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         </section>
 
-        <div className="mt-4">
-          <Link href={`/documents/${documentId}`} className="text-xs text-stone-400 hover:text-stone-900">
-            Open advanced document controls
-          </Link>
-        </div>
       </main>
     </div>
   );

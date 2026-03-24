@@ -1,11 +1,12 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getLanguageDisplayName, SOURCE_LANGUAGE_OVERRIDE_OPTIONS } from "../../utils/language";
 
 import { documentsApi, translationJobsApi } from "../../services/api";
+import { useAuthStore } from "../../stores/authStore";
 
 type Document = {
   id: number;
@@ -94,7 +95,17 @@ function formatEta(seconds: number | null) {
 
 export default function DocumentDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
   const id = Number(params.id);
+
+  // Admin-only page — redirect everyone until is_admin is exposed in AuthUser.
+  // The page remains in the codebase for future internal use.
+  useEffect(() => {
+    router.replace("/dashboard");
+  }, [router]);
+
+  if (!token) return null;
   const [doc, setDoc] = useState<Document | null>(null);
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
