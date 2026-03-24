@@ -43,6 +43,9 @@ export const useAuthStore = create<AuthState>()(
         set({ token: null, user: null });
       },
     }),
-    { name: "auth-storage" }
+    {
+      name: "helvara-auth",
+      partialize: (state) => ({ token: state.token, user: state.user }),
+    }
   )
 );
