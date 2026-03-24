@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { documentsApi, translationJobsApi } from "../../services/api";
-const INTRO_UPLOAD_MS = 1500;
-const INTRO_PARSE_MS = 1500;
-const INTRO_TOTAL_MS = INTRO_UPLOAD_MS + INTRO_PARSE_MS;
 
 type DocumentRecord = {
   id: number;
@@ -74,9 +71,8 @@ export default function ProcessingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [introPhase, setIntroPhase] = useState<"idle" | "upload" | "parse" | "done">("idle");
-  const [introStartTime, setIntroStartTime] = useState<number | null>(null);
-  const introPlayedRef = useRef(false);
+  const [introPhase, setIntroPhase] = useState<"idle" | "upload" | "parse" | "translate" | "review" | "done">("upload");
+  const [hasPlayedIntro, setHasPlayedIntro] = useState(false);
 
   const latestJob = jobs[0] ?? null;
   const reviewReadyStatuses = new Set(["in_review", "draft_saved", "review_complete", "ready_for_export", "exported"]);
@@ -172,46 +168,32 @@ export default function ProcessingPage() {
     translationProgress &&
       (translationProgress.completed_segments > 0 || translationProgress.percentage >= 12)
   );
-  const shouldRunIntro =
-    !introPlayedRef.current &&
-    !hasFailure &&
-    !translationDone &&
-    docStatus === "parsed" &&
-    !docProgress?.is_active &&
-    !translationMeaningfulProgress;
-
+  // Play through all four steps (600 ms each) on every mount, regardless of
+  // the actual job status. Real state is only revealed after the sequence ends.
   useEffect(() => {
-    introPlayedRef.current = false;
-    setIntroPhase("idle");
-    setIntroStartTime(null);
-  }, [documentId]);
-
-  useEffect(() => {
-    if (hasFailure && introStartTime !== null) {
-      // Failures always break out of intro immediately.
-      setIntroStartTime(null);
+    const t1 = window.setTimeout(() => setIntroPhase("parse"), 600);
+    const t2 = window.setTimeout(() => setIntroPhase("translate"), 1200);
+    const t3 = window.setTimeout(() => setIntroPhase("review"), 1800);
+    const t4 = window.setTimeout(() => {
       setIntroPhase("done");
-      return;
-    }
-    if (shouldRunIntro && introStartTime === null && introPhase === "idle") {
-      introPlayedRef.current = true;
-      setIntroStartTime(Date.now());
-      setIntroPhase("upload");
-    }
-  }, [hasFailure, introPhase, introStartTime, shouldRunIntro]);
-
-  useEffect(() => {
-    if (introStartTime === null) return;
-    const parseTimer = window.setTimeout(() => setIntroPhase("parse"), INTRO_UPLOAD_MS);
-    const doneTimer = window.setTimeout(() => {
-      setIntroPhase("done");
-      setIntroStartTime(null);
-    }, INTRO_TOTAL_MS);
+      setHasPlayedIntro(true);
+    }, 2400);
     return () => {
-      window.clearTimeout(parseTimer);
-      window.clearTimeout(doneTimer);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(t4);
     };
-  }, [introStartTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If a failure is confirmed before the intro ends, skip immediately to real state.
+  useEffect(() => {
+    if (hasFailure && !hasPlayedIntro) {
+      setHasPlayedIntro(true);
+      setIntroPhase("done");
+    }
+  }, [hasFailure, hasPlayedIntro]);
 
   const parseProgressValue = parsingDone ? 100 : docProgress?.is_active ? Math.max(0, Math.min(100, docProgress.percentage)) : 0;
   const translationProgressValue = translationDone
@@ -230,27 +212,28 @@ export default function ProcessingPage() {
   else if (translationStarted) currentStep = 2;
   else if (docProgress?.is_active || parsingDone) currentStep = 1;
 
-  const introActive = introStartTime !== null && (introPhase === "upload" || introPhase === "parse");
+  const introPhaseIndex = { upload: 0, parse: 1, translate: 2, review: 3, idle: -1, done: -1 }[introPhase];
+  const introActive = !hasPlayedIntro;
   const introSteps: { title: string; subtitle: string; status: PipelineStepStatus }[] = [
     {
       title: "Upload",
-      subtitle: introPhase === "upload" ? "In progress" : "Done",
-      status: introPhase === "upload" ? "current" : "complete",
+      subtitle: introPhaseIndex === 0 ? "In progress" : "Done",
+      status: introPhaseIndex === 0 ? "current" : "complete",
     },
     {
       title: "Parse",
-      subtitle: introPhase === "parse" ? "In progress" : "Waiting",
-      status: introPhase === "parse" ? "current" : "upcoming",
+      subtitle: introPhaseIndex === 1 ? "In progress" : introPhaseIndex > 1 ? "Done" : "Waiting",
+      status: introPhaseIndex === 1 ? "current" : introPhaseIndex > 1 ? "complete" : "upcoming",
     },
     {
       title: "Translate",
-      subtitle: "Waiting",
-      status: "upcoming",
+      subtitle: introPhaseIndex === 2 ? "In progress" : introPhaseIndex > 2 ? "Done" : "Waiting",
+      status: introPhaseIndex === 2 ? "current" : introPhaseIndex > 2 ? "complete" : "upcoming",
     },
     {
       title: "Review ready",
-      subtitle: "Waiting",
-      status: "upcoming",
+      subtitle: introPhaseIndex === 3 ? "In progress" : "Waiting",
+      status: introPhaseIndex === 3 ? "current" : "upcoming",
     },
   ];
 
@@ -284,48 +267,44 @@ export default function ProcessingPage() {
   ];
   const steps = introActive ? introSteps : realSteps;
 
-  const currentStatusHeading = introPhase === "upload"
-    ? "Uploading your document"
-    : introPhase === "parse"
-      ? "Parsing your document"
-      : hasFailure
-    ? parseFailed
-      ? "Parsing needs attention"
-      : "Translation needs attention"
-    : translationDone
-      ? "Review ready"
-      : translationProgress
-        ? "Translating your document"
-        : docProgress?.is_active
-          ? "Parsing your document"
-          : "Uploading your document";
+  const currentStatusHeading = introActive
+    ? introPhase === "upload" ? "Uploading your document"
+      : introPhase === "parse" ? "Parsing your document"
+      : introPhase === "translate" ? "Translating your document"
+      : "Preparing review"
+    : hasFailure
+      ? parseFailed ? "Parsing needs attention" : "Translation needs attention"
+      : translationDone
+        ? "Review ready"
+        : translationProgress
+          ? "Translating your document"
+          : docProgress?.is_active
+            ? "Parsing your document"
+            : "Uploading your document";
 
-  const currentStatusSupport = introPhase === "upload"
-    ? "Preparing your file for translation."
-    : introPhase === "parse"
-      ? "Extracting content so translation can begin."
-      : hasFailure
-    ? "Please retry the failed step to continue."
-    : translationDone
-      ? "Your document is ready for review."
-      : translationProgress
-        ? translationProgress.blocks_completed < 10
-          ? `Preparing your first page… • ${
-              isTranslationEtaReliable(translationProgress)
-                ? formatEta(translationProgress.eta_seconds)
-                : "Calculating remaining time…"
-            }`
-          : `Translating document… • ${
-              isTranslationEtaReliable(translationProgress)
-                ? formatEta(translationProgress.eta_seconds)
-                : "Calculating remaining time…"
-            }`
-        : docProgress?.is_active
-          ? `${docProgress.stage_label} • ${
-              docProgress.eta_seconds == null ? "Calculating remaining time" : formatEta(docProgress.eta_seconds)
-            }`
-          : "This usually takes a minute or two. You can stay on this page.";
-  const displayProgress = introPhase === "upload" ? 0 : introPhase === "parse" ? 16 : overallProgress;
+  const currentStatusSupport = introActive
+    ? introPhase === "upload" ? "Preparing your file for translation."
+      : introPhase === "parse" ? "Extracting content so translation can begin."
+      : introPhase === "translate" ? "Applying AI translation to each block."
+      : "Your document is almost ready."
+    : hasFailure
+      ? "Please retry the failed step to continue."
+      : translationDone
+        ? "Your document is ready for review."
+        : translationProgress
+          ? translationProgress.blocks_completed < 10
+            ? `Preparing your first page… • ${isTranslationEtaReliable(translationProgress) ? formatEta(translationProgress.eta_seconds) : "Calculating remaining time…"}`
+            : `Translating document… • ${isTranslationEtaReliable(translationProgress) ? formatEta(translationProgress.eta_seconds) : "Calculating remaining time…"}`
+          : docProgress?.is_active
+            ? `${docProgress.stage_label} • ${docProgress.eta_seconds == null ? "Calculating remaining time" : formatEta(docProgress.eta_seconds)}`
+            : "This usually takes a minute or two. You can stay on this page.";
+
+  const displayProgress = introActive
+    ? introPhase === "upload" ? 0
+      : introPhase === "parse" ? 25
+      : introPhase === "translate" ? 60
+      : 90
+    : overallProgress;
 
   // Early redirect: as soon as 10 blocks are ready the user can start reviewing,
   // even if translation is still running for the rest of the document.

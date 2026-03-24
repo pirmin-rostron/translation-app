@@ -103,6 +103,7 @@ export default function UploadPage() {
 
   // UI state
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
@@ -295,6 +296,7 @@ export default function UploadPage() {
     // Single non-ZIP file: preserve original redirect behaviour
     if (fileList.length === 1 && fileList[0].kind === "file") {
       const entry = fileList[0];
+      setIsUploading(true);
       updateEntry(entry.id, { status: "uploading" });
       try {
         const formData = buildFormData(entry);
@@ -306,6 +308,7 @@ export default function UploadPage() {
           status: "error",
           error: err instanceof Error ? err.message : "Upload failed",
         });
+        setIsUploading(false);
         setIsProcessing(false);
       }
       return;
@@ -698,15 +701,17 @@ export default function UploadPage() {
             <div className="flex items-center gap-4">
               <button
                 type="submit"
-                disabled={isProcessing || fileList.length === 0}
+                disabled={isUploading || isProcessing || fileList.length === 0}
                 className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ backgroundColor: "#0D7B6E" }}
               >
-                {isProcessing
-                  ? "Translating…"
-                  : fileList.length === 1
-                    ? "Translate document"
-                    : `Translate all${fileList.length > 0 ? ` (${fileList.length})` : ""}`}
+                {isUploading
+                  ? "Uploading…"
+                  : isProcessing
+                    ? "Translating…"
+                    : fileList.length === 1
+                      ? "Translate document"
+                      : `Translate all${fileList.length > 0 ? ` (${fileList.length})` : ""}`}
               </button>
               <button
                 type="button"
