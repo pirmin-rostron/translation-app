@@ -79,8 +79,8 @@ export function DocumentDiffPane({
               onClick={() => onFilterChange(chip.key)}
               className={`rounded-full px-3 py-1.5 text-sm ${
                 activeFilter === chip.key
-                  ? "bg-[#1A110A] text-white"
-                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                  ? "bg-[#0D7B6E] text-white"
+                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-200"
               }`}
             >
               {chip.label} ({chip.count})
@@ -96,9 +96,9 @@ export function DocumentDiffPane({
         </div>
       ) : (
         <div className="h-[74vh] overflow-y-auto bg-stone-50/30">
-          <div className="sticky top-0 z-20 grid border-b border-stone-200 text-xs font-medium uppercase tracking-widest text-stone-400 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="bg-stone-50 px-6 py-3">SOURCE</div>
-            <div className="border-l border-stone-200 bg-white px-6 py-3">TRANSLATED</div>
+          <div className="sticky top-0 z-20 grid border-b border-stone-200 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="bg-stone-50 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-stone-500">SOURCE</div>
+            <div className="border-l border-stone-200 bg-white px-6 py-3 text-xs font-semibold uppercase tracking-widest" style={{ color: "#0D7B6E" }}>TRANSLATED</div>
           </div>
           <div className="space-y-4 px-6 py-6">
           {displayedNodes.map((node) => {
@@ -120,11 +120,11 @@ export function DocumentDiffPane({
                         : "border-stone-200 bg-white";
             const memoryState = blockMemoryStates.get(node.key);
             const memoryBadge = memoryState?.hasExact ? (
-              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium" style={{ color: "#0D7B6E" }}>
                 Exact Match
               </span>
             ) : memoryState?.hasSemantic ? (
-              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500">
+              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium" style={{ color: "#0D7B6E" }}>
                 Memory{typeof memoryState.similarityScore === "number" ? ` ~${Math.round(memoryState.similarityScore * 100)}%` : ""}
               </span>
             ) : null;

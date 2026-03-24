@@ -45,15 +45,15 @@ export function ReviewGuidancePanel({
 
   return (
     <section ref={reviewGuidanceRef} className="mb-6 border border-stone-200 bg-white p-5">
-      <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Review Guidance</p>
+      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Review Guidance</p>
 
       <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Status overview</p>
-        <p className="mt-1 text-xl font-semibold" style={{ color: "#1A110A" }}>{statusLabel}</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Status overview</p>
+        <p className="mt-1 text-2xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>{statusLabel}</p>
       </div>
 
       <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Progress summary</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Progress summary</p>
         <p className="mt-1 text-sm text-stone-600">
           <span className="font-semibold" style={{ color: "#1A110A" }}>{completedBlocks}</span> of{" "}
           <span className="font-semibold" style={{ color: "#1A110A" }}>{totalBlocks}</span> blocks reviewed
@@ -69,7 +69,7 @@ export function ReviewGuidancePanel({
       </div>
 
       <div className="mt-3 border border-stone-100 bg-stone-50 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Recommended next step</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Recommended next step</p>
         <p className="mt-1 text-sm text-stone-600">{recommendedNextStep}</p>
       </div>
 

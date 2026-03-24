@@ -1376,7 +1376,7 @@ function TranslationReviewPageInner() {
       <main className="mx-auto max-w-7xl px-6 py-12">
         <Link
           href={`/documents/${job.document_id}`}
-          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-900"
+          className="mb-6 inline-block text-sm text-stone-500 hover:text-stone-900"
         >
           ← Back to document
         </Link>
