@@ -173,13 +173,11 @@ export default function LandingPage() {
     ? Math.floor(publicStats.words_translated / 1000) * 1000
     : 0;
   const docsTarget = publicStats?.documents_processed ?? 0;
-  const approvalsTarget = publicStats?.reviewer_approvals ?? 0;
   const glossaryTarget = publicStats?.glossary_terms ?? 0;
 
   const { ref: langsRef, displayValue: langsValue } = useCountUp({ target: 10 });
   const { ref: wordsRef, displayValue: wordsValue } = useCountUp({ target: wordsTarget });
   const { ref: docsRef, displayValue: docsValue } = useCountUp({ target: docsTarget });
-  const { ref: approvalsRef, displayValue: approvalsValue } = useCountUp({ target: approvalsTarget });
   const { ref: glossaryRef, displayValue: glossaryValue } = useCountUp({ target: glossaryTarget });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -291,21 +289,12 @@ export default function LandingPage() {
             </div>
           )}
 
-          {/* Reviewer approvals — dynamic, hidden if zero */}
-          {approvalsTarget > 0 && (
-            <div ref={approvalsRef} className="min-w-[120px]">
-              <p className="font-display text-4xl font-bold text-[#1A110A]">{approvalsValue}+</p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Approvals</p>
-              <p className="mt-0.5 text-sm text-stone-500">Human reviewed</p>
-            </div>
-          )}
-
           {/* Glossary terms — dynamic, hidden if zero */}
           {glossaryTarget > 0 && (
             <div ref={glossaryRef} className="min-w-[120px]">
               <p className="font-display text-4xl font-bold text-[#1A110A]">{glossaryValue}+</p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Glossary terms</p>
-              <p className="mt-0.5 text-sm text-stone-500">Enforced</p>
+              <p className="mt-0.5 text-sm text-stone-500">Enforced consistently</p>
             </div>
           )}
         </div>
