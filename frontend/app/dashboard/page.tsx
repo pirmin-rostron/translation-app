@@ -117,11 +117,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
-  // Redirect to login if unauthenticated
+  // Redirect to login if unauthenticated — wait for hydration to avoid false redirects
   useEffect(() => {
-    if (!token) router.replace("/login");
-  }, [token, router]);
+    if (hasHydrated && !token) router.replace("/login");
+  }, [hasHydrated, token, router]);
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<TranslationJob[]>({
     queryKey: QUERY_KEYS.recentJobs,
@@ -138,6 +139,7 @@ export default function DashboardPage() {
     staleTime: 60_000,
   });
 
+  if (!hasHydrated) return null;
   if (!token) return null;
 
   const firstName = getFirstName(user?.full_name, user?.email ?? "");

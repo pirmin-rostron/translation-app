@@ -12,6 +12,7 @@ export type AuthUser = {
 interface AuthState {
   token: string | null;
   user: AuthUser | null;
+  hasHydrated: boolean;
   setAuth: (token: string, user: AuthUser) => void;
   clearAuth: () => void;
 }
@@ -34,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       user: null,
+      hasHydrated: false,
       setAuth: (token, user) => {
         if (typeof document !== "undefined") setAuthCookie(token);
         set({ token, user });
@@ -46,6 +48,9 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "helvara-auth",
       partialize: (state) => ({ token: state.token, user: state.user }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.hasHydrated = true;
+      },
     }
   )
 );
