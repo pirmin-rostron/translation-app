@@ -1256,72 +1256,63 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
             semantic_suggestions[s.id] = semantic_match
         missing_segments.append(s)
 
-    # --- Pass 2: call translate_batch ONCE with all segments that need translation ---
-    provider_results_by_segment_id: dict[int, object] = {}
-    if missing_segments:
-        batch_ctx = [
-            SegmentContext(
-                segment_id=s.id,
-                source_text=s.source_text,
-                context_before=s.context_before,
-                context_after=s.context_after,
-                glossary_terms=glossary_matches_by_segment.get(s.id, []),
-            )
-            for s in missing_segments
-        ]
-        try:
-            provider_results = provider.translate_batch(
-                segments=batch_ctx,
-                source_language=source_lang,
-                target_language=doc.target_language,
-                industry=doc.industry,
-                domain=doc.domain,
-                translation_style=translation_style,
-            )
-        except Exception as batch_err:
-            logger.warning(
-                "Stage fallback: batch translation failed for job=%d, falling back to single segments: %s",
-                translation_job_id,
-                batch_err,
-            )
-            provider_results = [
-                provider.translate(
-                    source_text=s.source_text,
-                    source_language=source_lang,
-                    target_language=doc.target_language,
-                    industry=doc.industry,
-                    domain=doc.domain,
-                    context_before=s.context_before,
-                    context_after=s.context_after,
-                    glossary_terms=glossary_matches_by_segment.get(s.id, []),
-                    translation_style=translation_style,
-                )
-                for s in missing_segments
-            ]
-        for seg, res in zip(missing_segments, provider_results, strict=True):
-            provider_results_by_segment_id[seg.id] = res
-
-    translate_end_time = datetime.utcnow()
-    translate_duration = (translate_end_time - start_time).total_seconds()
-    segments_per_second = len(missing_segments) / translate_duration if translate_duration > 0 else 0
-    logger.info(
-        "Translation timing complete: job_id=%d segments=%d translated=%d duration=%.1fs rate=%.1f seg/s",
-        translation_job_id,
-        total_segments,
-        len(missing_segments),
-        translate_duration,
-        segments_per_second,
-    )
-
-    # --- Pass 3: build TranslationResult rows per block and commit incrementally ---
-    # Each block commit makes that block's translations visible to polling frontends
-    # before the full job finishes.
+    # --- Pass 2+3 merged: translate each block then commit immediately ---
+    # Translating and writing block-by-block keeps progress_completed_segments
+    # incrementing in real time rather than jumping 0→total after a single batch.
     segments_by_block: dict[int | None, list[DocumentSegment]] = defaultdict(list)
     for seg in segments:
         segments_by_block[seg.block_id].append(seg)
 
     completed_count = 0
     for block_segs in segments_by_block.values():
+        # Translate only the segments in this block that need API calls.
+        block_missing = [s for s in block_segs if s.id not in exact_memory_matches]
+        block_provider_results: dict[int, object] = {}
+        if block_missing:
+            batch_ctx = [
+                SegmentContext(
+                    segment_id=s.id,
+                    source_text=s.source_text,
+                    context_before=s.context_before,
+                    context_after=s.context_after,
+                    glossary_terms=glossary_matches_by_segment.get(s.id, []),
+                )
+                for s in block_missing
+            ]
+            try:
+                block_results_raw = provider.translate_batch(
+                    segments=batch_ctx,
+                    source_language=source_lang,
+                    target_language=doc.target_language,
+                    industry=doc.industry,
+                    domain=doc.domain,
+                    translation_style=translation_style,
+                )
+            except Exception as batch_err:
+                logger.warning(
+                    "Stage fallback: batch translation failed for job=%d, falling back to single segments: %s",
+                    translation_job_id,
+                    batch_err,
+                )
+                block_results_raw = [
+                    provider.translate(
+                        source_text=s.source_text,
+                        source_language=source_lang,
+                        target_language=doc.target_language,
+                        industry=doc.industry,
+                        domain=doc.domain,
+                        context_before=s.context_before,
+                        context_after=s.context_after,
+                        glossary_terms=glossary_matches_by_segment.get(s.id, []),
+                        translation_style=translation_style,
+                    )
+                    for s in block_missing
+                ]
+            for seg, res in zip(block_missing, block_results_raw, strict=True):
+                block_provider_results[seg.id] = res
+
+        # Build TranslationResult rows for this block and commit immediately so
+        # the frontend can see progress before the full job finishes.
         block_results: list[TranslationResult] = []
         for seg in block_segs:
             if seg.id in exact_memory_matches:
@@ -1346,7 +1337,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                     )
                 )
             else:
-                res = provider_results_by_segment_id[seg.id]
+                res = block_provider_results[seg.id]
                 seg_glossary_matches = glossary_matches_by_segment.get(seg.id, [])
                 semantic_suggestion = semantic_suggestions.get(seg.id)
                 semantic_details = (
@@ -1380,6 +1371,18 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         completed_count += len(block_segs)
         job.progress_completed_segments = completed_count
         db.commit()
+
+    translate_end_time = datetime.utcnow()
+    translate_duration = (translate_end_time - start_time).total_seconds()
+    segments_per_second = len(missing_segments) / translate_duration if translate_duration > 0 else 0
+    logger.info(
+        "Translation timing complete: job_id=%d segments=%d translated=%d duration=%.1fs rate=%.1f seg/s",
+        translation_job_id,
+        total_segments,
+        len(missing_segments),
+        translate_duration,
+        segments_per_second,
+    )
 
     # Final metadata update after all blocks are committed.
     job.translation_provider = provider_name
