@@ -173,10 +173,14 @@ export default function LandingPage() {
     ? Math.floor(publicStats.words_translated / 1000) * 1000
     : 0;
   const docsTarget = publicStats?.documents_processed ?? 0;
+  const approvalsTarget = publicStats?.reviewer_approvals ?? 0;
+  const glossaryTarget = publicStats?.glossary_terms ?? 0;
 
   const { ref: langsRef, displayValue: langsValue } = useCountUp({ target: 10 });
   const { ref: wordsRef, displayValue: wordsValue } = useCountUp({ target: wordsTarget });
   const { ref: docsRef, displayValue: docsValue } = useCountUp({ target: docsTarget });
+  const { ref: approvalsRef, displayValue: approvalsValue } = useCountUp({ target: approvalsTarget });
+  const { ref: glossaryRef, displayValue: glossaryValue } = useCountUp({ target: glossaryTarget });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -223,8 +227,8 @@ export default function LandingPage() {
       </header>
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="grain-hero relative flex min-h-screen items-center justify-center px-6 pt-16">
-        <div className="relative z-10 mx-auto w-full max-w-2xl py-24 text-center">
+      <section className="grain-hero relative flex min-h-[50vh] items-center justify-center px-6 pt-16">
+        <div className="relative z-10 mx-auto w-full max-w-2xl py-12 text-center">
           <p className="fade-up fade-up-1 mb-5 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
             AI-powered document translation
           </p>
@@ -251,9 +255,9 @@ export default function LandingPage() {
 
       {/* ── Stats ─────────────────────────────────────────────────── */}
       <section className="border-t border-stone-200 px-6 py-16">
-        <div className="mx-auto grid max-w-3xl grid-cols-2 gap-8 text-center sm:grid-cols-4">
-          {/* Languages — static */}
-          <div ref={langsRef}>
+        <div className="mx-auto flex max-w-3xl flex-wrap justify-center gap-12 text-center">
+          {/* Languages — static, always shown */}
+          <div ref={langsRef} className="min-w-[120px]">
             <p className="font-display text-4xl font-bold text-[#1A110A]">{langsValue}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Languages</p>
             <p className="mt-0.5 text-sm text-stone-500">Supported</p>
@@ -261,7 +265,7 @@ export default function LandingPage() {
 
           {/* Words translated — dynamic, hidden if zero */}
           {wordsTarget > 0 && (
-            <div ref={wordsRef}>
+            <div ref={wordsRef} className="min-w-[120px]">
               <p className="font-display text-4xl font-bold text-[#1A110A]">
                 {(wordsValue / 1000).toFixed(0)},000+
               </p>
@@ -272,19 +276,30 @@ export default function LandingPage() {
 
           {/* Documents — dynamic, hidden if zero */}
           {docsTarget > 0 && (
-            <div ref={docsRef}>
+            <div ref={docsRef} className="min-w-[120px]">
               <p className="font-display text-4xl font-bold text-[#1A110A]">{docsValue}+</p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Documents</p>
               <p className="mt-0.5 text-sm text-stone-500">Processed</p>
             </div>
           )}
 
-          {/* Avg. turnaround — static */}
-          <div>
-            <p className="font-display text-4xl font-bold text-[#1A110A]">&lt;&nbsp;4h</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Avg. turnaround</p>
-            <p className="mt-0.5 text-sm text-stone-500">Per document</p>
-          </div>
+          {/* Reviewer approvals — dynamic, hidden if zero */}
+          {approvalsTarget > 0 && (
+            <div ref={approvalsRef} className="min-w-[120px]">
+              <p className="font-display text-4xl font-bold text-[#1A110A]">{approvalsValue}+</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Approvals</p>
+              <p className="mt-0.5 text-sm text-stone-500">Human reviewed</p>
+            </div>
+          )}
+
+          {/* Glossary terms — dynamic, hidden if zero */}
+          {glossaryTarget > 0 && (
+            <div ref={glossaryRef} className="min-w-[120px]">
+              <p className="font-display text-4xl font-bold text-[#1A110A]">{glossaryValue}+</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Glossary terms</p>
+              <p className="mt-0.5 text-sm text-stone-500">Enforced</p>
+            </div>
+          )}
         </div>
       </section>
 
