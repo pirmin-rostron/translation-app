@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import AllTranslationsPage from "../components/AllTranslationsPage";
 
 export default function DocumentsPage() {
-  redirect("/");
+  return <AllTranslationsPage />;
 }

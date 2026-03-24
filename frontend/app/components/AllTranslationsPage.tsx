@@ -160,7 +160,16 @@ export default function AllTranslationsPage() {
                   return (
                   <tr key={doc.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      <Link href={`/documents/${doc.id}`} className="text-slate-900 hover:underline">
+                      <Link
+                        href={
+                          latestJob && REVIEW_STATUSES.has(workflowStatus)
+                            ? `/translation-jobs/${latestJob.id}`
+                            : TRANSLATION_IN_PROGRESS_STATUSES.has(workflowStatus) || PARSE_IN_PROGRESS_STATUSES.has(workflowStatus)
+                              ? `/processing/${doc.id}`
+                              : `/documents/${doc.id}`
+                        }
+                        className="text-slate-900 hover:underline"
+                      >
                         {doc.filename}
                       </Link>
                     </td>
