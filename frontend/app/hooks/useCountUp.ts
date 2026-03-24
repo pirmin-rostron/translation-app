@@ -23,11 +23,20 @@ function easeOut(t: number): number {
  */
 export function useCountUp({ target, duration = 1500 }: UseCountUpOptions): UseCountUpResult {
   const ref = useRef<HTMLDivElement>(null);
-  const [displayValue, setDisplayValue] = useState(0);
+  // Initialise to target so the final value is visible on first paint before
+  // the IntersectionObserver fires. The animation resets to 0 on its first
+  // requestAnimationFrame tick (easeOut(0) * target === 0).
+  const [displayValue, setDisplayValue] = useState(target);
   const hasAnimated = useRef(false);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Reset when target changes from 0 to a real value (data loaded after mount)
+    // Skip the initial mount — we already show `target` as the initial value.
+    // Only reset when target genuinely changes (e.g. API data arrives).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     hasAnimated.current = false;
     setDisplayValue(0);
   }, [target]);

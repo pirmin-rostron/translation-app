@@ -238,7 +238,7 @@ export default function LandingPage() {
           <p className="fade-up fade-up-3 mb-12 text-lg leading-relaxed text-[#6B6158]">
             AI-powered translation with human review. Built for teams that care about accuracy.
           </p>
-          <div className="fade-up fade-up-4">
+          <div className="fade-up fade-up-4 mt-10 mb-2">
             <WaitlistForm
               name={name}
               email={email}
@@ -254,7 +254,15 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats ─────────────────────────────────────────────────── */}
-      <section className="border-t border-stone-200 px-6 py-16">
+      <section className="border-t border-stone-200 px-6 py-16" style={{ backgroundColor: "#EDE9E1" }}>
+        <div className="mb-10 text-center">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+            BUILT FOR ACCURACY
+          </p>
+          <h2 className="text-2xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
+            Trusted by teams who can&apos;t afford mistranslations.
+          </h2>
+        </div>
         <div className="mx-auto flex max-w-3xl flex-wrap justify-center gap-12 text-center">
           {/* Languages — static, always shown */}
           <div ref={langsRef} className="min-w-[120px]">
