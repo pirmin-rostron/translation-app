@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import "./landing.css";
 import { Card } from "./components/ui/Card";
+import { useCountUp } from "./hooks/useCountUp";
 
 type FormState = "idle" | "loading" | "success" | "error";
 
@@ -45,11 +46,6 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: "10M+", label: "words translated" },
-  { value: "500+", label: "documents processed" },
-  { value: "20+",  label: "language pairs" },
-];
 
 const steps = [
   { n: "1", title: "Upload", body: "Drop your document. Helvara parses and segments it automatically." },
@@ -142,6 +138,13 @@ function WaitlistForm({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type PublicStats = {
+  words_translated: number;
+  documents_processed: number;
+  reviewer_approvals: number;
+  glossary_terms: number;
+};
+
 export default function LandingPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -149,6 +152,7 @@ export default function LandingPage() {
   const [formState, setFormState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
 
   // Redirect logged-in users to the app.
   useEffect(() => {
@@ -157,6 +161,22 @@ export default function LandingPage() {
       router.replace("/upload");
     }
   }, [router]);
+
+  useEffect(() => {
+    fetch("/api/stats/public")
+      .then((r) => r.ok ? r.json() as Promise<PublicStats> : Promise.reject())
+      .then(setPublicStats)
+      .catch(() => { /* graceful degradation — show static stats only */ });
+  }, []);
+
+  const wordsTarget = publicStats
+    ? Math.floor(publicStats.words_translated / 1000) * 1000
+    : 0;
+  const docsTarget = publicStats?.documents_processed ?? 0;
+
+  const { ref: langsRef, displayValue: langsValue } = useCountUp({ target: 10 });
+  const { ref: wordsRef, displayValue: wordsValue } = useCountUp({ target: wordsTarget });
+  const { ref: docsRef, displayValue: docsValue } = useCountUp({ target: docsTarget });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -230,15 +250,41 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats ─────────────────────────────────────────────────── */}
-      {/* Placeholder numbers — will be replaced with live data (PIR-30) */}
-      <section className="border-y border-[#E5E0D8] bg-white px-6 py-14">
-        <div className="mx-auto grid max-w-3xl grid-cols-3 gap-8 text-center">
-          {stats.map((s) => (
-            <div key={s.label}>
-              <p className="text-4xl font-bold text-[#1A110A]">{s.value}</p>
-              <p className="mt-1 text-sm text-[#6B6158]">{s.label}</p>
+      <section className="border-t border-stone-200 px-6 py-16">
+        <div className="mx-auto grid max-w-3xl grid-cols-2 gap-8 text-center sm:grid-cols-4">
+          {/* Languages — static */}
+          <div ref={langsRef}>
+            <p className="font-display text-4xl font-bold text-[#1A110A]">{langsValue}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Languages</p>
+            <p className="mt-0.5 text-sm text-stone-500">Supported</p>
+          </div>
+
+          {/* Words translated — dynamic, hidden if zero */}
+          {wordsTarget > 0 && (
+            <div ref={wordsRef}>
+              <p className="font-display text-4xl font-bold text-[#1A110A]">
+                {(wordsValue / 1000).toFixed(0)},000+
+              </p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Words</p>
+              <p className="mt-0.5 text-sm text-stone-500">Translated</p>
             </div>
-          ))}
+          )}
+
+          {/* Documents — dynamic, hidden if zero */}
+          {docsTarget > 0 && (
+            <div ref={docsRef}>
+              <p className="font-display text-4xl font-bold text-[#1A110A]">{docsValue}+</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Documents</p>
+              <p className="mt-0.5 text-sm text-stone-500">Processed</p>
+            </div>
+          )}
+
+          {/* Avg. turnaround — static */}
+          <div>
+            <p className="font-display text-4xl font-bold text-[#1A110A]">&lt;&nbsp;4h</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Avg. turnaround</p>
+            <p className="mt-0.5 text-sm text-stone-500">Per document</p>
+          </div>
         </div>
       </section>
 
