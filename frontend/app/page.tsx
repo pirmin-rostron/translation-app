@@ -169,9 +169,7 @@ export default function LandingPage() {
       .catch(() => { /* graceful degradation — show static stats only */ });
   }, []);
 
-  const wordsTarget = publicStats
-    ? Math.floor(publicStats.words_translated / 1000) * 1000
-    : 0;
+  const wordsTarget = publicStats?.words_translated ?? 0;
   const docsTarget = publicStats?.documents_processed ?? 0;
   const glossaryTarget = publicStats?.glossary_terms ?? 0;
 
@@ -273,7 +271,7 @@ export default function LandingPage() {
           {wordsTarget > 0 && (
             <div ref={wordsRef} className="min-w-[120px]">
               <p className="font-display text-4xl font-bold text-[#1A110A]">
-                {(wordsValue / 1000).toFixed(0)},000+
+                {wordsValue.toLocaleString()}+
               </p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Words</p>
               <p className="mt-0.5 text-sm text-stone-500">Translated</p>
