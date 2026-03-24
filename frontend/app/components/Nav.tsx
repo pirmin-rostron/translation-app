@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
     match: (pathname) => pathname === "/dashboard",
   },
   {
-    label: "Upload",
+    label: "Translate",
     href: "/upload",
     match: (pathname) => pathname.startsWith("/upload"),
   },
@@ -55,7 +55,7 @@ export default function Nav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
         <Link
           href="/dashboard"
-          className="text-lg font-semibold"
+          className="text-xl font-semibold"
           style={{
             fontFamily: "'Playfair Display', Georgia, serif",
             color: "#1A110A",
@@ -97,7 +97,7 @@ export default function Nav() {
           <button
             type="button"
             onClick={handleLogout}
-            className="text-sm text-stone-400 hover:text-stone-900 transition-colors"
+            className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
           >
             Logout
           </button>

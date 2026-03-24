@@ -383,7 +383,7 @@ export default function UploadPage() {
               color: "#1A110A",
             }}
           >
-            Upload Documents
+            Translate Documents
           </h1>
           <p className="mt-2 text-sm text-stone-500">
             DOCX, TXT, RTF, or ZIP · max 10 MB per file · max {MAX_FILES} files
@@ -710,8 +710,8 @@ export default function UploadPage() {
                   : isProcessing
                     ? "Translating…"
                     : fileList.length === 1
-                      ? "Translate document"
-                      : `Translate all${fileList.length > 0 ? ` (${fileList.length})` : ""}`}
+                      ? "Translate"
+                      : `Translate${fileList.length > 0 ? ` (${fileList.length})` : ""}`}
               </button>
               <button
                 type="button"
