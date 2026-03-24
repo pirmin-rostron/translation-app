@@ -7,3 +7,4 @@ __pycache__
 venv
 .next
 .DS_Store
+frontend/.env.local
