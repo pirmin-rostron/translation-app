@@ -144,40 +144,40 @@ export const documentsApi = {
 
 export const translationJobsApi = {
   getById: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}`),
 
   getReviewBlocks: <T>(jobId: number, page: number = 1, pageSize: number = 10) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/review-blocks?page=${page}&page_size=${pageSize}`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/review-blocks?page=${page}&page_size=${pageSize}`),
 
   getReviewSummary: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/review-summary`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/review-summary`),
 
   getProgress: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/progress`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/progress`),
 
   getExports: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/exports`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/exports`),
 
   getPreview: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/preview`),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/preview`),
 
   retry: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/retry`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/retry`, { method: "POST" }),
 
   export: <T>(jobId: number, fileType: string, formattingMode: string) =>
     apiFetch<T>(
-      `${API_URL}/api/translation-jobs/${jobId}/export?file_type=${fileType}&formatting_mode=${formattingMode}`,
+      `${API_URL}/translation-jobs/${jobId}/export?file_type=${fileType}&formatting_mode=${formattingMode}`,
       { method: "POST" }
     ),
 
   markReady: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/mark-ready`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/mark-ready`, { method: "POST" }),
 
   approveSafeSegments: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/approve-safe-segments`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/approve-safe-segments`, { method: "POST" }),
 
   saveDraft: <T>(jobId: number) =>
-    apiFetch<T>(`${API_URL}/api/translation-jobs/${jobId}/save-draft`, { method: "POST" }),
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/save-draft`, { method: "POST" }),
 };
 
 // --- translation_results (part of translation_jobs router boundary) ---
