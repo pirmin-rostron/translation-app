@@ -2173,3 +2173,26 @@ def list_document_translation_jobs(
         .all()
     )
     return jobs
+
+
+@router.get("/translation-jobs", response_model=list[TranslationJobResponse])
+def list_translation_jobs(
+    limit: int = Query(default=10, ge=1, le=50),
+    order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """List translation jobs for the current organisation.
+
+    Returns jobs ordered by created_at in the requested direction, capped at
+    `limit` (max 50). Scoped to the authenticated user's organisation.
+    """
+    order_col = TranslationJob.created_at.desc() if order == "desc" else TranslationJob.created_at.asc()
+    jobs = (
+        db.query(TranslationJob)
+        .filter(TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None))
+        .order_by(order_col)
+        .limit(limit)
+        .all()
+    )
+    return jobs
