@@ -2,7 +2,10 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTokenRefresh } from "./hooks/useTokenRefresh";
+
+const PUBLIC_ROUTES = ["/", "/login", "/register", "/preview"];
 
 function TokenRefreshRunner() {
   useTokenRefresh();
@@ -22,9 +25,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
+  const pathname = usePathname();
+  const isPublic = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+
   return (
     <QueryClientProvider client={queryClient}>
-      <TokenRefreshRunner />
+      {!isPublic && <TokenRefreshRunner />}
       {children}
     </QueryClientProvider>
   );
