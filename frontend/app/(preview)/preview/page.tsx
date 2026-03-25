@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -324,11 +325,12 @@ function CtaForm() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PreviewPage() {
-  // Redirect logged-in users to the app
+  const router = useRouter();
+
   useEffect(() => {
     const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
-    if (match) window.location.replace("/upload");
-  }, []);
+    if (match) router.replace("/dashboard");
+  }, [router]);
 
   return (
     <>
