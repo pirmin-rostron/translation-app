@@ -112,6 +112,18 @@ export default function AdminPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
 
+  // Invite form
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFullName, setInviteFullName] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteResult, setInviteResult] = useState<{
+    isNewUser: boolean;
+    email: string;
+    temporaryPassword?: string;
+  } | null>(null);
+
   // Usage
   const [usageData, setUsageData] = useState<UsageResponse | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
@@ -187,6 +199,45 @@ export default function AdminPage() {
       )
       .finally(() => setAuditLoading(false));
   }, [authChecked, activeTab]);
+
+  // ── Invite handler ───────────────────────────────────────────────────────
+  async function handleInvite(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setInviteLoading(true);
+    setInviteError("");
+    setInviteResult(null);
+    try {
+      type InviteResponse = {
+        user: { id: number; email: string; full_name: string | null };
+        role: string;
+        is_new_user: boolean;
+        temporary_password?: string;
+      };
+      const res = await apiFetch<InviteResponse>(`${API_URL}/auth/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          full_name: inviteFullName.trim(),
+          role: inviteRole,
+        }),
+      });
+      setInviteResult({
+        isNewUser: res.is_new_user,
+        email: res.user.email,
+        temporaryPassword: res.temporary_password,
+      });
+      setInviteEmail("");
+      setInviteFullName("");
+      setInviteRole("member");
+      // Refresh members list
+      void apiFetch<OrgMember[]>(`${API_URL}/auth/org/members`).then(setMembers);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to invite user.");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
 
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (!authChecked) {
@@ -380,9 +431,87 @@ export default function AdminPage() {
                   </table>
                 </div>
 
+                {/* ── Invite User ── */}
+                <div className="border border-stone-200 bg-white px-5 py-5">
+                  <p className="mb-4 text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+                    Invite User
+                  </p>
+
+                  {inviteResult && (
+                    <div className="mb-4 border border-[#0D7B6E]/30 bg-[#E6F4F2] px-5 py-4">
+                      {inviteResult.isNewUser && inviteResult.temporaryPassword ? (
+                        <>
+                          <p className="mb-3 text-sm font-semibold" style={{ color: "#0D7B6E" }}>
+                            Account created. Share these credentials with the user:
+                          </p>
+                          <div className="space-y-1 rounded border border-[#0D7B6E]/20 bg-white px-4 py-3 font-mono text-sm" style={{ color: "#1A110A" }}>
+                            <p><span className="text-stone-400">Email:</span> {inviteResult.email}</p>
+                            <p><span className="text-stone-400">Temporary password:</span> <span className="font-bold select-all">{inviteResult.temporaryPassword}</span></p>
+                          </div>
+                          <p className="mt-2 text-xs text-stone-500">They should change this on first login.</p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium" style={{ color: "#0D7B6E" }}>
+                          User added to your organisation.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {inviteError && (
+                    <p className="mb-4 text-sm text-red-600">{inviteError}</p>
+                  )}
+
+                  <form onSubmit={(e) => { void handleInvite(e); }} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="user@company.com"
+                        disabled={inviteLoading}
+                        className="w-full border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Full name</label>
+                      <input
+                        type="text"
+                        required
+                        value={inviteFullName}
+                        onChange={(e) => setInviteFullName(e.target.value)}
+                        placeholder="Ada Lovelace"
+                        disabled={inviteLoading}
+                        className="w-full border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Role</label>
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value as "member" | "admin")}
+                        disabled={inviteLoading}
+                        className="border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                      >
+                        <option value="member">Member</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={inviteLoading || !inviteEmail.trim() || !inviteFullName.trim()}
+                      className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      style={{ backgroundColor: "#0D7B6E" }}
+                    >
+                      {inviteLoading ? "Sending…" : "Send Invite"}
+                    </button>
+                  </form>
+                </div>
+
                 {/* Cross-org admin — requires backend endpoints not yet implemented */}
                 {/* GET /admin/users and GET /admin/organisations do not exist yet */}
-                <ComingSoon note="Cross-org user and organisation management — requires /admin/users and /admin/organisations backend endpoints." />
               </>
             )}
           </section>
