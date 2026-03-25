@@ -142,7 +142,7 @@ export function DocumentDiffPane({
                   <p className="text-xs font-medium uppercase tracking-widest text-stone-400">{blockLabel}</p>
                   {memoryBadge}
                 </div>
-                <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-posthog-mask>
                   <div className="min-w-0 bg-stone-50 px-4 py-4">{renderNode(node, "source")}</div>
                   <div className="min-w-0 border-l border-stone-200 bg-white px-4 py-4">
                     {renderNode(node, "target")}

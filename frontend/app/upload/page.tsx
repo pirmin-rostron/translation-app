@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import posthog from 'posthog-js';
 import { documentsApi, translationJobsApi } from "../services/api";
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -301,6 +302,7 @@ export default function UploadPage() {
       try {
         const formData = buildFormData(entry);
         const created = await documentsApi.uploadAndTranslate<{ id: number }>(formData);
+        posthog.capture('document_uploaded', { filename: entry.file?.name });
         router.push(`/processing/${created.id}`);
         // Component will unmount on navigation — no further state updates needed
       } catch (err) {

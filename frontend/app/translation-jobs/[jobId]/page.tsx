@@ -8,6 +8,7 @@ import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
 import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
 import { getLanguageDisplayName } from "../../utils/language";
 
+import posthog from 'posthog-js';
 import { API_URL, documentsApi, translationJobsApi, translationResultsApi } from "../../services/api";
 
 type TranslationJob = {
@@ -1186,6 +1187,7 @@ function TranslationReviewPageInner() {
       void handleOpenPreviewDocument();
       return;
     }
+    posthog.capture('review_started', { job_id: jobId });
     const recommendedBlockId = getRecommendedReviewBlockId();
     if (recommendedBlockId != null) {
       moveToBlockById(recommendedBlockId);
@@ -1229,6 +1231,7 @@ function TranslationReviewPageInner() {
       const exportPayload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(exportPayload);
       triggerExportDownload(exportPayload);
+      posthog.capture('export_completed', { job_id: job.id, file_type: selectedFormat });
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage("Export successful. Your file is downloading.");
     } catch (err) {
@@ -1265,6 +1268,7 @@ function TranslationReviewPageInner() {
       const payload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(payload);
       triggerExportDownload(payload);
+      posthog.capture('export_completed', { job_id: job.id, file_type: selectedFormat });
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage("Export successful. Your file is downloading.");
     } catch (err) {

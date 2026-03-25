@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import posthog from 'posthog-js';
 
 export type AuthUser = {
   id: number;
@@ -39,10 +40,14 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, user) => {
         if (typeof document !== "undefined") setAuthCookie(token);
         set({ token, user });
+        if (typeof window !== 'undefined') {
+          posthog.identify(String(user.id), { email: user.email, name: user.full_name ?? undefined });
+        }
       },
       clearAuth: () => {
         if (typeof document !== "undefined") clearAuthCookie();
         set({ token: null, user: null });
+        if (typeof window !== 'undefined') posthog.reset();
       },
     }),
     {

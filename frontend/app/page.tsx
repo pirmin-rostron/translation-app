@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RefObject, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import posthog from 'posthog-js';
 import "./landing.css";
 import { Card } from "./components/ui/Card";
 import { useCountUp } from "./hooks/useCountUp";
@@ -198,6 +199,7 @@ export default function LandingPage() {
 
       setFormState("success");
       setMessage(data.message ?? "You're on the list!");
+      posthog.capture('waitlist_signup', { email: email.trim() });
       setName("");
       setEmail("");
     } catch {
