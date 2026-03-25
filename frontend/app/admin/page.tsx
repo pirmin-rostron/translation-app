@@ -38,8 +38,10 @@ type OrgMember = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString();
+function fmt(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
 function toTitle(s: string): string {
@@ -150,7 +152,7 @@ export default function AdminPage() {
     if (!authChecked || activeTab !== "waitlist") return;
     setWaitlistLoading(true);
     setWaitlistError("");
-    void apiFetch<WaitlistEntry[]>(`${API_URL}/api/waitlist`)
+    void apiFetch<WaitlistEntry[]>(`${API_URL}/waitlist`)
       .then(setWaitlist)
       .catch((err) =>
         setWaitlistError(err instanceof Error ? err.message : "Failed to load waitlist")
@@ -550,7 +552,7 @@ export default function AdminPage() {
                 </p>
                 {auditLoading && <p className="text-stone-500">Loading audit log…</p>}
                 {auditError && <p className="mb-2 text-red-600">{auditError}</p>}
-                {!auditLoading && (
+                {!auditLoading && !auditError && (
                   <div className="overflow-x-auto border border-stone-200 bg-white">
                     <table className="min-w-full divide-y divide-stone-100 text-sm">
                       <thead className="bg-stone-50">
