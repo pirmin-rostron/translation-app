@@ -6,6 +6,24 @@ import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useCountUp } from "./hooks/useCountUp";
 
+// ─── Carousel data ─────────────────────────────────────────────────────────────
+
+const DOC_TYPES = [
+  "Contract","Legal brief","Compliance policy","Technical manual",
+  "Business proposal","Financial report","Court filing","Patent application",
+  "Medical record","HR policy","Tender document","Terms of service",
+  "Privacy policy","Employment agreement","Insurance policy",
+  "Annual report","Regulatory filing","Research paper",
+  "Investment memo","Board resolution",
+];
+
+const LANGUAGES = [
+  "German","French","Dutch","Spanish","Japanese","Korean",
+  "Italian","Portuguese","Mandarin","Arabic","Russian","Polish",
+  "Swedish","Norwegian","Danish","Finnish","Turkish","Hindi",
+  "Thai","Vietnamese",
+];
+
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 
 const T = {
@@ -231,6 +249,35 @@ export default function LandingPage() {
   const docsTarget     = publicStats?.documents_processed ?? 0;
   const glossaryTarget = publicStats?.glossary_terms      ?? 0;
 
+  const [docIdx, setDocIdx] = useState(0);
+  const [docVisible, setDocVisible] = useState(true);
+  const [langIdx, setLangIdx] = useState(0);
+  const [langVisible, setLangVisible] = useState(true);
+
+  // Documents cycle every 2s, scroll UP (exit top, enter bottom)
+  useEffect(() => {
+    const t = setInterval(() => {
+      setDocVisible(false);
+      setTimeout(() => {
+        setDocIdx(i => (i + 1) % DOC_TYPES.length);
+        setDocVisible(true);
+      }, 280);
+    }, 2000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Languages cycle every 3s, scroll DOWN (exit bottom, enter top)
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLangVisible(false);
+      setTimeout(() => {
+        setLangIdx(i => (i + 1) % LANGUAGES.length);
+        setLangVisible(true);
+      }, 280);
+    }, 3000);
+    return () => clearInterval(t);
+  }, []);
+
   const { ref: langsRef,    displayValue: langsValue    } = useCountUp({ target: 10 });
   const { ref: wordsRef,    displayValue: wordsValue    } = useCountUp({ target: wordsTarget });
   const { ref: docsRef,     displayValue: docsValue     } = useCountUp({ target: docsTarget });
@@ -325,21 +372,81 @@ export default function LandingPage() {
         }}>
           <GrainOverlay />
           <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 1 }}>
-            <p style={eyebrow}>Translation Workflow Platform</p>
-            <h1 style={{
-              ...display,
-              fontSize: "clamp(3rem, 7vw, 5.5rem)",
-              fontWeight: 700,
-              lineHeight: 1.05,
-              letterSpacing: "-0.02em",
-              color: T.onSurface,
-              maxWidth: "800px",
-              marginBottom: 0,
+            {/* ── Three-column hero carousel ── */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "0",
+              alignItems: "center",
+              marginBottom: "3rem",
+              paddingBottom: "2.5rem",
+              borderBottom: "1px solid rgba(8,32,18,0.08)",
             }}>
-              Manage all your{" "}
-              <em style={{ fontStyle: "italic" }}>translations</em>{" "}
-              in one place.
-            </h1>
+              {/* Left — static "Translate" */}
+              <div>
+                <p style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(3rem, 6vw, 5rem)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.05,
+                  color: "#082012",
+                  margin: 0,
+                }}>
+                  Translate
+                </p>
+              </div>
+
+              {/* Centre — document types, scroll UP */}
+              <div style={{ overflow: "hidden", height: "clamp(3.6rem, 7.2vw, 6rem)" }}>
+                <p style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(3rem, 6vw, 5rem)",
+                  fontWeight: 400,
+                  fontStyle: "italic",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.05,
+                  color: "#082012",
+                  margin: 0,
+                  transition: "opacity 0.28s ease, transform 0.28s ease",
+                  opacity: docVisible ? 1 : 0,
+                  transform: docVisible ? "translateY(0)" : "translateY(-16px)",
+                }}>
+                  {DOC_TYPES[docIdx]}
+                </p>
+              </div>
+
+              {/* Right — languages, scroll DOWN */}
+              <div style={{ overflow: "hidden", height: "clamp(3.6rem, 7.2vw, 6rem)" }}>
+                <p style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(3rem, 6vw, 5rem)",
+                  fontWeight: 400,
+                  fontStyle: "italic",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.05,
+                  color: "#082012",
+                  margin: 0,
+                  transition: "opacity 0.28s ease, transform 0.28s ease",
+                  opacity: langVisible ? 1 : 0,
+                  transform: langVisible ? "translateY(0)" : "translateY(16px)",
+                }}>
+                  {LANGUAGES[langIdx]}
+                </p>
+              </div>
+            </div>
+
+            {/* Connector line */}
+            <p style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.875rem",
+              color: "#424843",
+              opacity: 0.5,
+              letterSpacing: "0.05em",
+              marginBottom: "2.5rem",
+            }}>
+              Powered by AI. Reviewed by you. Ready to export.
+            </p>
             <p style={{
               ...inter,
               marginLeft: "16.666%",
