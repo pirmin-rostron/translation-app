@@ -305,6 +305,17 @@ export const adminApi = {
 
 // --- glossary_terms router ---
 
+export type GlossaryTerm = {
+  id: number;
+  source_term: string;
+  target_term: string;
+  source_language: string;
+  target_language: string;
+  industry: string | null;
+  domain: string | null;
+  created_at: string;
+};
+
 export const glossaryTermsApi = {
   list: <T>() =>
     apiFetch<T>(`${API_URL}/glossary-terms`),
@@ -315,6 +326,24 @@ export const glossaryTermsApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
+
+  update: (id: number, data: Partial<GlossaryTermCreate>) =>
+    apiFetch<GlossaryTerm>(`${API_URL}/glossary-terms/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  importCsv: (file: File, sourceLang: string, targetLang: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("source_language", sourceLang);
+    fd.append("target_language", targetLang);
+    return apiFetch<{ imported: number; skipped: number; errors: string[] }>(
+      `${API_URL}/glossary-terms/import`,
+      { method: "POST", body: fd }
+    );
+  },
 
   delete: <T>(id: number) =>
     apiFetch<T>(`${API_URL}/glossary-terms/${id}`, { method: "DELETE" }),
