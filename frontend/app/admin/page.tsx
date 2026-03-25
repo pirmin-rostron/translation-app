@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, API_URL, type UsageEvent, type UsageResponse } from "../services/api";
+import {
+  apiFetch,
+  API_URL,
+  adminApi,
+  type WaitlistEntry,
+  type OrgInfo,
+  type OrgMember,
+  type AuditEvent,
+  type AdminUsageResponse,
+  type InviteResult,
+} from "../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -14,26 +24,6 @@ type UserMe = {
   full_name: string | null;
   is_admin: boolean;
   created_at: string;
-};
-
-type WaitlistEntry = {
-  id: number;
-  name: string;
-  email: string;
-  created_at: string;
-};
-
-type OrgInfo = {
-  id: number;
-  name: string;
-  created_at: string;
-};
-
-type OrgMember = {
-  id: number;
-  email: string;
-  full_name: string | null;
-  role: string;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -127,10 +117,10 @@ export default function AdminPage() {
   } | null>(null);
 
   // Usage
-  const [usageData, setUsageData] = useState<UsageResponse | null>(null);
+  const [usageData, setUsageData] = useState<AdminUsageResponse | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState("");
-  const [auditLog, setAuditLog] = useState<UsageEvent[]>([]);
+  const [auditLog, setAuditLog] = useState<AuditEvent[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState("");
 
@@ -152,7 +142,7 @@ export default function AdminPage() {
     if (!authChecked || activeTab !== "waitlist") return;
     setWaitlistLoading(true);
     setWaitlistError("");
-    void apiFetch<WaitlistEntry[]>(`${API_URL}/waitlist`)
+    void adminApi.getWaitlist()
       .then(setWaitlist)
       .catch((err) =>
         setWaitlistError(err instanceof Error ? err.message : "Failed to load waitlist")
@@ -166,8 +156,8 @@ export default function AdminPage() {
     setUsersLoading(true);
     setUsersError("");
     void Promise.all([
-      apiFetch<OrgInfo>(`${API_URL}/auth/org`),
-      apiFetch<OrgMember[]>(`${API_URL}/auth/org/members`),
+      adminApi.getOrg(),
+      adminApi.getOrgMembers(),
     ])
       .then(([orgData, membersData]) => {
         setOrg(orgData);
@@ -185,7 +175,7 @@ export default function AdminPage() {
 
     setUsageLoading(true);
     setUsageError("");
-    void apiFetch<UsageResponse>(`${API_URL}/auth/usage`)
+    void adminApi.getUsage()
       .then(setUsageData)
       .catch((err) =>
         setUsageError(err instanceof Error ? err.message : "Failed to load usage data")
@@ -194,8 +184,8 @@ export default function AdminPage() {
 
     setAuditLoading(true);
     setAuditError("");
-    void apiFetch<UsageEvent[]>(`${API_URL}/auth/org/audit`)
-      .then(setAuditLog)
+    void adminApi.getAuditLog()
+      .then((res) => setAuditLog(res.events))
       .catch((err) =>
         setAuditError(err instanceof Error ? err.message : "Failed to load audit log")
       )
@@ -209,20 +199,10 @@ export default function AdminPage() {
     setInviteError("");
     setInviteResult(null);
     try {
-      type InviteResponse = {
-        user: { id: number; email: string; full_name: string | null };
-        role: string;
-        is_new_user: boolean;
-        temporary_password?: string;
-      };
-      const res = await apiFetch<InviteResponse>(`${API_URL}/auth/invite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: inviteEmail.trim(),
-          full_name: inviteFullName.trim(),
-          role: inviteRole,
-        }),
+      const res: InviteResult = await adminApi.inviteUser({
+        email: inviteEmail.trim(),
+        full_name: inviteFullName.trim(),
+        role: inviteRole,
       });
       setInviteResult({
         isNewUser: res.is_new_user,
@@ -233,7 +213,7 @@ export default function AdminPage() {
       setInviteFullName("");
       setInviteRole("member");
       // Refresh members list
-      void apiFetch<OrgMember[]>(`${API_URL}/auth/org/members`).then(setMembers);
+      void adminApi.getOrgMembers().then(setMembers);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Failed to invite user.");
     } finally {
@@ -332,7 +312,7 @@ export default function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {waitlist.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-stone-50">
+                      <tr key={entry.email} className="hover:bg-stone-50">
                         <td className={TD} style={{ color: "#1A110A" }}>
                           {entry.name}
                         </td>
@@ -384,11 +364,11 @@ export default function AdminPage() {
                       className="mt-1 text-xl font-semibold"
                       style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
                     >
-                      {org.name}
+                      {org.org.name}
                     </p>
                     <p className="mt-0.5 text-xs text-stone-400">
                       {members.length} member{members.length !== 1 ? "s" : ""} · Created{" "}
-                      {fmt(org.created_at)}
+                      {fmt(org.org.created_at)}
                     </p>
                   </div>
                 )}
@@ -410,7 +390,7 @@ export default function AdminPage() {
                     </thead>
                     <tbody className="divide-y divide-stone-100">
                       {members.map((m) => (
-                        <tr key={m.id} className="hover:bg-stone-50">
+                        <tr key={m.user_id} className="hover:bg-stone-50">
                           <td className={TD} style={{ color: "#1A110A" }}>
                             {m.full_name ?? <span className="text-stone-300">—</span>}
                           </td>
@@ -557,7 +537,7 @@ export default function AdminPage() {
                     <table className="min-w-full divide-y divide-stone-100 text-sm">
                       <thead className="bg-stone-50">
                         <tr>
-                          {["Time", "Event", "User ID", "Job ID", "Document ID"].map((col) => (
+                          {["Time", "Event", "Meta"].map((col) => (
                             <th key={col} className={TH}>
                               {col}
                             </th>
@@ -576,14 +556,14 @@ export default function AdminPage() {
                             >
                               {toTitle(event.event_type)}
                             </td>
-                            <td className={TD}>{event.user_id ?? "—"}</td>
-                            <td className={TD}>{event.job_id ?? "—"}</td>
-                            <td className={TD}>{event.document_id ?? "—"}</td>
+                            <td className={`${TD} max-w-xs truncate font-mono text-xs`}>
+                              {event.meta ? JSON.stringify(event.meta) : "—"}
+                            </td>
                           </tr>
                         ))}
                         {auditLog.length === 0 && !auditError && (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-stone-400">
+                            <td colSpan={3} className="px-4 py-8 text-center text-stone-400">
                               No audit events recorded yet.
                             </td>
                           </tr>

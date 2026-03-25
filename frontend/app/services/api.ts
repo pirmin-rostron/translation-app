@@ -219,6 +219,90 @@ export const usageApi = {
   get: () => apiFetch<UsageResponse>(`${API_URL}/auth/usage`),
 };
 
+// --- admin types and api ---
+
+export type WaitlistEntry = {
+  name: string;
+  email: string;
+  created_at: string | null;
+};
+
+export type OrgInfo = {
+  org: { id: number; name: string; created_at: string | null };
+  role: string;
+};
+
+export type OrgMember = {
+  user_id: number;
+  email: string;
+  full_name: string | null;
+  role: string;
+  joined_at: string | null;
+};
+
+export type AuditEvent = {
+  id: number;
+  event_type: string;
+  created_at: string | null;
+  meta: Record<string, unknown> | null;
+};
+
+export type AuditLogResponse = {
+  total: number;
+  offset: number;
+  limit: number;
+  events: AuditEvent[];
+};
+
+export type AdminUsageResponse = {
+  totals: {
+    users_registered: number;
+    logins: number;
+    documents_ingested: number;
+    jobs_created: number;
+    words_translated: number;
+    jobs_exported: number;
+  };
+  recent: Array<{
+    id: number;
+    event_type: string;
+    created_at: string | null;
+    meta: Record<string, unknown> | null;
+  }>;
+};
+
+export type InviteRequest = {
+  email: string;
+  full_name: string;
+  role: string;
+};
+
+export type InviteResult = {
+  user: { id: number; email: string; full_name: string | null };
+  role: string;
+  is_new_user: boolean;
+  temporary_password?: string;
+};
+
+export const adminApi = {
+  getWaitlist: () =>
+    apiFetch<WaitlistEntry[]>(`${API_URL}/waitlist`),
+  getOrg: () =>
+    apiFetch<OrgInfo>(`${API_URL}/auth/org`),
+  getOrgMembers: () =>
+    apiFetch<OrgMember[]>(`${API_URL}/auth/org/members`),
+  getUsage: () =>
+    apiFetch<AdminUsageResponse>(`${API_URL}/auth/usage`),
+  getAuditLog: (limit = 50, offset = 0) =>
+    apiFetch<AuditLogResponse>(`${API_URL}/auth/org/audit?limit=${limit}&offset=${offset}`),
+  inviteUser: (body: InviteRequest) =>
+    apiFetch<InviteResult>(`${API_URL}/auth/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+};
+
 // --- glossary_terms router ---
 
 export const glossaryTermsApi = {
