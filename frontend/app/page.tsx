@@ -9,12 +9,12 @@ import { useCountUp } from "./hooks/useCountUp";
 // ─── Carousel data ─────────────────────────────────────────────────────────────
 
 const DOC_TYPES = [
-  "Contract","Legal brief","Compliance policy","Technical manual",
-  "Business proposal","Financial report","Court filing","Patent application",
-  "Medical record","HR policy","Tender document","Terms of service",
-  "Privacy policy","Employment agreement","Insurance policy",
-  "Annual report","Regulatory filing","Research paper",
-  "Investment memo","Board resolution",
+  "contract", "compliance policy", "legal brief", "privacy policy",
+  "employment agreement", "terms of service", "financial report",
+  "technical manual", "board resolution", "investment memo",
+  "insurance policy", "court filing", "patent application",
+  "regulatory filing", "tender document", "annual report",
+  "research paper", "HR policy", "business proposal", "medical record",
 ];
 
 const LANGUAGES = [
@@ -372,81 +372,31 @@ export default function LandingPage() {
         }}>
           <GrainOverlay />
           <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 1 }}>
-            {/* ── Three-column hero carousel ── */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "0",
-              alignItems: "center",
-              marginBottom: "3rem",
-              paddingBottom: "2.5rem",
-              borderBottom: "1px solid rgba(8,32,18,0.08)",
-            }}>
-              {/* Left — static "Translate" */}
-              <div>
-                <p style={{
-                  fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(3rem, 6vw, 5rem)",
-                  fontWeight: 700,
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.05,
-                  color: "#082012",
-                  margin: 0,
-                }}>
-                  Translate
-                </p>
-              </div>
-
-              {/* Centre — document types, scroll UP */}
-              <div style={{ overflow: "hidden", height: "clamp(3.6rem, 7.2vw, 6rem)" }}>
-                <p style={{
-                  fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(3rem, 6vw, 5rem)",
-                  fontWeight: 400,
-                  fontStyle: "italic",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.05,
-                  color: "#082012",
-                  margin: 0,
-                  transition: "opacity 0.28s ease, transform 0.28s ease",
-                  opacity: docVisible ? 1 : 0,
-                  transform: docVisible ? "translateY(0)" : "translateY(-16px)",
-                }}>
-                  {DOC_TYPES[docIdx]}
-                </p>
-              </div>
-
-              {/* Right — languages, scroll DOWN */}
-              <div style={{ overflow: "hidden", height: "clamp(3.6rem, 7.2vw, 6rem)" }}>
-                <p style={{
-                  fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(3rem, 6vw, 5rem)",
-                  fontWeight: 400,
-                  fontStyle: "italic",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.05,
-                  color: "#082012",
-                  margin: 0,
-                  transition: "opacity 0.28s ease, transform 0.28s ease",
-                  opacity: langVisible ? 1 : 0,
-                  transform: langVisible ? "translateY(0)" : "translateY(16px)",
-                }}>
-                  {LANGUAGES[langIdx]}
-                </p>
-              </div>
-            </div>
-
-            {/* Connector line */}
+            {/* ── Eyebrow + H1 ── */}
             <p style={{
               fontFamily: "Inter, sans-serif",
-              fontSize: "0.875rem",
-              color: "#424843",
-              opacity: 0.5,
-              letterSpacing: "0.05em",
-              marginBottom: "2.5rem",
+              fontSize: "0.6875rem",
+              fontWeight: 600,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "#082012",
+              opacity: 0.55,
+              marginBottom: "1.5rem",
             }}>
-              Powered by AI. Reviewed by you. Ready to export.
+              Translation Workflow Platform
             </p>
+            <h1 style={{
+              fontFamily: "'Newsreader', Georgia, serif",
+              fontSize: "clamp(3.5rem, 8vw, 6rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.05,
+              color: "#082012",
+              maxWidth: "800px",
+              marginBottom: "0",
+            }}>
+              Manage all your <em style={{ fontStyle: "italic" }}>translations</em> in one place.
+            </h1>
             <p style={{
               ...inter,
               marginLeft: "16.666%",
@@ -515,6 +465,87 @@ export default function LandingPage() {
                 <PainPoint key={p.n} {...p} />
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── Carousel ── */}
+        <section style={{ backgroundColor: "#082012", padding: "5rem 2rem", position: "relative", overflow: "hidden" }}>
+          <GrainOverlay />
+          <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 1, textAlign: "center" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              gap: "0 0.4rem",
+              lineHeight: 1.2,
+            }}>
+              <span style={{
+                fontFamily: "'Newsreader', Georgia, serif",
+                fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                fontWeight: 400,
+                fontStyle: "italic",
+                color: "rgba(232,245,226,0.45)",
+              }}>
+                Translate a
+              </span>
+              <div style={{ overflow: "hidden", height: "clamp(2.4rem, 6vw, 4.2rem)", display: "inline-flex", alignItems: "center" }}>
+                <span style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                  fontWeight: 700,
+                  color: "#e8f5e2",
+                  display: "block",
+                  transition: "opacity 0.28s ease, transform 0.28s ease",
+                  opacity: docVisible ? 1 : 0,
+                  transform: docVisible ? "translateY(0)" : "translateY(-12px)",
+                }}>
+                  {DOC_TYPES[docIdx]}
+                </span>
+              </div>
+              <span style={{
+                fontFamily: "'Newsreader', Georgia, serif",
+                fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                fontWeight: 400,
+                fontStyle: "italic",
+                color: "rgba(232,245,226,0.45)",
+              }}>
+                into
+              </span>
+              <div style={{ overflow: "hidden", height: "clamp(2.4rem, 6vw, 4.2rem)", display: "inline-flex", alignItems: "center" }}>
+                <span style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                  fontWeight: 700,
+                  color: "#e8f5e2",
+                  display: "block",
+                  transition: "opacity 0.28s ease, transform 0.28s ease",
+                  opacity: langVisible ? 1 : 0,
+                  transform: langVisible ? "translateY(0)" : "translateY(12px)",
+                }}>
+                  {LANGUAGES[langIdx]}
+                </span>
+              </div>
+              <span style={{
+                fontFamily: "'Newsreader', Georgia, serif",
+                fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                fontWeight: 400,
+                fontStyle: "italic",
+                color: "rgba(232,245,226,0.45)",
+              }}>
+                .
+              </span>
+            </div>
+            <p style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.8125rem",
+              color: "rgba(232,245,226,0.35)",
+              marginTop: "2rem",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}>
+              Powered by AI. Reviewed by you. Ready to export.
+            </p>
           </div>
         </section>
 
