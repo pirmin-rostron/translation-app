@@ -10,7 +10,7 @@ import { useCountUp } from "./hooks/useCountUp";
 
 const DOC_TYPES = [
   "contract", "compliance policy", "legal brief", "privacy policy",
-  "employment agreement", "terms of service", "financial report",
+  "terms of service", "financial report",
   "technical manual", "board resolution", "investment memo",
   "insurance policy", "court filing", "patent application",
   "regulatory filing", "tender document", "annual report",
