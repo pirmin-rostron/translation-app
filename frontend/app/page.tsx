@@ -225,7 +225,7 @@ export default function LandingPage() {
     <div className="font-sans bg-[#F5F2EC] text-[#1A110A]">
 
       {/* ── Nav ───────────────────────────────────────────────────── */}
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-[#E5E0D8] bg-[#F5F2EC]/90 backdrop-blur-md">
+      <header className="fixed inset-x-0 top-0 z-50 bg-[#F5F2EC]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <span className="font-display text-xl font-semibold text-[#1A110A]">Helvara</span>
           <Link
@@ -247,37 +247,35 @@ export default function LandingPage() {
             Manage all your translations in one place.
           </h1>
           <p className="fade-up fade-up-3 mb-12 text-lg leading-relaxed text-[#6B6158]">
-            AI-assisted translation with structured human review. One platform for legal, compliance, and enterprise teams who need consistency, control, and an audit-ready output.
+            Upload your documents, review AI translations block by block, and export with confidence. Built for legal, compliance, and enterprise teams who need consistency and control.
           </p>
-          <div className="fade-up fade-up-4 mt-10 mb-2">
-            <WaitlistForm
-              name={name}
-              email={email}
-              formState={formState}
-              message={message}
-              nameRef={nameRef}
-              onNameChange={setName}
-              onEmailChange={setEmail}
-              onSubmit={handleSubmit}
-            />
+          <div className="fade-up fade-up-4 mt-10 mb-2 flex flex-col items-center gap-3">
+            <a
+              href="#waitlist"
+              className="rounded-full px-8 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#0D7B6E" }}
+            >
+              Request early access
+            </a>
+            <p className="text-xs text-[#9E9189]">No commitment. We&apos;ll be in touch.</p>
           </div>
         </div>
       </section>
 
       {/* ── Problem ───────────────────────────────────────────────── */}
-      <section className="border-t border-[#E5E0D8] px-6 py-20" style={{ backgroundColor: "#F5F2EC" }}>
+      <section className="border-t border-[#E5E0D8] bg-white px-6 py-20">
         <div className="mx-auto max-w-3xl text-center">
           <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
             WHY HELVARA
           </p>
           <h2 className="mb-10 font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
-            Translation today is broken.
+            Sound familiar?
           </h2>
           <ul className="space-y-5 text-left">
             {[
-              "Generic AI tools translate without context — producing output that's technically correct but tonally wrong.",
-              "Review is unstructured — no audit trail, no consistency, no enforcement of approved terminology.",
-              "Every document starts from scratch — your team re-translates the same terms differently every time.",
+              "You paste into ChatGPT and get output that sounds almost right — until a lawyer reads it.",
+              "Your team reviews in email threads, comments in Word, and loses track of what was actually approved.",
+              "The same term gets translated five different ways across five documents because no one enforced the glossary.",
             ].map((point) => (
               <li key={point} className="flex gap-4 text-base leading-relaxed text-[#6B6158]">
                 <span className="shrink-0 font-semibold" style={{ color: "#0D7B6E" }}>—</span>
@@ -377,7 +375,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ───────────────────────────────────────────────────── */}
-      <section className="bg-[#1A110A] px-6 py-28">
+      <section id="waitlist" className="bg-[#1A110A] px-6 py-28">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="mb-4 font-display text-[clamp(2rem,5vw,3rem)] font-bold text-white">
             Translation your legal team will actually sign off on.
