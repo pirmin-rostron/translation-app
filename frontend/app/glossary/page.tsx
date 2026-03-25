@@ -334,7 +334,15 @@ export default function GlossaryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search source or target term…"
-              className="mb-3 w-full max-w-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[#0D7B6E] focus:outline-none"
+              style={{
+                borderTop: "none", borderLeft: "none", borderRight: "none",
+                borderBottom: "1px solid rgba(194,200,193,0.5)",
+                borderRadius: 0, background: "transparent",
+                padding: "0.5rem 0", fontSize: "0.9375rem",
+                color: "#1c1c17", outline: "none", width: "100%",
+                maxWidth: "24rem", fontFamily: "Inter, sans-serif",
+                marginBottom: "0.75rem",
+              }}
             />
             {/* Language pair pills */}
             {langPairs.length > 0 && (
