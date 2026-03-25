@@ -9,7 +9,7 @@ import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
 import { getLanguageDisplayName } from "../../utils/language";
 
 import posthog from 'posthog-js';
-import { API_URL, documentsApi, translationJobsApi, translationResultsApi } from "../../services/api";
+import { API_URL, documentsApi, glossaryTermsApi, translationJobsApi, translationResultsApi } from "../../services/api";
 
 type TranslationJob = {
   id: number;
@@ -1049,6 +1049,23 @@ function TranslationReviewPageInner() {
     }
   }
 
+  async function handleAddToGlossary(sourceTerm: string, targetTerm: string) {
+    if (!job || !sourceTerm.trim() || !targetTerm.trim()) return;
+    try {
+      await glossaryTermsApi.create({
+        source_term: sourceTerm.trim(),
+        target_term: targetTerm.trim(),
+        source_language: job.source_language,
+        target_language: job.target_language,
+        industry: null,
+        domain: null,
+      });
+      setMessage("Added to glossary.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add to glossary.");
+    }
+  }
+
   function handleSkipBlock() {
     const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     if (nextBlockId == null) {
@@ -1508,6 +1525,9 @@ function TranslationReviewPageInner() {
             semanticMemoryUsed={selectedBlockSemanticMemory}
             memorySimilarityScore={selectedBlockMemorySimilarity}
             memorySourceText={selectedBlockMemorySourceText}
+            onAddToGlossary={handleAddToGlossary}
+            sourceLanguage={job.source_language}
+            targetLanguage={job.target_language}
           />
         </div>
         {/* Pagination controls */}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 type SemanticChoiceOption = "current" | "suggested";
 
 type SelectedBlock = {
@@ -66,6 +68,9 @@ type ReviewDetailsPaneProps = {
   semanticMemoryUsed: boolean;
   memorySimilarityScore: number | null;
   memorySourceText: string | null;
+  onAddToGlossary: (sourceTerm: string, targetTerm: string) => Promise<void>;
+  sourceLanguage: string;
+  targetLanguage: string;
 };
 
 export function ReviewDetailsPane({
@@ -118,8 +123,32 @@ export function ReviewDetailsPane({
   semanticMemoryUsed,
   memorySimilarityScore,
   memorySourceText,
+  onAddToGlossary,
+  sourceLanguage,
+  targetLanguage,
 }: ReviewDetailsPaneProps) {
   const primaryDecisionLabel = hasSemanticChoice && !hasAmbiguityChoice ? "Confirm selection" : "Approve";
+
+  // Glossary form state
+  const [showGlossaryForm, setShowGlossaryForm] = useState(false);
+  const [glossarySource, setGlossarySource] = useState("");
+  const [glossaryTarget, setGlossaryTarget] = useState("");
+  const [glossarySaving, setGlossarySaving] = useState(false);
+
+  // Reset glossary form when block becomes unresolved
+  useEffect(() => {
+    if (!currentBlockResolved) setShowGlossaryForm(false);
+  }, [currentBlockResolved]);
+
+  async function handleSaveGlossary() {
+    setGlossarySaving(true);
+    try {
+      await onAddToGlossary(glossarySource, glossaryTarget);
+      setShowGlossaryForm(false);
+    } finally {
+      setGlossarySaving(false);
+    }
+  }
 
   if (reviewComplete) {
     return (
@@ -426,6 +455,57 @@ export function ReviewDetailsPane({
                 >
                   Edit
                 </button>
+                {/* Add to glossary */}
+                {!showGlossaryForm ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGlossarySource(glossaryMatches[0]?.source_term ?? "");
+                      setGlossaryTarget(glossaryMatches[0]?.target_term ?? "");
+                      setShowGlossaryForm(true);
+                    }}
+                    className="w-full text-sm font-medium"
+                    style={{ color: "#0D7B6E" }}
+                  >
+                    + Add to glossary
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      value={glossarySource}
+                      onChange={(e) => setGlossarySource(e.target.value)}
+                      placeholder={`Source term (${sourceLanguage})`}
+                      disabled={glossarySaving}
+                      className="w-full border border-stone-300 px-2 py-1.5 text-sm focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                    />
+                    <input
+                      value={glossaryTarget}
+                      onChange={(e) => setGlossaryTarget(e.target.value)}
+                      placeholder={`Target term (${targetLanguage})`}
+                      disabled={glossarySaving}
+                      className="w-full border border-stone-300 px-2 py-1.5 text-sm focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={glossarySaving || !glossarySource.trim() || !glossaryTarget.trim()}
+                        onClick={() => { void handleSaveGlossary(); }}
+                        className="rounded-full px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                        style={{ backgroundColor: "#0D7B6E" }}
+                      >
+                        {glossarySaving ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowGlossaryForm(false)}
+                        disabled={glossarySaving}
+                        className="text-xs text-stone-400 hover:text-stone-600 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {!isReadOnly && isEditing && (
