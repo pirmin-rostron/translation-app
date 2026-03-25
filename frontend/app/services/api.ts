@@ -22,7 +22,7 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: mergedHeaders });
 
   if (res.status === 401 && typeof window !== "undefined") {
-    const authPaths = ["/login", "/register"];
+    const authPaths = ["/login", "/register", "/preview", "/"];
     if (!authPaths.some((p) => window.location.pathname.startsWith(p))) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
