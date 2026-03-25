@@ -1,156 +1,200 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { RefObject, FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import posthog from 'posthog-js';
-import "./landing.css";
-import { Card } from "./components/ui/Card";
+import posthog from "posthog-js";
 import { useCountUp } from "./hooks/useCountUp";
 
-type FormState = "idle" | "loading" | "success" | "error";
+// ─── Design tokens ─────────────────────────────────────────────────────────────
 
-// ─── Static data ──────────────────────────────────────────────────────────────
+const T = {
+  surface:             "#fcf9f0",
+  surfaceContainerLow: "#f6f3eb",
+  surfaceContainer:    "#f1eee5",
+  primaryContainer:    "#082012",
+  onSurface:           "#1c1c17",
+  onSurfaceVariant:    "#424843",
+  accent:              "#0D7B6E",
+} as const;
+
+// ─── Static data ───────────────────────────────────────────────────────────────
+
+const painPoints = [
+  {
+    n: "01",
+    title: "Siloed Translation Assets",
+    body: "You paste into ChatGPT and get output that sounds almost right — until a lawyer reads it.",
+  },
+  {
+    n: "02",
+    title: "Fragmented Workflows",
+    body: "Your team reviews in email threads, comments in Word, and loses track of what was actually approved.",
+  },
+  {
+    n: "03",
+    title: "No Glossary Enforcement",
+    body: "The same term gets translated five different ways across five documents because no one enforced the glossary.",
+  },
+];
+
+const steps = [
+  { n: "1", title: "Upload",  body: "Drop your document. Helvara parses and segments it automatically." },
+  { n: "2", title: "Review",  body: "AI translates block by block. You review, edit, and approve." },
+  { n: "3", title: "Export",  body: "Download your translated document in DOCX, RTF, or TXT." },
+];
 
 const features = [
   {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4.5 6.5L14 18h-4l-.5-2.5C7 14.5 5 12 5 9a7 7 0 0 1 7-7z" />
-        <path d="M9 21h6" />
-        <path d="M12 18v3" />
-      </svg>
-    ),
     title: "Linguistic Insights",
     body: "Helvara surfaces glossary matches, translation memory, and semantic context for every block — so reviewers make faster, more confident decisions.",
   },
   {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-        <polyline points="9 11 12 14 22 4" />
-      </svg>
-    ),
     title: "Human Review Workflow",
     body: "Block-by-block structured review with approve, edit, and skip controls. Every decision is tracked and auditable from upload to export.",
   },
   {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        <path d="M10 10h4" />
-        <path d="M10 14h4" />
-      </svg>
-    ),
     title: "Connected Glossary",
     body: "Define terminology once. Helvara enforces it consistently across every document — and lets reviewers add new terms directly from the review workflow.",
   },
   {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="1 4 1 10 7 10" />
-        <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
-      </svg>
-    ),
     title: "Translation Memory",
     body: "Approved translations are remembered. Similar content in future documents is surfaced automatically, reducing review time with every job.",
   },
 ];
 
+// ─── Shared style helpers ──────────────────────────────────────────────────────
 
-const steps = [
-  { n: "1", title: "Upload", body: "Drop your document. Helvara parses and segments it automatically." },
-  { n: "2", title: "Review", body: "AI translates block by block. You review, edit, and approve." },
-  { n: "3", title: "Export", body: "Download your translated document in DOCX, RTF, or TXT." },
-];
-
-// ─── WaitlistForm ─────────────────────────────────────────────────────────────
-
-type WaitlistFormProps = {
-  name: string;
-  email: string;
-  formState: FormState;
-  message: string;
-  nameRef?: RefObject<HTMLInputElement>;
-  onNameChange: (v: string) => void;
-  onEmailChange: (v: string) => void;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
-  dark?: boolean;
+const display: React.CSSProperties = {
+  fontFamily: "'Newsreader', Georgia, serif",
 };
 
-function WaitlistForm({
-  name,
-  email,
-  formState,
-  message,
-  nameRef,
-  onNameChange,
-  onEmailChange,
-  onSubmit,
-  dark = false,
-}: WaitlistFormProps) {
-  const isLoading = formState === "loading";
-  const labelClass = `mb-1.5 block text-xs font-medium ${dark ? "text-[#9E9189]" : "text-[#6B6158]"}`;
-  const inputClass = `w-full py-2 text-sm disabled:opacity-50 ${dark ? "input-underline-dark" : "input-underline"}`;
+const inter: React.CSSProperties = {
+  fontFamily: "Inter, sans-serif",
+};
 
-  if (formState === "success") {
-    return (
-      <div className="flex items-start gap-3 rounded-xl border border-[#0D7B6E]/30 bg-[#E6F4F2] px-6 py-5">
-        <svg className="mt-0.5 shrink-0 text-[#0D7B6E]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        <p className="text-sm font-medium text-[#0D7B6E]">{message}</p>
-      </div>
-    );
-  }
+const eyebrow: React.CSSProperties = {
+  ...inter,
+  fontSize: "0.7rem",
+  fontWeight: 600,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: T.accent,
+  marginBottom: "1rem",
+};
 
+// ─── Grain overlay ─────────────────────────────────────────────────────────────
+
+function GrainOverlay() {
   return (
-    <form onSubmit={onSubmit} noValidate>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className={labelClass}>Your name</label>
-          <input
-            ref={nameRef}
-            type="text"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Ada Lovelace"
-            required
-            disabled={isLoading}
-            className={inputClass}
-          />
-        </div>
-        <div className="flex-1">
-          <label className={labelClass}>Work email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            placeholder="ada@company.com"
-            required
-            disabled={isLoading}
-            className={inputClass}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={isLoading || !name.trim() || !email.trim()}
-          className="shrink-0 rounded-full bg-[#0D7B6E] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A6459] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isLoading ? "Joining…" : "Join the waitlist"}
-        </button>
-      </div>
-      {formState === "error" && (
-        <p className="mt-3 text-xs text-[#B91C1C]">{message}</p>
-      )}
-    </form>
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: 0,
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E\")",
+        backgroundRepeat: "repeat",
+        pointerEvents: "none",
+        zIndex: 0,
+      }}
+    />
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Feature card (dark hover) ─────────────────────────────────────────────────
+
+function FeatureCard({ title, body }: { title: string; body: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        backgroundColor: hovered ? T.primaryContainer : "#ffffff",
+        padding: "2rem",
+        borderRadius: "4px",
+        transition: "background-color 0.25s ease",
+        cursor: "default",
+      }}
+    >
+      <h3
+        style={{
+          ...display,
+          fontSize: "1.1rem",
+          fontWeight: 600,
+          letterSpacing: "-0.01em",
+          color: hovered ? "#e8f5e2" : T.onSurface,
+          marginBottom: "0.75rem",
+          transition: "color 0.25s ease",
+        }}
+      >
+        {title}
+      </h3>
+      <p
+        style={{
+          ...inter,
+          fontSize: "0.9rem",
+          lineHeight: 1.7,
+          color: hovered ? "rgba(232,245,226,0.75)" : T.onSurfaceVariant,
+          transition: "color 0.25s ease",
+        }}
+      >
+        {body}
+      </p>
+    </div>
+  );
+}
+
+// ─── Pain point row (ghost number hover) ──────────────────────────────────────
+
+function PainPoint({ n, title, body }: { n: string; title: string; body: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: "relative", paddingLeft: "4.5rem", paddingBottom: "2.5rem", cursor: "default" }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 0,
+          top: "-0.25rem",
+          ...display,
+          fontSize: "3.5rem",
+          fontWeight: 700,
+          lineHeight: 1,
+          color: hovered ? "rgba(8,32,18,0.18)" : "rgba(8,32,18,0.07)",
+          transition: "color 0.2s ease",
+          userSelect: "none",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {n}
+      </span>
+      <p
+        style={{
+          ...inter,
+          fontSize: "0.65rem",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: T.accent,
+          marginBottom: "0.4rem",
+        }}
+      >
+        {title}
+      </p>
+      <p style={{ ...inter, fontSize: "1rem", lineHeight: 1.7, color: T.onSurfaceVariant }}>{body}</p>
+    </div>
+  );
+}
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+type FormState = "idle" | "loading" | "success" | "error";
 
 type PublicStats = {
   words_translated: number;
@@ -159,13 +203,13 @@ type PublicStats = {
   glossary_terms: number;
 };
 
+// ─── Page ──────────────────────────────────────────────────────────────────────
+
 export default function LandingPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [message, setMessage] = useState("");
-  const nameRef = useRef<HTMLInputElement>(null);
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
 
   // Redirect logged-in users to the app.
@@ -183,13 +227,13 @@ export default function LandingPage() {
       .catch(() => { /* graceful degradation — show static stats only */ });
   }, []);
 
-  const wordsTarget = publicStats?.words_translated ?? 0;
-  const docsTarget = publicStats?.documents_processed ?? 0;
-  const glossaryTarget = publicStats?.glossary_terms ?? 0;
+  const wordsTarget    = publicStats?.words_translated    ?? 0;
+  const docsTarget     = publicStats?.documents_processed ?? 0;
+  const glossaryTarget = publicStats?.glossary_terms      ?? 0;
 
-  const { ref: langsRef, displayValue: langsValue } = useCountUp({ target: 10 });
-  const { ref: wordsRef, displayValue: wordsValue } = useCountUp({ target: wordsTarget });
-  const { ref: docsRef, displayValue: docsValue } = useCountUp({ target: docsTarget });
+  const { ref: langsRef,    displayValue: langsValue    } = useCountUp({ target: 10 });
+  const { ref: wordsRef,    displayValue: wordsValue    } = useCountUp({ target: wordsTarget });
+  const { ref: docsRef,     displayValue: docsValue     } = useCountUp({ target: docsTarget });
   const { ref: glossaryRef, displayValue: glossaryValue } = useCountUp({ target: glossaryTarget });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -198,10 +242,10 @@ export default function LandingPage() {
     setMessage("");
 
     try {
-      const res = await fetch(`/api/waitlist`, {
+      const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+        body: JSON.stringify({ name: "", email: email.trim() }),
       });
 
       const data = (await res.json()) as { message?: string };
@@ -212,8 +256,7 @@ export default function LandingPage() {
 
       setFormState("success");
       setMessage(data.message ?? "You're on the list!");
-      posthog.capture('waitlist_signup', { email: email.trim() });
-      setName("");
+      posthog.capture("waitlist_signup", { email: email.trim() });
       setEmail("");
     } catch {
       setFormState("error");
@@ -222,186 +265,407 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="font-sans bg-[#F5F2EC] text-[#1A110A]">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { margin: 0; background: ${T.surface}; }
+        ::selection { background: ${T.primaryContainer}; color: #fff; }
+      `}</style>
 
-      {/* ── Nav ───────────────────────────────────────────────────── */}
-      <header className="fixed inset-x-0 top-0 z-50 bg-[#F5F2EC]/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <span className="font-display text-xl font-semibold text-[#1A110A]">Helvara</span>
-          <Link
-            href="/login"
-            className="rounded-full px-4 py-1.5 text-sm font-medium text-[#0D7B6E] transition-colors hover:bg-[#E6F4F2]"
-          >
-            Log in
-          </Link>
-        </div>
-      </header>
+      <div style={{ ...inter, background: T.surface, color: T.onSurface }}>
 
-      {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="grain-hero relative flex min-h-[50vh] items-center justify-center px-6 pt-16">
-        <div className="relative z-10 mx-auto w-full max-w-2xl py-12 text-center">
-          <p className="fade-up fade-up-1 mb-5 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
-            Translation Workflow Platform
-          </p>
-          <h1 className="fade-up fade-up-2 mb-6 font-display text-[clamp(2.8rem,7vw,4.5rem)] font-bold leading-[1.1] tracking-tight text-[#1A110A]">
-            Manage all your translations in one place.
-          </h1>
-          <p className="fade-up fade-up-3 mb-12 text-lg leading-relaxed text-[#6B6158]">
-            Upload your documents, review AI translations block by block, and export with confidence. Built for legal, compliance, and enterprise teams who need consistency and control.
-          </p>
-          <div className="fade-up fade-up-4 mt-10 mb-2 flex flex-col items-center gap-3">
+        {/* ── Nav ── */}
+        <header style={{
+          position: "fixed",
+          inset: "0 0 auto 0",
+          zIndex: 50,
+          background: "rgba(252,249,240,0.8)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+        }}>
+          <div style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            padding: "1.25rem 1.5rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}>
+            <span style={{ ...display, fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.01em", color: T.onSurface }}>
+              Helvara
+            </span>
             <a
-              href="#waitlist"
-              className="rounded-full px-8 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#0D7B6E" }}
+              href="/login"
+              style={{
+                ...inter,
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: T.accent,
+                textDecoration: "none",
+                padding: "0.375rem 1rem",
+                borderRadius: "9999px",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(13,123,110,0.08)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
             >
-              Request early access
+              Log in
             </a>
-            <p className="text-xs text-[#9E9189]">No commitment. We&apos;ll be in touch.</p>
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* ── Problem ───────────────────────────────────────────────── */}
-      <section className="border-t border-[#E5E0D8] bg-white px-6 py-20">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
-            WHY HELVARA
-          </p>
-          <h2 className="mb-10 font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
-            Sound familiar?
-          </h2>
-          <ul className="space-y-5 text-left">
-            {[
-              "You paste into ChatGPT and get output that sounds almost right — until a lawyer reads it.",
-              "Your team reviews in email threads, comments in Word, and loses track of what was actually approved.",
-              "The same term gets translated five different ways across five documents because no one enforced the glossary.",
-            ].map((point) => (
-              <li key={point} className="flex gap-4 text-base leading-relaxed text-[#6B6158]">
-                <span className="shrink-0 font-semibold" style={{ color: "#0D7B6E" }}>—</span>
-                {point}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── How it works ──────────────────────────────────────────── */}
-      <section className="border-t border-[#E5E0D8] bg-white px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="mb-16 text-center font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
-            From document to delivery in three steps.
-          </h2>
-          <div className="grid gap-10 sm:grid-cols-3">
-            {steps.map((step) => (
-              <div key={step.n} className="flex flex-col gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6F4F2] text-sm font-bold text-[#0D7B6E]">
-                  {step.n}
-                </span>
-                <div>
-                  <h3 className="mb-1.5 text-sm font-semibold text-[#1A110A]">{step.title}</h3>
-                  <p className="text-sm leading-relaxed text-[#6B6158]">{step.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Feature cards ─────────────────────────────────────────── */}
-      <section className="border-t border-[#E5E0D8] px-6 py-24" style={{ backgroundColor: "#F5F2EC" }}>
-        <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2">
-          {features.map((f) => (
-            <Card key={f.title} className="flex flex-col gap-5 p-7">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#E6F4F2] text-[#0D7B6E]">
-                {f.icon}
-              </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-[#1A110A]">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-[#6B6158]">{f.body}</p>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Stats ─────────────────────────────────────────────────── */}
-      <section className="border-t border-stone-200 px-6 py-16" style={{ backgroundColor: "#EDE9E1" }}>
-        <div className="mb-10 text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
-            BUILT FOR ACCURACY
-          </p>
-          <h2 className="text-2xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
-            Trusted by teams who can&apos;t afford mistranslations.
-          </h2>
-        </div>
-        <div className="mx-auto flex max-w-3xl flex-wrap justify-center gap-12 text-center">
-          {/* Languages — static, always shown */}
-          <div ref={langsRef} className="min-w-[120px]">
-            <p className="font-display text-4xl font-bold text-[#1A110A]">{langsValue}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Languages</p>
-            <p className="mt-0.5 text-sm text-stone-500">Supported</p>
-          </div>
-
-          {/* Words translated — dynamic, hidden if zero */}
-          {wordsTarget > 0 && (
-            <div ref={wordsRef} className="min-w-[120px]">
-              <p className="font-display text-4xl font-bold text-[#1A110A]">
-                {wordsValue.toLocaleString()}+
+        {/* ── Hero ── */}
+        <section style={{
+          backgroundColor: T.surface,
+          padding: "10rem 1.5rem 8rem",
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          <GrainOverlay />
+          <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 1 }}>
+            <p style={eyebrow}>Translation Workflow Platform</p>
+            <h1 style={{
+              ...display,
+              fontSize: "clamp(3rem, 7vw, 5.5rem)",
+              fontWeight: 700,
+              lineHeight: 1.05,
+              letterSpacing: "-0.02em",
+              color: T.onSurface,
+              maxWidth: "800px",
+              marginBottom: 0,
+            }}>
+              Manage all your{" "}
+              <em style={{ fontStyle: "italic" }}>translations</em>{" "}
+              in one place.
+            </h1>
+            <p style={{
+              ...inter,
+              marginLeft: "16.666%",
+              marginTop: "2rem",
+              maxWidth: "520px",
+              fontSize: "1.1rem",
+              lineHeight: 1.65,
+              color: T.onSurfaceVariant,
+            }}>
+              Upload your documents, review AI translations block by block, and export with confidence. Built for legal, compliance, and enterprise teams who need consistency and control.
+            </p>
+            <div style={{ marginLeft: "16.666%", marginTop: "2.5rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
+              <a
+                href="#waitlist"
+                style={{
+                  background: T.primaryContainer,
+                  color: "#ffffff",
+                  ...inter,
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "0.8rem 2rem",
+                  borderRadius: "9999px",
+                  display: "inline-block",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
+              >
+                Request early access
+              </a>
+              <p style={{ ...inter, fontSize: "0.75rem", color: T.onSurfaceVariant, margin: 0 }}>
+                No commitment. We&apos;ll be in touch.
               </p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Words</p>
-              <p className="mt-0.5 text-sm text-stone-500">Translated</p>
             </div>
-          )}
+          </div>
+        </section>
 
-          {/* Documents — dynamic, hidden if zero */}
-          {docsTarget > 0 && (
-            <div ref={docsRef} className="min-w-[120px]">
-              <p className="font-display text-4xl font-bold text-[#1A110A]">{docsValue}+</p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Documents</p>
-              <p className="mt-0.5 text-sm text-stone-500">Processed</p>
+        {/* ── Sound Familiar ── */}
+        <section style={{ backgroundColor: T.surfaceContainerLow, padding: "7rem 1.5rem" }}>
+          <div style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr 2fr",
+            gap: "4rem",
+            alignItems: "start",
+          }}>
+            <div>
+              <p style={eyebrow}>Why Helvara</p>
+              <h2 style={{
+                ...display,
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+                color: T.onSurface,
+                marginBottom: "1.5rem",
+              }}>
+                Sound familiar?
+              </h2>
+              <div style={{ width: "48px", height: "4px", background: T.accent, borderRadius: "2px" }} />
             </div>
-          )}
-
-          {/* Glossary terms — dynamic, hidden if zero */}
-          {glossaryTarget > 0 && (
-            <div ref={glossaryRef} className="min-w-[120px]">
-              <p className="font-display text-4xl font-bold text-[#1A110A]">{glossaryValue}+</p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">Glossary terms</p>
-              <p className="mt-0.5 text-sm text-stone-500">Enforced consistently</p>
+            <div>
+              {painPoints.map((p) => (
+                <PainPoint key={p.n} {...p} />
+              ))}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* ── CTA ───────────────────────────────────────────────────── */}
-      <section id="waitlist" className="bg-[#1A110A] px-6 py-28">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="mb-4 font-display text-[clamp(2rem,5vw,3rem)] font-bold text-white">
-            Translation your legal team will actually sign off on.
-          </h2>
-          <p className="mb-10 text-lg text-[#9E9189]">Built for teams who can&apos;t afford mistranslations. Request early access.</p>
-          <WaitlistForm
-            name={name}
-            email={email}
-            formState={formState}
-            message={message}
-            onNameChange={setName}
-            onEmailChange={setEmail}
-            onSubmit={handleSubmit}
-            dark
-          />
-        </div>
-      </section>
+        {/* ── How it works ── */}
+        <section style={{ backgroundColor: T.surface, padding: "7rem 1.5rem" }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: "4rem" }}>
+              <p style={eyebrow}>The Helvara Workflow</p>
+              <h2 style={{
+                ...display,
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+                color: T.onSurface,
+              }}>
+                From document to delivery in three steps.
+              </h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
+              {steps.map((step) => (
+                <div
+                  key={step.n}
+                  style={{
+                    background: "#ffffff",
+                    borderTop: `3px solid ${T.accent}`,
+                    padding: "2rem",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div style={{
+                    width: "2.25rem",
+                    height: "2.25rem",
+                    borderRadius: "9999px",
+                    background: "rgba(13,123,110,0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    ...inter,
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    color: T.accent,
+                    marginBottom: "1.25rem",
+                  }}>
+                    {step.n}
+                  </div>
+                  <h3 style={{
+                    ...display,
+                    fontSize: "1.1rem",
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    color: T.onSurface,
+                    marginBottom: "0.6rem",
+                  }}>
+                    {step.title}
+                  </h3>
+                  <p style={{ ...inter, fontSize: "0.9rem", lineHeight: 1.7, color: T.onSurfaceVariant }}>{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-      {/* ── Footer ────────────────────────────────────────────────── */}
-      <footer className="bg-[#1A110A] px-6 pb-10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 border-t border-white/10 pt-8">
-          <span className="text-xs text-[#9E9189]">© 2026 Helvara</span>
-          <span className="text-xs text-[#9E9189]">Built for precision.</span>
-        </div>
-      </footer>
+        {/* ── Features ── */}
+        <section style={{ backgroundColor: T.surfaceContainer, padding: "7rem 1.5rem" }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: "4rem" }}>
+              <h2 style={{
+                ...display,
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+                color: T.onSurface,
+              }}>
+                Built for the way teams actually work.
+              </h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
+              {features.map((f) => (
+                <FeatureCard key={f.title} {...f} />
+              ))}
+            </div>
+          </div>
+        </section>
 
-    </div>
+        {/* ── Stats ── */}
+        <section style={{ backgroundColor: "#ede9e1", padding: "5rem 1.5rem" }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            <div style={{ marginBottom: "3rem", textAlign: "center" }}>
+              <p style={eyebrow}>Built for accuracy</p>
+              <h2 style={{
+                ...display,
+                fontSize: "1.6rem",
+                fontWeight: 600,
+                color: T.onSurface,
+                letterSpacing: "-0.01em",
+              }}>
+                Trusted by teams who can&apos;t afford mistranslations.
+              </h2>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3rem", textAlign: "center" }}>
+              {/* Languages — static, always shown */}
+              <div ref={langsRef} style={{ minWidth: "120px" }}>
+                <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{langsValue}</p>
+                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Languages</p>
+                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Supported</p>
+              </div>
+
+              {/* Words translated — dynamic, hidden if zero */}
+              {wordsTarget > 0 && (
+                <div ref={wordsRef} style={{ minWidth: "120px" }}>
+                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{wordsValue.toLocaleString()}+</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Words</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Translated</p>
+                </div>
+              )}
+
+              {/* Documents — dynamic, hidden if zero */}
+              {docsTarget > 0 && (
+                <div ref={docsRef} style={{ minWidth: "120px" }}>
+                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{docsValue}+</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Documents</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Processed</p>
+                </div>
+              )}
+
+              {/* Glossary terms — dynamic, hidden if zero */}
+              {glossaryTarget > 0 && (
+                <div ref={glossaryRef} style={{ minWidth: "120px" }}>
+                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{glossaryValue}+</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Glossary terms</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Enforced consistently</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── CTA ── */}
+        <section
+          id="waitlist"
+          style={{
+            backgroundColor: T.primaryContainer,
+            padding: "7rem 1.5rem",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <GrainOverlay />
+          <div style={{ maxWidth: "700px", margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
+            <h2 style={{
+              ...display,
+              fontSize: "clamp(2rem, 5vw, 3rem)",
+              fontWeight: 700,
+              lineHeight: 1.1,
+              letterSpacing: "-0.02em",
+              color: "#e8f5e2",
+              marginBottom: "1rem",
+            }}>
+              Translation your legal team will{" "}
+              <em style={{ fontStyle: "italic" }}>actually sign off on.</em>
+            </h2>
+            <p style={{ ...inter, fontSize: "1.05rem", lineHeight: 1.7, color: "rgba(232,245,226,0.7)", marginBottom: "2.5rem" }}>
+              Built for teams who can&apos;t afford mistranslations. Request early access.
+            </p>
+
+            {formState === "success" ? (
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                background: "rgba(13,123,110,0.15)",
+                border: "1px solid rgba(13,123,110,0.3)",
+                borderRadius: "9999px",
+                padding: "0.75rem 1.5rem",
+                color: "#7ecfc7",
+                ...inter,
+                fontSize: "0.9rem",
+                fontWeight: 500,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {message}
+              </div>
+            ) : (
+              <form onSubmit={(e) => { void handleSubmit(e); }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: "480px" }}>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@company.com"
+                    disabled={formState === "loading"}
+                    style={{
+                      flex: 1,
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: "9999px",
+                      padding: "0.75rem 1.25rem",
+                      color: "#fff",
+                      ...inter,
+                      fontSize: "0.9rem",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={formState === "loading" || !email.trim()}
+                    style={{
+                      background: T.surface,
+                      color: T.primaryContainer,
+                      border: "none",
+                      borderRadius: "9999px",
+                      padding: "0.75rem 1.5rem",
+                      ...inter,
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      opacity: formState === "loading" || !email.trim() ? 0.6 : 1,
+                      transition: "opacity 0.15s",
+                    }}
+                  >
+                    {formState === "loading" ? "Joining…" : "Request access"}
+                  </button>
+                </div>
+                {formState === "error" && (
+                  <p style={{ ...inter, fontSize: "0.8rem", color: "#f87171", margin: 0 }}>{message}</p>
+                )}
+              </form>
+            )}
+          </div>
+        </section>
+
+        {/* ── Footer ── */}
+        <footer style={{ background: "#051d0f", padding: "2rem 1.5rem" }}>
+          <div style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            paddingTop: "2rem",
+          }}>
+            <span style={{ ...display, fontSize: "1.1rem", fontWeight: 600, color: "rgba(232,245,226,0.6)", letterSpacing: "-0.01em" }}>
+              Helvara
+            </span>
+            <span style={{ ...inter, fontSize: "0.75rem", color: "rgba(232,245,226,0.35)" }}>
+              © 2026 Helvara
+            </span>
+          </div>
+        </footer>
+
+      </div>
+    </>
   );
 }

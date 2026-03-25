@@ -5,7 +5,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTokenRefresh } from "./hooks/useTokenRefresh";
 
-const PUBLIC_ROUTES = ["/", "/login", "/register", "/preview"];
+const PUBLIC_ROUTES = ["/", "/login", "/register"];
 
 function TokenRefreshRunner() {
   useTokenRefresh();
