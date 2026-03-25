@@ -167,7 +167,20 @@ export default function GlossaryPage() {
     }
   }
 
-  const INPUT = "w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[#0D7B6E] focus:outline-none";
+  const INPUT: React.CSSProperties = {
+    borderTop: "none",
+    borderLeft: "none",
+    borderRight: "none",
+    borderBottom: "1px solid rgba(194,200,193,0.5)",
+    borderRadius: 0,
+    background: "transparent",
+    padding: "0.5rem 0",
+    fontSize: "0.9375rem",
+    color: "#1c1c17",
+    outline: "none",
+    width: "100%",
+    fontFamily: "Inter, sans-serif",
+  };
   const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400";
 
   return (
@@ -229,7 +242,7 @@ export default function GlossaryPage() {
               type="submit"
               disabled={csvImporting || !csvFile}
               className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{ backgroundColor: "#0D7B6E" }}
+              style={{ backgroundColor: "#082012" }}
             >
               {csvImporting ? "Importing…" : "Import"}
             </button>
@@ -259,48 +272,48 @@ export default function GlossaryPage() {
               value={form.source_term}
               onChange={(e) => setForm((current) => ({ ...current, source_term: e.target.value }))}
               placeholder="Source term"
-              className={INPUT}
+              style={INPUT}
               required
             />
             <input
               value={form.target_term}
               onChange={(e) => setForm((current) => ({ ...current, target_term: e.target.value }))}
               placeholder="Target term"
-              className={INPUT}
+              style={INPUT}
               required
             />
             <input
               value={form.source_language}
               onChange={(e) => setForm((current) => ({ ...current, source_language: e.target.value }))}
               placeholder="Source language"
-              className={INPUT}
+              style={INPUT}
               required
             />
             <input
               value={form.target_language}
               onChange={(e) => setForm((current) => ({ ...current, target_language: e.target.value }))}
               placeholder="Target language"
-              className={INPUT}
+              style={INPUT}
               required
             />
             <input
               value={form.industry}
               onChange={(e) => setForm((current) => ({ ...current, industry: e.target.value }))}
               placeholder="Industry (optional)"
-              className={INPUT}
+              style={INPUT}
             />
             <input
               value={form.domain}
               onChange={(e) => setForm((current) => ({ ...current, domain: e.target.value }))}
               placeholder="Domain (optional)"
-              className={INPUT}
+              style={INPUT}
             />
             <div className="flex flex-wrap items-center gap-3 md:col-span-2">
               <button
                 type="submit"
                 disabled={saving}
                 className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ backgroundColor: "#082012" }}
               >
                 {saving ? "Saving…" : "Save glossary term"}
               </button>

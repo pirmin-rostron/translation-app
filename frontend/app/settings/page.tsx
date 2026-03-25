@@ -174,7 +174,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-2xl px-6 py-12">
+      <main className="mx-auto max-w-2xl px-6 py-12" style={{ paddingTop: "6rem" }}>
         <h1
           className="mb-1 text-2xl font-semibold"
           style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
@@ -236,7 +236,7 @@ export default function SettingsPage() {
                 onClick={() => void handleSaveProfile()}
                 disabled={profileSaving}
                 className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ backgroundColor: "#082012" }}
               >
                 {profileSaving ? "Saving…" : "Save changes"}
               </button>
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                 disabled
                 title="Email preference saving is not yet available"
                 className="rounded-full px-4 py-2 text-sm font-medium text-white opacity-40 cursor-not-allowed"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ backgroundColor: "#082012" }}
               >
                 Save preferences
               </button>

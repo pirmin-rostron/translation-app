@@ -705,7 +705,7 @@ export default function UploadPage() {
                 type="submit"
                 disabled={isUploading || isProcessing || fileList.length === 0}
                 className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ backgroundColor: "#082012" }}
               >
                 {isUploading
                   ? "Uploading…"
@@ -731,7 +731,7 @@ export default function UploadPage() {
                 type="button"
                 onClick={() => router.push("/documents")}
                 className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ backgroundColor: "#082012" }}
               >
                 View all translations
               </button>
