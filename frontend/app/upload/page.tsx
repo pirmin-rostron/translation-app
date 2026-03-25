@@ -367,11 +367,11 @@ export default function UploadPage() {
   // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-3xl px-6 py-12">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC", paddingTop: "5.5rem" }}>
+      <main className="mx-auto max-w-3xl px-6 pb-12">
 
         {/* ── Header ── */}
-        <div className="mb-8">
+        <div style={{ marginBottom: "2.5rem" }}>
           <p
             className="mb-1 text-xs font-medium uppercase tracking-widest"
             style={{ color: "#0D7B6E" }}
@@ -704,8 +704,13 @@ export default function UploadPage() {
               <button
                 type="submit"
                 disabled={isUploading || isProcessing || fileList.length === 0}
-                className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: "#082012" }}
+                className="rounded-full px-6 py-2.5 text-sm font-medium text-white"
+                style={{
+                  backgroundColor: "#082012",
+                  opacity: (isUploading || isProcessing || fileList.length === 0) ? 0.5 : 1,
+                  cursor: (isUploading || isProcessing || fileList.length === 0) ? "not-allowed" : "pointer",
+                  transition: "opacity 0.15s",
+                }}
               >
                 {isUploading
                   ? "Uploading…"

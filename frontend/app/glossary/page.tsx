@@ -184,11 +184,11 @@ export default function GlossaryPage() {
   const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400";
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-5xl px-6 py-12">
+    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC", paddingTop: "5.5rem" }}>
+      <main className="mx-auto max-w-5xl px-6 pb-12">
         <h1
-          className="mb-6 text-2xl font-semibold"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+          className="text-2xl font-semibold"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A", marginBottom: "2.5rem" }}
         >
           Glossary
         </h1>
