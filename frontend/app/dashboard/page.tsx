@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { apiFetch, API_URL } from "../services/api";
@@ -34,12 +34,12 @@ const STATUS_LABELS: Record<TranslationJob["status"], string> = {
   failed: "Failed",
 };
 
-const STATUS_STYLES: Record<TranslationJob["status"], string> = {
-  pending:    "bg-stone-100 text-stone-600",
-  processing: "bg-amber-50 text-amber-700",
-  review:     "bg-teal-50 text-teal-700",
-  completed:  "bg-green-50 text-green-700",
-  failed:     "bg-red-50 text-red-600",
+const STATUS_BADGE: Record<TranslationJob["status"], React.CSSProperties> = {
+  pending:    { background: "#f1eee5", color: "#424843" },
+  processing: { background: "#fef3cd", color: "#92610a" },
+  review:     { background: "#e6f0ea", color: "#082012" },
+  completed:  { background: "#e6f4f2", color: "#0D7B6E" },
+  failed:     { background: "#fde8e8", color: "#ba1a1a" },
 };
 
 function formatDate(iso: string): string {
@@ -58,29 +58,101 @@ function getFirstName(fullName: string | null | undefined, email: string): strin
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function JobRow({ job }: { job: TranslationJob }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <Link
       href={`/translation-jobs/${job.id}`}
-      className="group flex items-center justify-between border-b border-stone-100 px-6 py-4 transition-colors hover:bg-stone-50 last:border-b-0"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "1rem 2rem",
+        borderBottom: "1px solid #f6f3eb",
+        backgroundColor: hovered ? "#f6f3eb" : "transparent",
+        transition: "background-color 0.15s",
+        textDecoration: "none",
+        cursor: "pointer",
+      }}
     >
-      <div className="flex items-center gap-4 min-w-0">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-stone-900 group-hover:text-teal-700 transition-colors">
-            {job.document_name ?? `Job #${job.id}`}
-          </p>
-          <p className="mt-0.5 text-xs text-stone-400">
-            {job.source_language} → {job.target_language} · {formatDate(job.created_at)}
-          </p>
-        </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{
+          fontFamily: "Inter, sans-serif",
+          fontSize: "0.875rem",
+          fontWeight: 500,
+          color: hovered ? "#082012" : "#1c1c17",
+          transition: "color 0.15s",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          margin: 0,
+        }}>
+          {job.document_name ?? `Job #${job.id}`}
+        </p>
+        <p style={{
+          fontFamily: "Inter, sans-serif",
+          fontSize: "0.75rem",
+          color: "#424843",
+          opacity: 0.7,
+          marginTop: "2px",
+          margin: "2px 0 0",
+        }}>
+          {job.source_language} → {job.target_language} · {formatDate(job.created_at)}
+        </p>
       </div>
-      <span
-        className={[
-          "ml-4 flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
-          STATUS_STYLES[job.status],
-        ].join(" ")}
-      >
+      <span style={{
+        ...STATUS_BADGE[job.status],
+        borderRadius: "9999px",
+        padding: "0.2rem 0.75rem",
+        fontSize: "0.6875rem",
+        fontWeight: 600,
+        fontFamily: "Inter, sans-serif",
+        flexShrink: 0,
+        marginLeft: "1rem",
+      }}>
         {STATUS_LABELS[job.status]}
       </span>
+    </Link>
+  );
+}
+
+function QuickActionCard({ label, desc, href }: { label: string; desc: string; href: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Link
+      href={href}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "block",
+        backgroundColor: hovered ? "#f6f3eb" : "#ffffff",
+        borderRadius: "4px",
+        padding: "1.25rem 1.5rem",
+        cursor: "pointer",
+        transition: "background-color 0.15s",
+        textDecoration: "none",
+      }}
+    >
+      <p style={{
+        fontFamily: "Inter, sans-serif",
+        fontSize: "0.875rem",
+        fontWeight: 600,
+        color: "#082012",
+        margin: 0,
+      }}>
+        {label}
+      </p>
+      <p style={{
+        fontFamily: "Inter, sans-serif",
+        fontSize: "0.75rem",
+        color: "#424843",
+        opacity: 0.65,
+        marginTop: "2px",
+        margin: "2px 0 0",
+      }}>
+        {desc}
+      </p>
     </Link>
   );
 }
@@ -112,83 +184,134 @@ export default function DashboardPage() {
   const firstName = getFirstName(user?.full_name, user?.email ?? "");
 
   return (
-    <div
-      className="min-h-screen px-6 py-10"
-      style={{ backgroundColor: "#F5F2EC" }}
-    >
-      <div className="mx-auto max-w-4xl">
+    <div style={{ backgroundColor: "#fcf9f0", minHeight: "100vh", padding: "5rem 2rem 4rem" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
 
         {/* ── Header ── */}
-        <div className="mb-10 flex items-end justify-between">
+        <div style={{ marginBottom: "2.5rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div>
-            <p
-              className="text-xs font-medium uppercase tracking-widest mb-1"
-              style={{ color: "#0D7B6E" }}
-            >
+            <p style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.6875rem",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              color: "#0D7B6E",
+              opacity: 0.8,
+              marginBottom: "0.375rem",
+              margin: "0 0 0.375rem",
+            }}>
               Welcome back
             </p>
-            <h1
-              className="text-4xl font-semibold"
-              style={{
-                fontFamily: "'Playfair Display', Georgia, serif",
-                color: "#1A110A",
-              }}
-            >
+            <h1 style={{
+              fontFamily: "'Newsreader', Georgia, serif",
+              fontSize: "clamp(2.5rem, 5vw, 3.5rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              color: "#082012",
+              lineHeight: 1.05,
+              margin: 0,
+            }}>
               {firstName}
             </h1>
           </div>
 
           <Link
             href="/upload"
-            className="rounded-full px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "#0D7B6E" }}
+            style={{
+              backgroundColor: "#082012",
+              color: "#ffffff",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              padding: "0.625rem 1.5rem",
+              borderRadius: "9999px",
+              textDecoration: "none",
+              transition: "opacity 0.15s",
+              display: "inline-block",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
           >
             New translation
           </Link>
         </div>
 
         {/* ── Recent jobs ── */}
-        <div className="rounded-sm border border-stone-200 bg-white">
-          <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "#1A110A" }}
-            >
+        <div style={{ backgroundColor: "#ffffff", borderRadius: "4px" }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "1.25rem 2rem",
+            borderBottom: "1px solid #f1eee5",
+          }}>
+            <h2 style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "#082012",
+              opacity: 0.5,
+              margin: 0,
+            }}>
               Recent translations
             </h2>
             <Link
               href="/documents"
-              className="text-xs font-medium transition-colors hover:underline"
-              style={{ color: "#0D7B6E" }}
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: "0.75rem",
+                color: "#0D7B6E",
+                textDecoration: "none",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
             >
               View all
             </Link>
           </div>
 
           {jobsLoading && (
-            <div className="space-y-0">
+            <div>
               {[...Array(3)].map((_, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between border-b border-stone-100 px-6 py-4 last:border-b-0"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "1rem 2rem",
+                    borderBottom: i < 2 ? "1px solid #f6f3eb" : "none",
+                  }}
                 >
-                  <div className="space-y-2">
-                    <div className="h-3.5 w-48 rounded-sm bg-stone-100 animate-pulse" />
-                    <div className="h-2.5 w-32 rounded-sm bg-stone-100 animate-pulse" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div className="animate-pulse" style={{ height: "0.875rem", width: "12rem", borderRadius: "2px", backgroundColor: "#f6f3eb" }} />
+                    <div className="animate-pulse" style={{ height: "0.625rem", width: "8rem", borderRadius: "2px", backgroundColor: "#f6f3eb" }} />
                   </div>
-                  <div className="h-5 w-16 rounded-full bg-stone-100 animate-pulse" />
+                  <div className="animate-pulse" style={{ height: "1.25rem", width: "4rem", borderRadius: "9999px", backgroundColor: "#f6f3eb" }} />
                 </div>
               ))}
             </div>
           )}
 
           {!jobsLoading && (!jobs || jobs.length === 0) && (
-            <div className="px-6 py-12 text-center">
-              <p className="text-sm text-stone-400">No translations yet.</p>
+            <div style={{ padding: "3rem 2rem", textAlign: "center" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.875rem", color: "#424843", opacity: 0.6, margin: "0 0 0.75rem" }}>
+                No translations yet.
+              </p>
               <Link
                 href="/upload"
-                className="mt-3 inline-block text-sm font-medium transition-colors hover:underline"
-                style={{ color: "#0D7B6E" }}
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "#0D7B6E",
+                  textDecoration: "none",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
               >
                 Upload your first document →
               </Link>
@@ -203,30 +326,32 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-        <Link href="/documents" className="mt-3 inline-block text-sm font-medium hover:underline" style={{ color: "#0D7B6E" }}>
+
+        <Link
+          href="/documents"
+          style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            color: "#0D7B6E",
+            textDecoration: "none",
+            display: "inline-block",
+            marginTop: "0.75rem",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
+        >
           View all translations →
         </Link>
 
         {/* ── Quick actions ── */}
-        <div className="mt-6 grid grid-cols-3 gap-4">
+        <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
           {[
-            { label: "Upload document", href: "/upload", desc: "Start a new translation job" },
-            { label: "Glossary", href: "/glossary", desc: "Manage terminology" },
-            { label: "Settings", href: "/settings", desc: "Account & preferences" },
+            { label: "Upload document", href: "/upload",   desc: "Start a new translation job" },
+            { label: "Glossary",        href: "/glossary", desc: "Manage terminology" },
+            { label: "Settings",        href: "/settings", desc: "Account & preferences" },
           ].map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className="group rounded-sm border border-stone-200 bg-white px-5 py-4 transition-colors hover:border-teal-200 hover:bg-teal-50"
-            >
-              <p
-                className="text-sm font-medium transition-colors group-hover:text-teal-700"
-                style={{ color: "#1A110A" }}
-              >
-                {action.label}
-              </p>
-              <p className="mt-0.5 text-xs text-stone-400">{action.desc}</p>
-            </Link>
+            <QuickActionCard key={action.href} {...action} />
           ))}
         </div>
 
