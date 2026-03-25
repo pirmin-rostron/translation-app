@@ -14,7 +14,7 @@ const DOC_TYPES = [
   "technical manual", "board resolution", "investment memo",
   "insurance policy", "court filing", "patent application",
   "regulatory filing", "tender document", "annual report",
-  "research paper", "HR policy", "business proposal", "medical record",
+  "research paper", "HR policy", "business proposal",
 ];
 
 const LANGUAGES = [
@@ -479,11 +479,13 @@ export default function LandingPage() {
               flexWrap: "nowrap",
               minHeight: "6rem",
               width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
             }}>
               {/* Static: "Translate a" */}
               <span style={{
                 fontFamily: "'Newsreader', Georgia, serif",
-                fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                 fontWeight: 700,
                 letterSpacing: "-0.02em",
                 lineHeight: 1.1,
@@ -497,13 +499,13 @@ export default function LandingPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "22rem",
+                width: "clamp(12rem, 28vw, 22rem)",
                 flexShrink: 0,
                 overflow: "hidden",
               }}>
                 <span style={{
                   fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                  fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
                   letterSpacing: "-0.02em",
@@ -521,7 +523,7 @@ export default function LandingPage() {
               {/* Static: "into" */}
               <span style={{
                 fontFamily: "'Newsreader', Georgia, serif",
-                fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                 fontWeight: 700,
                 letterSpacing: "-0.02em",
                 lineHeight: 1.1,
@@ -535,13 +537,13 @@ export default function LandingPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "14rem",
+                width: "clamp(8rem, 16vw, 14rem)",
                 flexShrink: 0,
                 overflow: "hidden",
               }}>
                 <span style={{
                   fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                  fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
                   letterSpacing: "-0.02em",
