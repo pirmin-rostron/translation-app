@@ -17,33 +17,46 @@ const features = [
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
+        <path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4.5 6.5L14 18h-4l-.5-2.5C7 14.5 5 12 5 9a7 7 0 0 1 7-7z" />
+        <path d="M9 21h6" />
+        <path d="M12 18v3" />
       </svg>
     ),
-    title: "AI Translation",
-    body: "Claude-powered models translate with full contextual awareness — not word by word.",
+    title: "Linguistic Insights",
+    body: "Helvara surfaces glossary matches, translation memory, and semantic context for every block — so reviewers make faster, more confident decisions.",
   },
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
         <circle cx="12" cy="12" r="3" />
+        <polyline points="9 11 12 14 22 4" />
       </svg>
     ),
-    title: "Human Review",
-    body: "Every translation passes through structured block-by-block review before export.",
+    title: "Human Review Workflow",
+    body: "Block-by-block structured review with approve, edit, and skip controls. Every decision is tracked and auditable from upload to export.",
   },
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <path d="M10 10h4" />
+        <path d="M10 14h4" />
       </svg>
     ),
-    title: "Team Glossaries",
-    body: "Define terminology once. Helvara enforces it consistently across every document.",
+    title: "Connected Glossary",
+    body: "Define terminology once. Helvara enforces it consistently across every document — and lets reviewers add new terms directly from the review workflow.",
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="1 4 1 10 7 10" />
+        <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
+      </svg>
+    ),
+    title: "Translation Memory",
+    body: "Approved translations are remembered. Similar content in future documents is surfaced automatically, reducing review time with every job.",
   },
 ];
 
@@ -228,13 +241,13 @@ export default function LandingPage() {
       <section className="grain-hero relative flex min-h-[50vh] items-center justify-center px-6 pt-16">
         <div className="relative z-10 mx-auto w-full max-w-2xl py-12 text-center">
           <p className="fade-up fade-up-1 mb-5 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
-            AI-powered document translation
+            Translation Workflow Platform
           </p>
           <h1 className="fade-up fade-up-2 mb-6 font-display text-[clamp(2.8rem,7vw,4.5rem)] font-bold leading-[1.1] tracking-tight text-[#1A110A]">
-            Precision in every translation.
+            Manage all your translations in one place.
           </h1>
           <p className="fade-up fade-up-3 mb-12 text-lg leading-relaxed text-[#6B6158]">
-            AI-powered translation with human review. Built for teams that care about accuracy.
+            AI-assisted translation with structured human review. One platform for legal, compliance, and enterprise teams who need consistency, control, and an audit-ready output.
           </p>
           <div className="fade-up fade-up-4 mt-10 mb-2">
             <WaitlistForm
@@ -248,6 +261,69 @@ export default function LandingPage() {
               onSubmit={handleSubmit}
             />
           </div>
+        </div>
+      </section>
+
+      {/* ── Problem ───────────────────────────────────────────────── */}
+      <section className="border-t border-[#E5E0D8] px-6 py-20" style={{ backgroundColor: "#F5F2EC" }}>
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#0D7B6E]">
+            WHY HELVARA
+          </p>
+          <h2 className="mb-10 font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
+            Translation today is broken.
+          </h2>
+          <ul className="space-y-5 text-left">
+            {[
+              "Generic AI tools translate without context — producing output that's technically correct but tonally wrong.",
+              "Review is unstructured — no audit trail, no consistency, no enforcement of approved terminology.",
+              "Every document starts from scratch — your team re-translates the same terms differently every time.",
+            ].map((point) => (
+              <li key={point} className="flex gap-4 text-base leading-relaxed text-[#6B6158]">
+                <span className="shrink-0 font-semibold" style={{ color: "#0D7B6E" }}>—</span>
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── How it works ──────────────────────────────────────────── */}
+      <section className="border-t border-[#E5E0D8] bg-white px-6 py-24">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="mb-16 text-center font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
+            From document to delivery in three steps.
+          </h2>
+          <div className="grid gap-10 sm:grid-cols-3">
+            {steps.map((step) => (
+              <div key={step.n} className="flex flex-col gap-4">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6F4F2] text-sm font-bold text-[#0D7B6E]">
+                  {step.n}
+                </span>
+                <div>
+                  <h3 className="mb-1.5 text-sm font-semibold text-[#1A110A]">{step.title}</h3>
+                  <p className="text-sm leading-relaxed text-[#6B6158]">{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Feature cards ─────────────────────────────────────────── */}
+      <section className="border-t border-[#E5E0D8] px-6 py-24" style={{ backgroundColor: "#F5F2EC" }}>
+        <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2">
+          {features.map((f) => (
+            <Card key={f.title} className="flex flex-col gap-5 p-7">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#E6F4F2] text-[#0D7B6E]">
+                {f.icon}
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-[#1A110A]">{f.title}</h3>
+                <p className="text-sm leading-relaxed text-[#6B6158]">{f.body}</p>
+              </div>
+            </Card>
+          ))}
         </div>
       </section>
 
@@ -300,52 +376,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Feature cards ─────────────────────────────────────────── */}
-      <section className="px-6 py-24">
-        <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-3">
-          {features.map((f) => (
-            <Card key={f.title} className="flex flex-col gap-5 p-7">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#E6F4F2] text-[#0D7B6E]">
-                {f.icon}
-              </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-[#1A110A]">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-[#6B6158]">{f.body}</p>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* ── How it works ──────────────────────────────────────────── */}
-      <section className="border-t border-[#E5E0D8] bg-white px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="mb-16 text-center font-display text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-[#1A110A]">
-            From document to delivery in three steps.
-          </h2>
-          <div className="grid gap-10 sm:grid-cols-3">
-            {steps.map((step) => (
-              <div key={step.n} className="flex flex-col gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E6F4F2] text-sm font-bold text-[#0D7B6E]">
-                  {step.n}
-                </span>
-                <div>
-                  <h3 className="mb-1.5 text-sm font-semibold text-[#1A110A]">{step.title}</h3>
-                  <p className="text-sm leading-relaxed text-[#6B6158]">{step.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── CTA ───────────────────────────────────────────────────── */}
       <section className="bg-[#1A110A] px-6 py-28">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="mb-4 font-display text-[clamp(2rem,5vw,3rem)] font-bold text-white">
-            Ready to translate with confidence?
+            Translation your legal team will actually sign off on.
           </h2>
-          <p className="mb-10 text-lg text-[#9E9189]">Join the waitlist for early access.</p>
+          <p className="mb-10 text-lg text-[#9E9189]">Built for teams who can&apos;t afford mistranslations. Request early access.</p>
           <WaitlistForm
             name={name}
             email={email}
