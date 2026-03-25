@@ -58,6 +58,17 @@ function isTranslationEtaReliable(progress: TranslationProgress | null) {
   return true;
 }
 
+// ─── Step indicator ────────────────────────────────────────────────────────────
+
+const STEP_CIRCLE: Record<PipelineStepStatus, React.CSSProperties> = {
+  complete:  { background: "#082012", color: "#ffffff", width: 24, height: 24, borderRadius: "9999px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", flexShrink: 0 },
+  current:   { background: "#f1eee5", color: "#082012", width: 24, height: 24, borderRadius: "9999px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", flexShrink: 0 },
+  failed:    { background: "#fde8e8", color: "#ba1a1a", width: 24, height: 24, borderRadius: "9999px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", flexShrink: 0 },
+  upcoming:  { background: "#f6f3eb", color: "#424843", opacity: 0.5, width: 24, height: 24, borderRadius: "9999px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", flexShrink: 0 },
+};
+
+const wrapper: React.CSSProperties = { minHeight: "100vh", background: "#fcf9f0", paddingTop: "5.5rem" };
+
 export default function ProcessingPage() {
   const params = useParams();
   const router = useRouter();
@@ -321,95 +332,188 @@ export default function ProcessingPage() {
     return () => window.clearTimeout(timer);
   }, [latestJob, router, translationDone]);
 
-  if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Preparing translation pipeline...</div>;
-  if (!doc) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Document not found.</div>;
+  if (loading) return (
+    <div style={wrapper}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "3rem 2rem", fontFamily: "Inter, sans-serif", color: "#424843", opacity: 0.6 }}>
+        Preparing translation pipeline...
+      </div>
+    </div>
+  );
+  if (!doc) return (
+    <div style={wrapper}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "3rem 2rem", fontFamily: "Inter, sans-serif", color: "#ba1a1a" }}>
+        Document not found.
+      </div>
+    </div>
+  );
+
+  const pillButton: React.CSSProperties = {
+    backgroundColor: "#082012",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "9999px",
+    padding: "0.5rem 1.25rem",
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    fontFamily: "Inter, sans-serif",
+    cursor: "pointer",
+    opacity: actionLoading ? 0.6 : 1,
+    transition: "opacity 0.15s",
+  };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1
-          className="text-2xl font-semibold"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
-        >
-          Preparing your translation review
-        </h1>
-        <p className="mt-1 text-sm text-stone-500">{doc.filename}</p>
+    <div style={wrapper}>
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "3rem 2rem" }}>
 
-        <section className="mt-6 border border-stone-200 bg-white p-6">
-          <p className="text-lg font-semibold" style={{ color: "#1A110A" }}>{currentStatusHeading}</p>
-          <p className="mt-1 text-sm text-stone-500">{currentStatusSupport}</p>
+        {/* ── Page header ── */}
+        <div style={{ marginBottom: "0.25rem" }}>
+          <p style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: "0.6875rem",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.15em",
+            color: "#0D7B6E",
+            opacity: 0.7,
+            marginBottom: "0.5rem",
+          }}>
+            Processing
+          </p>
+          <h1 style={{
+            fontFamily: "'Newsreader', Georgia, serif",
+            fontSize: "clamp(2rem, 4vw, 2.75rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "#082012",
+            margin: 0,
+          }}>
+            Preparing your translation review
+          </h1>
+          <p style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: "0.875rem",
+            color: "#424843",
+            opacity: 0.65,
+            marginTop: "0.25rem",
+          }}>
+            {doc.filename}
+          </p>
+        </div>
 
-          <div className="mt-4">
-            <div className="h-2 w-full overflow-hidden bg-stone-100">
+        {/* ── Status card ── */}
+        <div style={{ backgroundColor: "#ffffff", borderRadius: "4px", padding: "2rem", marginTop: "2rem" }}>
+
+          <p style={{
+            fontFamily: "'Newsreader', Georgia, serif",
+            fontSize: "1.25rem",
+            fontWeight: 600,
+            color: "#082012",
+            margin: 0,
+          }}>
+            {currentStatusHeading}
+          </p>
+          <p style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: "0.875rem",
+            color: "#424843",
+            opacity: 0.7,
+            marginTop: "0.25rem",
+          }}>
+            {currentStatusSupport}
+          </p>
+
+          {/* ── Progress bar ── */}
+          <div style={{ marginTop: "1.5rem" }}>
+            <div style={{ background: "#f1eee5", height: 3, borderRadius: "9999px" }}>
               <div
-                className={`h-full transition-all ${hasFailure ? "bg-amber-500" : "bg-[#0D7B6E]"}`}
-                style={{ width: `${Math.max(0, Math.min(100, displayProgress))}%` }}
+                className="transition-all"
+                style={{
+                  width: `${Math.max(0, Math.min(100, displayProgress))}%`,
+                  height: 3,
+                  borderRadius: "9999px",
+                  background: hasFailure ? "#d97706" : "#082012",
+                }}
               />
             </div>
-            <p className="mt-1 text-xs text-stone-400">{displayProgress}% complete</p>
+            <p style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: "0.75rem",
+              color: "#424843",
+              opacity: 0.5,
+              marginTop: "0.5rem",
+            }}>
+              {displayProgress}% complete
+            </p>
           </div>
 
-          <ol className="mt-5 space-y-3">
+          {/* ── Step list ── */}
+          <ol style={{ marginTop: "1.5rem", listStyle: "none", padding: 0, margin: "1.5rem 0 0" }}>
             {steps.map((step, index) => (
-              <li key={step.title} className="flex items-start gap-3">
-                <span
-                  className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                    step.status === "complete"
-                      ? "text-white"
-                      : step.status === "current"
-                        ? "bg-stone-200 text-stone-700"
-                        : step.status === "failed"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-stone-100 text-stone-400"
-                  }`}
-                  style={step.status === "complete" ? { backgroundColor: "#0D7B6E" } : undefined}
-                >
+              <li key={step.title} style={{ display: "flex", gap: "0.875rem", alignItems: "flex-start", paddingBottom: "1rem" }}>
+                <span style={STEP_CIRCLE[step.status]}>
                   {step.status === "complete" ? "✓" : index + 1}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="text-sm font-medium"
-                    style={step.status === "upcoming" ? { color: "#78716c" } : { color: "#1A110A" }}
-                  >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: "#1c1c17",
+                    opacity: step.status === "upcoming" ? 0.45 : 1,
+                    margin: 0,
+                  }}>
                     {step.title}
                   </p>
-                  <p className={`text-xs ${step.status === "upcoming" ? "text-stone-400" : "text-stone-500"}`}>{step.subtitle}</p>
+                  <p style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: "0.75rem",
+                    color: "#424843",
+                    opacity: 0.55,
+                    marginTop: "2px",
+                    margin: "2px 0 0",
+                  }}>
+                    {step.subtitle}
+                  </p>
                 </div>
               </li>
             ))}
           </ol>
 
+          {/* ── Success state ── */}
           {translationDone && latestJob && (
-            <div className="mt-5 border border-stone-200 bg-stone-50 p-4">
-              <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Your document is ready for review.</p>
-              <p className="mt-1 text-xs text-stone-500">Opening review automatically…</p>
+            <div style={{ background: "#f0faf8", borderRadius: "4px", padding: "1.5rem", marginTop: "1.5rem" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", fontWeight: 600, color: "#082012", margin: 0 }}>
+                Your document is ready for review.
+              </p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.75rem", color: "#424843", opacity: 0.6, marginTop: "0.25rem" }}>
+                Opening review automatically…
+              </p>
               <button
                 type="button"
                 onClick={() => router.replace(`/translation-jobs/${latestJob.id}`)}
-                className="mt-3 rounded-full px-3 py-2 text-xs font-medium text-white"
-                style={{ backgroundColor: "#0D7B6E" }}
+                style={{ ...pillButton, marginTop: "0.75rem" }}
               >
                 Open review now
               </button>
             </div>
           )}
 
+          {/* ── Failure state ── */}
           {hasFailure && (
-            <div className="mt-5 border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-medium text-red-700">
+            <div style={{ background: "#fff5f5", borderRadius: "4px", padding: "1.5rem", marginTop: "1.5rem" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem", fontWeight: 600, color: "#ba1a1a", margin: 0 }}>
                 {parseFailed ? "Parsing could not be completed" : "Translation could not be completed"}
               </p>
-              <p className="mt-1 text-xs text-red-600">
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.75rem", color: "#ba1a1a", opacity: 0.75, marginTop: "0.25rem" }}>
                 {latestJob?.error_message || doc.error_message || "Please retry to continue your workflow."}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div style={{ marginTop: "0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                 {parseFailed && (
                   <button
                     type="button"
                     onClick={handleRetryDocument}
                     disabled={actionLoading}
-                    className="rounded-full px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
-                    style={{ backgroundColor: "#0D7B6E" }}
+                    style={pillButton}
                   >
                     Retry this step
                   </button>
@@ -419,8 +523,7 @@ export default function ProcessingPage() {
                     type="button"
                     onClick={handleRetryTranslation}
                     disabled={actionLoading}
-                    className="rounded-full px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
-                    style={{ backgroundColor: "#0D7B6E" }}
+                    style={pillButton}
                   >
                     Retry this step
                   </button>
@@ -429,11 +532,15 @@ export default function ProcessingPage() {
             </div>
           )}
 
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-        </section>
+          {/* ── Inline error ── */}
+          {error && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.875rem", color: "#ba1a1a", marginTop: "1rem" }}>
+              {error}
+            </p>
+          )}
 
+        </div>
       </main>
     </div>
   );
 }
-
