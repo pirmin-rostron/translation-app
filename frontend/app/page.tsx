@@ -472,76 +472,74 @@ export default function LandingPage() {
         <section style={{ background: "#082012", padding: "6rem 2rem" }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", textAlign: "center" }}>
             <div style={{
-              display: "inline-flex",
-              alignItems: "baseline",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              gap: "0 0.4em",
-              lineHeight: 1.1,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr 1fr",
+              alignItems: "center",
+              gap: "0",
+              width: "100%",
+              minHeight: "7rem",
             }}>
-              {/* Static: "Translate a" */}
-              <span style={{
-                fontFamily: "'Newsreader', Georgia, serif",
-                fontSize: "clamp(2.5rem, 5vw, 4.5rem)",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: "rgba(252,249,240,0.9)",
-              }}>Translate a</span>
+              {/* Col 1 — "Translate a" */}
+              <div style={{ textAlign: "center" }}>
+                <span style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.02em",
+                  color: "rgba(252,249,240,0.9)",
+                  lineHeight: 1.1,
+                }}>Translate a</span>
+              </div>
 
-              {/* Cycling doc type — fixed width container */}
-              <span style={{
-                display: "inline-block",
-                width: "clamp(14rem, 28vw, 26rem)",
-                textAlign: "left",
-                overflow: "hidden",
-              }}>
+              {/* Col 2 — cycling doc type, centred */}
+              <div style={{ textAlign: "center", overflow: "hidden" }}>
                 <span style={{
                   display: "inline-block",
                   fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(2.5rem, 5vw, 4.5rem)",
+                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
                   letterSpacing: "-0.02em",
                   color: "rgba(252,249,240,0.9)",
+                  lineHeight: 1.1,
                   transition: "opacity 0.25s ease, transform 0.25s ease",
                   opacity: docVisible ? 1 : 0,
                   transform: docVisible ? "translateY(0)" : "translateY(-8px)",
                 }}>
                   {DOC_TYPES[docIdx]}
                 </span>
-              </span>
+              </div>
 
-              {/* Static: "into" */}
-              <span style={{
-                fontFamily: "'Newsreader', Georgia, serif",
-                fontSize: "clamp(2.5rem, 5vw, 4.5rem)",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: "rgba(252,249,240,0.9)",
-              }}>into</span>
+              {/* Col 3 — "into" */}
+              <div style={{ textAlign: "center" }}>
+                <span style={{
+                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.02em",
+                  color: "rgba(252,249,240,0.9)",
+                  lineHeight: 1.1,
+                }}>into</span>
+              </div>
 
-              {/* Cycling language — fixed width container */}
-              <span style={{
-                display: "inline-block",
-                width: "clamp(9rem, 18vw, 16rem)",
-                textAlign: "left",
-                overflow: "hidden",
-              }}>
+              {/* Col 4 — cycling language, centred */}
+              <div style={{ textAlign: "center", overflow: "hidden" }}>
                 <span style={{
                   display: "inline-block",
                   fontFamily: "'Newsreader', Georgia, serif",
-                  fontSize: "clamp(2.5rem, 5vw, 4.5rem)",
+                  fontSize: "clamp(2rem, 4vw, 3.5rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
                   letterSpacing: "-0.02em",
                   color: "rgba(252,249,240,0.9)",
+                  lineHeight: 1.1,
                   transition: "opacity 0.25s ease, transform 0.25s ease",
                   opacity: langVisible ? 1 : 0,
                   transform: langVisible ? "translateY(0)" : "translateY(8px)",
                 }}>
                   {LANGUAGES[langIdx]}
                 </span>
-              </span>
+              </div>
             </div>
 
             <p style={{
