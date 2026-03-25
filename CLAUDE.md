@@ -94,6 +94,14 @@ pip install sqlalchemy alembic
 - Do not cross-call routers in ways that blur these boundaries.
 - Frontend fetches must map to these router boundaries — do not create catch-all API wrappers.
 
+### API Contract Rules
+
+- All API calls must go through typed functions in `frontend/app/services/api.ts` — never use inline `apiFetch` calls inside components.
+- Every backend endpoint used by a component must have a corresponding typed response interface in `api.ts` that matches the actual backend Pydantic model exactly. Check the backend schema before defining the frontend type.
+- Components handle display logic only — no API parsing, shape assumptions, or raw fetch calls.
+- When a new backend endpoint is added, the corresponding `api.ts` type and fetch function must be added in the same change.
+- Never assume a response is a plain array if the backend returns a paginated wrapper — always check the actual `response_model`.
+
 ---
 
 ## Rendering Rules
@@ -123,6 +131,13 @@ pip install sqlalchemy alembic
 - If fewer than 2 valid options exist, treat as non-ambiguity.
 - Explanations/meanings must be in English (UI language).
 - Translation option text remains in the target language.
+
+---
+
+## Product Naming Conventions
+
+- All user-facing surfaces that expose translation intelligence (glossary matches, semantic memory matches, ambiguity detection, translation memory confidence) must be labelled "Linguistic Insights" — not "glossary match", "semantic match", "memory match", or other internal terms.
+- Internal code and backend field names may use technical terms — only the user-facing UI label must use "Linguistic Insights".
 
 ---
 
@@ -217,6 +232,7 @@ Use Tailwind classes consistently for these states:
 - Fail safely on malformed/incomplete data.
 - Keep responses focused — do not refactor unrelated code in the same pass.
 - After any backend parser change, always run the parser against all three test RTF files (`basic_test.rtf`, `legal_test.rtf`, `messy_test.rtf`) and verify block output before finishing.
+- The frontend runs as a production Next.js build (`next build` + `next start`). `NEXT_PUBLIC_*` environment variables are baked into the bundle at build time — they are not available at runtime. Any new `NEXT_PUBLIC_*` var must be added to: (1) `/app/.env` on the server, (2) `docker-compose.yml` build args, (3) `frontend/Dockerfile` ARG and ENV declarations.
 
 ---
 
