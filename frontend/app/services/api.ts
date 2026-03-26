@@ -58,6 +58,7 @@ export const queryKeys = {
   },
   translationJobs: {
     all: () => ["translation-jobs"] as const,
+    recent: () => ["translation-jobs", "recent"] as const,
     byDocument: (documentId: number) => ["documents", documentId, "translation-jobs"] as const,
     detail: (id: number) => ["translation-jobs", id] as const,
     progress: (id: number) => ["translation-jobs", id, "progress"] as const,
@@ -140,9 +141,44 @@ export const documentsApi = {
     }),
 };
 
+// --- dashboard types ---
+
+export type TranslationJobListItem = {
+  id: number;
+  document_id: number;
+  status: string;
+  source_language: string | null;
+  target_language: string;
+  translation_style: string | null;
+  translation_provider: string | null;
+  error_message: string | null;
+  progress_total_segments: number | null;
+  progress_completed_segments: number;
+  created_at: string;
+  last_saved_at: string | null;
+  document_name: string | null;
+};
+
+export type DashboardStats = {
+  activeProjects: number;
+  wordsTranslated: number;
+  pendingReview: number;
+};
+
+export type ProjectListItem = {
+  id: number;
+  name: string;
+  description: string | null;
+  glossary_id: number | null;
+  translation_count: number;
+};
+
 // --- translation_jobs router ---
 
 export const translationJobsApi = {
+  listRecent: (limit = 10) =>
+    apiFetch<TranslationJobListItem[]>(`${API_URL}/translation-jobs?limit=${limit}&order=desc`),
+
   getById: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}`),
 

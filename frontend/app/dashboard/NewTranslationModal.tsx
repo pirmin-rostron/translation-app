@@ -1,0 +1,241 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useDashboardStore } from "../stores/dashboardStore";
+import { documentsApi } from "../services/api";
+import type { ProjectListItem } from "../services/api";
+import { ModalOverlay } from "./ModalOverlay";
+
+const LANGUAGE_OPTIONS = [
+  { value: "English",  label: "English" },
+  { value: "German",   label: "German" },
+  { value: "French",   label: "French" },
+  { value: "Dutch",    label: "Dutch" },
+  { value: "Spanish",  label: "Spanish" },
+  { value: "Japanese", label: "Japanese" },
+  { value: "Korean",   label: "Korean" },
+  { value: "Thai",     label: "Thai" },
+];
+
+const ALLOWED_EXTS = new Set(["docx", "pdf", "txt"]);
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+export function NewTranslationModal({ projects }: { projects: ProjectListItem[] }) {
+  const router = useRouter();
+  const open = useDashboardStore((s) => s.translationModalOpen);
+  const closeModal = useDashboardStore((s) => s.closeTranslationModal);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [sourceLang, setSourceLang] = useState("English");
+  const [targetLang, setTargetLang] = useState("German");
+  const [projectId, setProjectId] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const f = files[0];
+    const ext = f.name.toLowerCase().split(".").pop() ?? "";
+    if (!ALLOWED_EXTS.has(ext)) {
+      setError("Only DOCX, PDF, and TXT files are allowed.");
+      return;
+    }
+    if (f.size > MAX_FILE_SIZE) {
+      setError("File must be under 10 MB.");
+      return;
+    }
+    setError("");
+    setFile(f);
+  }
+
+  async function handleSubmit() {
+    if (!file) {
+      setError("Please select a file.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("target_language", targetLang);
+      fd.append("translation_style", "natural");
+      const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      handleClose();
+      router.push(`/processing/${result.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+      setSubmitting(false);
+    }
+  }
+
+  function handleClose() {
+    setFile(null);
+    setError("");
+    setSubmitting(false);
+    closeModal();
+  }
+
+  return (
+    <ModalOverlay open={open} onClose={handleClose}>
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="m-0 font-newsreader text-2xl font-bold text-dash-forest">
+            New Translation
+          </h2>
+          <p className="mt-1 font-inter text-[0.8125rem] text-dash-text-muted">
+            Upload a document to translate
+          </p>
+        </div>
+        <button
+          onClick={handleClose}
+          className="cursor-pointer border-none bg-transparent p-1 text-xl text-dash-text-muted"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Upload zone */}
+      <div
+        role="button"
+        tabIndex={0}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+        }}
+        className={`mb-5 cursor-pointer rounded p-8 text-center transition-colors ${
+          isDragging
+            ? "border-2 border-dashed border-dash-teal bg-dash-teal/5"
+            : "border-2 border-dashed border-[#d4d0c8] bg-[#faf8f3]"
+        }`}
+      >
+        {file ? (
+          <div>
+            <p className="m-0 font-inter text-sm font-medium text-dash-text-dark">
+              {file.name}
+            </p>
+            <p className="mt-1 font-inter text-xs text-dash-text-muted">
+              Click to change file
+            </p>
+          </div>
+        ) : (
+          <div>
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={isDragging ? "#4a8a82" : "#8a9a8a"}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mx-auto mb-2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <p className="m-0 font-inter text-[0.8125rem] font-medium text-dash-text-mid">
+              Drop file here or click to browse
+            </p>
+            <p className="mt-1 font-inter text-[0.6875rem] text-dash-text-muted">
+              DOCX, PDF, TXT — max 10 MB
+            </p>
+          </div>
+        )}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".docx,.pdf,.txt"
+        className="hidden"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      {/* Language selectors */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+            Source language
+          </label>
+          <select
+            value={sourceLang}
+            onChange={(e) => setSourceLang(e.target.value)}
+            className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          >
+            {LANGUAGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+            Target language
+          </label>
+          <select
+            value={targetLang}
+            onChange={(e) => setTargetLang(e.target.value)}
+            className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          >
+            {LANGUAGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Project selector */}
+      <div className="mb-6">
+        <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+          Add to project
+        </label>
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+        >
+          <option value="">No project (standalone)</option>
+          {projects.map((p) => (
+            <option key={p.id} value={String(p.id)}>{p.name}</option>
+          ))}
+          <option value="__new__">Create new project…</option>
+        </select>
+      </div>
+
+      {error && (
+        <p className="mb-4 font-inter text-[0.8125rem] text-status-error">{error}</p>
+      )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={handleClose}
+          className="cursor-pointer border-none bg-transparent px-4 py-2 font-inter text-[0.8125rem] text-dash-text-mid"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !file}
+          className="cursor-pointer rounded-full border-none bg-dash-forest px-6 py-2 font-inter text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {submitting ? "Uploading…" : "Upload & Translate"}
+        </button>
+      </div>
+    </ModalOverlay>
+  );
+}

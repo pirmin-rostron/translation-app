@@ -9,7 +9,10 @@ import {
   translationResultsApi,
   usageApi,
 } from "../services/api";
-import type { UsageResponse } from "../services/api";
+import type {
+  TranslationJobListItem,
+  UsageResponse,
+} from "../services/api";
 
 // ---------------------------------------------------------------------------
 // Shared response types
@@ -218,6 +221,68 @@ export function useReviewSummary(jobId: number | undefined) {
     queryFn: () => translationJobsApi.getReviewSummary<ReviewSummary>(jobId!),
     enabled: jobId != null,
     staleTime: 10_000,
+  });
+}
+
+// --- Dashboard ---
+
+export type DashboardTranslation = {
+  id: number;
+  document_name: string | null;
+  project_id: number | null;
+  project_name: string | null;
+  source_language: string;
+  target_language: string;
+  progress: number;
+  status: string;
+  updated_at: string;
+};
+
+const SAMPLE_TRANSLATIONS: DashboardTranslation[] = [
+  { id: 1, document_name: "HR_Policy_2024.docx",      project_id: 1, project_name: "Legal Docs", source_language: "EN", target_language: "DE", progress: 78, status: "In Review",   updated_at: "2026-03-25T10:00:00Z" },
+  { id: 2, document_name: "Compliance_Manual_v3.pdf",  project_id: 1, project_name: "Legal Docs", source_language: "EN", target_language: "FR", progress: 45, status: "In Progress", updated_at: "2026-03-24T14:30:00Z" },
+  { id: 3, document_name: "Product_Spec_Sheet.docx",   project_id: null, project_name: null,      source_language: "EN", target_language: "TH", progress: 12, status: "Pending",     updated_at: "2026-03-23T09:15:00Z" },
+  { id: 4, document_name: "NDA_Agreement_2024.pdf",    project_id: null, project_name: null,      source_language: "EN", target_language: "JA", progress: 91, status: "In Review",   updated_at: "2026-03-22T16:45:00Z" },
+];
+
+function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
+  const src = j.source_language?.substring(0, 2).toUpperCase() ?? "EN";
+  const tgt = j.target_language?.substring(0, 2).toUpperCase() ?? "";
+  let progress = 0;
+  let status = "Pending";
+  if (j.status === "completed" || j.status === "exported") {
+    progress = 100;
+    status = "Completed";
+  } else if (j.status === "review" || j.status === "in_review") {
+    progress = 78;
+    status = "In Review";
+  } else if (j.status === "processing") {
+    progress = 45;
+    status = "In Progress";
+  }
+  return {
+    id: j.id,
+    document_name: j.document_name,
+    project_id: null,
+    project_name: null,
+    source_language: src,
+    target_language: tgt,
+    progress,
+    status,
+    updated_at: j.created_at,
+  };
+}
+
+export function useDashboardTranslations() {
+  return useQuery<DashboardTranslation[]>({
+    queryKey: queryKeys.translationJobs.recent(),
+    queryFn: async () => {
+      const jobs = await translationJobsApi.listRecent(10);
+      if (jobs.length === 0) return [];
+      return jobs.map(mapJobToTranslation);
+    },
+    staleTime: 30_000,
+    placeholderData: SAMPLE_TRANSLATIONS,
   });
 }
 

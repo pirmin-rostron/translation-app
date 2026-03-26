@@ -2,360 +2,307 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
-import { apiFetch, API_URL } from "../services/api";
+import { useDashboardStore } from "../stores/dashboardStore";
+import { useDashboardTranslations } from "../hooks/queries";
+import type { DashboardTranslation } from "../hooks/queries";
+import { SplitButton } from "./SplitButton";
+import { NewTranslationModal } from "./NewTranslationModal";
+import { NewProjectModal } from "./NewProjectModal";
+import type { ProjectListItem } from "../services/api";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type TranslationJob = {
-  id: number;
-  status: "pending" | "processing" | "review" | "completed" | "failed";
-  source_language: string;
-  target_language: string;
-  created_at: string;
-  document_name: string | null;
-};
-
-// ─── Query keys ───────────────────────────────────────────────────────────────
-
-const QUERY_KEYS = {
-  recentJobs: ["translation-jobs", "recent"] as const,
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const STATUS_LABELS: Record<TranslationJob["status"], string> = {
-  pending: "Pending",
-  processing: "Processing",
-  review: "In Review",
-  completed: "Completed",
-  failed: "Failed",
-};
-
-const STATUS_BADGE: Record<TranslationJob["status"], React.CSSProperties> = {
-  pending:    { background: "#f1eee5", color: "#424843" },
-  processing: { background: "#fef3cd", color: "#92610a" },
-  review:     { background: "#e6f0ea", color: "#082012" },
-  completed:  { background: "#e6f4f2", color: "#0D7B6E" },
-  failed:     { background: "#fde8e8", color: "#ba1a1a" },
-};
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getFirstName(fullName: string | null | undefined, email: string): string {
   if (fullName) return fullName.split(" ")[0];
   return email.split("@")[0];
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function JobRow({ job }: { job: TranslationJob }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <Link
-      href={`/translation-jobs/${job.id}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1rem 2rem",
-        borderBottom: "1px solid #f6f3eb",
-        backgroundColor: hovered ? "#f6f3eb" : "transparent",
-        transition: "background-color 0.15s",
-        textDecoration: "none",
-        cursor: "pointer",
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <p style={{
-          fontFamily: "Inter, sans-serif",
-          fontSize: "0.875rem",
-          fontWeight: 500,
-          color: hovered ? "#082012" : "#1c1c17",
-          transition: "color 0.15s",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          margin: 0,
-        }}>
-          {job.document_name ?? `Job #${job.id}`}
-        </p>
-        <p style={{
-          fontFamily: "Inter, sans-serif",
-          fontSize: "0.75rem",
-          color: "#424843",
-          opacity: 0.7,
-          marginTop: "2px",
-          margin: "2px 0 0",
-        }}>
-          {job.source_language} → {job.target_language} · {formatDate(job.created_at)}
-        </p>
-      </div>
-      <span style={{
-        ...STATUS_BADGE[job.status],
-        borderRadius: "9999px",
-        padding: "0.2rem 0.75rem",
-        fontSize: "0.6875rem",
-        fontWeight: 600,
-        fontFamily: "Inter, sans-serif",
-        flexShrink: 0,
-        marginLeft: "1rem",
-      }}>
-        {STATUS_LABELS[job.status]}
-      </span>
-    </Link>
-  );
+function formatNumber(n: number): string {
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(n);
 }
 
-function QuickActionCard({ label, desc, href }: { label: string; desc: string; href: string }) {
-  const [hovered, setHovered] = useState(false);
+// ─── Sample stats (placeholder until API endpoint exists) ────────────────────
+
+const SAMPLE_STATS = {
+  activeProjects: 10,
+  wordsTranslated: 84000,
+  pendingReview: 3,
+} as const;
+
+// ─── Status badge classes ────────────────────────────────────────────────────
+
+function statusBadgeClasses(status: string): string {
+  switch (status) {
+    case "In Review":
+      return "bg-dash-teal/[0.12] text-dash-teal";
+    case "In Progress":
+      return "bg-[#f1f1ef] text-dash-text-mid";
+    case "Pending":
+      return "bg-[rgba(217,169,56,0.12)] text-[#b08d2a]";
+    default:
+      return "bg-[#f1f1ef] text-dash-text-mid";
+  }
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function StatCard({ label, value, delta }: { label: string; value: string; delta: string }) {
   return (
-    <Link
-      href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "block",
-        backgroundColor: hovered ? "#f6f3eb" : "#ffffff",
-        borderRadius: "4px",
-        padding: "1.25rem 1.5rem",
-        cursor: "pointer",
-        transition: "background-color 0.15s",
-        textDecoration: "none",
-      }}
-    >
-      <p style={{
-        fontFamily: "Inter, sans-serif",
-        fontSize: "0.875rem",
-        fontWeight: 600,
-        color: "#082012",
-        margin: 0,
-      }}>
+    <div className="group rounded-lg border border-dash-border bg-dash-surface p-6 transition-colors hover:border-t-2 hover:border-t-dash-teal">
+      <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
         {label}
       </p>
-      <p style={{
-        fontFamily: "Inter, sans-serif",
-        fontSize: "0.75rem",
-        color: "#424843",
-        opacity: 0.65,
-        marginTop: "2px",
-        margin: "2px 0 0",
-      }}>
-        {desc}
+      <p className="mb-1 font-newsreader text-[2.5rem] font-bold leading-[1.1] text-dash-forest">
+        {value}
       </p>
-    </Link>
+      <p className="font-inter text-xs text-dash-teal">
+        {delta}
+      </p>
+    </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <div className="flex min-w-[120px] items-center gap-2">
+      <div className="h-1 flex-1 overflow-hidden rounded-sm bg-dash-border">
+        <div
+          className="h-full rounded-sm bg-dash-teal transition-[width] duration-300 ease-out"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="min-w-[2rem] text-right font-inter text-xs text-dash-text-mid">
+        {percent}%
+      </span>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 font-inter text-[0.6875rem] font-medium ${statusBadgeClasses(status)}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function TranslationRow({ t }: { t: DashboardTranslation }) {
+  return (
+    <tr className="transition-colors hover:bg-[#faf8f3]">
+      <td className="px-5 py-3.5 font-inter text-sm font-medium text-dash-text-dark">
+        {t.document_name ?? `Document #${t.id}`}
+      </td>
+      <td
+        className={`px-5 py-3.5 font-inter text-sm ${
+          t.project_name
+            ? "text-dash-text-mid"
+            : "italic text-dash-text-muted"
+        }`}
+      >
+        {t.project_name ?? "No project"}
+      </td>
+      <td className="px-5 py-3.5 font-inter text-[0.8125rem] text-dash-text-mid">
+        {t.source_language} → {t.target_language}
+      </td>
+      <td className="px-5 py-3.5">
+        <ProgressBar percent={t.progress} />
+      </td>
+      <td className="px-5 py-3.5">
+        <StatusBadge status={t.status} />
+      </td>
+    </tr>
+  );
+}
+
+function TermChip({ label }: { label: string }) {
+  return (
+    <span className="whitespace-nowrap rounded-full bg-dash-teal/[0.08] px-2.5 py-1 font-inter text-[0.6875rem] font-medium text-dash-teal">
+      {label}
+    </span>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
 
-  // Redirect to login if unauthenticated — wait for hydration to avoid false redirects
+  // Redirect to login if unauthenticated
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
   }, [hasHydrated, token, router]);
 
-  const { data: jobs, isLoading: jobsLoading } = useQuery<TranslationJob[]>({
-    queryKey: QUERY_KEYS.recentJobs,
-    queryFn: () =>
-      apiFetch(`${API_URL}/translation-jobs?limit=10&order=desc`) as Promise<TranslationJob[]>,
-    enabled: !!token,
-    staleTime: 30_000,
-  });
+  // Server state via React Query — placeholderData ensures page always renders
+  const { data: translations } = useDashboardTranslations();
+
+  // Stats — placeholder until endpoint exists
+  const stats = SAMPLE_STATS;
+
+  // Projects — placeholder until endpoint exists
+  const projects: ProjectListItem[] = [];
 
   if (!hasHydrated) return null;
   if (!token) return null;
 
   const firstName = getFirstName(user?.full_name, user?.email ?? "");
+  const displayTranslations = translations ?? [];
+  const hasTranslations = displayTranslations.length > 0;
 
   return (
-    <div style={{ backgroundColor: "#fcf9f0", minHeight: "100vh", padding: "5rem 2rem 4rem" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="min-h-screen bg-dash-bg pt-20">
+      <div className="mx-auto max-w-[1100px] px-10 py-12">
 
-        {/* ── Header ── */}
-        <div style={{ marginBottom: "2.5rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        {/* ── Hero + Split Button ── */}
+        <div className="mb-10 flex items-start justify-between">
           <div>
-            <p style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "0.6875rem",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.15em",
-              color: "#0D7B6E",
-              opacity: 0.8,
-              marginBottom: "0.375rem",
-              margin: "0 0 0.375rem",
-            }}>
-              Welcome back
+            <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+              OVERVIEW
             </p>
-            <h1 style={{
-              fontFamily: "'Newsreader', Georgia, serif",
-              fontSize: "clamp(2.5rem, 5vw, 3.5rem)",
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              color: "#082012",
-              lineHeight: 1.05,
-              margin: 0,
-            }}>
-              {firstName}
+            <h1 className="mb-2 font-newsreader text-[clamp(2rem,4vw,2.75rem)] font-bold leading-[1.1] tracking-tight text-dash-forest">
+              Welcome back, <em>{firstName}</em>.
             </h1>
+            <p className="font-inter text-[0.9375rem] text-dash-text-mid">
+              Here&apos;s what&apos;s happening across your translation workspace.
+            </p>
           </div>
-
-          <Link
-            href="/upload"
-            style={{
-              backgroundColor: "#082012",
-              color: "#ffffff",
-              fontFamily: "Inter, sans-serif",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              padding: "0.625rem 1.5rem",
-              borderRadius: "9999px",
-              textDecoration: "none",
-              transition: "opacity 0.15s",
-              display: "inline-block",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
-          >
-            New translation
-          </Link>
+          <SplitButton />
         </div>
 
-        {/* ── Recent jobs ── */}
-        <div style={{ backgroundColor: "#ffffff", borderRadius: "4px" }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "1.25rem 2rem",
-            borderBottom: "1px solid #f1eee5",
-          }}>
-            <h2 style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: "#082012",
-              opacity: 0.5,
-              margin: 0,
-            }}>
-              Recent translations
-            </h2>
-            <Link
-              href="/documents"
-              style={{
-                fontFamily: "Inter, sans-serif",
-                fontSize: "0.75rem",
-                color: "#0D7B6E",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
-            >
-              View all
-            </Link>
-          </div>
+        {/* ── Stat Cards ── */}
+        <div className="mb-10 grid grid-cols-3 gap-4">
+          <StatCard
+            label="Active Projects"
+            value={String(stats.activeProjects)}
+            delta="↑ 2 this month"
+          />
+          <StatCard
+            label="Words Translated"
+            value={formatNumber(stats.wordsTranslated)}
+            delta="↑ 12,400 this week"
+          />
+          <StatCard
+            label="Pending Review"
+            value={String(stats.pendingReview)}
+            delta="Awaiting approval"
+          />
+        </div>
 
-          {jobsLoading && (
-            <div>
-              {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "1rem 2rem",
-                    borderBottom: i < 2 ? "1px solid #f6f3eb" : "none",
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <div className="animate-pulse" style={{ height: "0.875rem", width: "12rem", borderRadius: "2px", backgroundColor: "#f6f3eb" }} />
-                    <div className="animate-pulse" style={{ height: "0.625rem", width: "8rem", borderRadius: "2px", backgroundColor: "#f6f3eb" }} />
-                  </div>
-                  <div className="animate-pulse" style={{ height: "1.25rem", width: "4rem", borderRadius: "9999px", backgroundColor: "#f6f3eb" }} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!jobsLoading && (!jobs || jobs.length === 0) && (
-            <div style={{ padding: "3rem 2rem", textAlign: "center" }}>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.875rem", color: "#424843", opacity: 0.6, margin: "0 0 0.75rem" }}>
-                No translations yet.
-              </p>
+        {/* ── Active Translations ── */}
+        {hasTranslations ? (
+          <div className="mb-10">
+            {/* Section header */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="font-newsreader text-xl font-bold text-dash-forest">
+                  Active Translations
+                </h2>
+                <div className="h-0.5 w-8 rounded-sm bg-dash-teal" />
+              </div>
               <Link
-                href="/upload"
-                style={{
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#0D7B6E",
-                  textDecoration: "none",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
+                href="/documents"
+                className="font-inter text-[0.8125rem] font-medium text-dash-teal no-underline hover:underline"
               >
-                Upload your first document →
+                View all →
               </Link>
             </div>
-          )}
 
-          {!jobsLoading && jobs && jobs.length > 0 && (
-            <div>
-              {jobs.map((job) => (
-                <JobRow key={job.id} job={job} />
-              ))}
+            {/* Table card */}
+            <div className="overflow-hidden rounded-lg border border-dash-border bg-dash-surface">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-dash-border-light">
+                    {["Document", "Project", "Language", "Progress", "Status"].map((col) => (
+                      <th
+                        key={col}
+                        className="px-5 py-3 text-left font-inter text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-dash-text-muted"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayTranslations.map((t) => (
+                    <TranslationRow key={t.id} t={t} />
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* Empty state */
+          <div className="mb-10 rounded-lg border border-dash-border bg-dash-surface px-8 py-16 text-center">
+            <p className="mb-2 font-newsreader text-xl font-bold text-dash-forest">
+              No translations yet
+            </p>
+            <p className="mb-5 font-inter text-sm text-dash-text-muted">
+              Upload your first document to get started.
+            </p>
+            <button
+              onClick={openTranslationModal}
+              className="cursor-pointer rounded-full border-none bg-dash-forest px-6 py-2.5 font-inter text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              + New Translation
+            </button>
+          </div>
+        )}
 
-        <Link
-          href="/documents"
-          style={{
-            fontFamily: "Inter, sans-serif",
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            color: "#0D7B6E",
-            textDecoration: "none",
-            display: "inline-block",
-            marginTop: "0.75rem",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
-        >
-          View all translations →
-        </Link>
+        {/* ── Bottom Cards ── */}
+        <div className="grid grid-cols-2 gap-4">
 
-        {/* ── Quick actions ── */}
-        <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
-          {[
-            { label: "Upload document", href: "/upload",   desc: "Start a new translation job" },
-            { label: "Glossary",        href: "/glossary", desc: "Manage terminology" },
-            { label: "Settings",        href: "/settings", desc: "Account & preferences" },
-          ].map((action) => (
-            <QuickActionCard key={action.href} {...action} />
-          ))}
+          {/* Connected Glossary */}
+          <div className="rounded-lg border border-dash-border bg-dash-surface p-6">
+            <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+              CONNECTED GLOSSARY
+            </p>
+            <h3 className="mb-1.5 font-newsreader text-lg font-bold text-dash-forest">
+              Legal &amp; Compliance Terms
+            </h3>
+            <p className="mb-4 font-inter text-[0.8125rem] text-dash-text-mid">
+              218 terms enforced across all active projects.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <TermChip label="Force Majeure" />
+              <TermChip label="Indemnification" />
+              <TermChip label="Jurisdiction" />
+              <TermChip label="Confidentiality" />
+              <span className="self-center px-2.5 py-1 font-inter text-[0.6875rem] font-medium text-dash-text-muted">
+                +214 more
+              </span>
+            </div>
+          </div>
+
+          {/* Translation Memory */}
+          <div className="rounded-lg bg-dash-forest p-6">
+            <p className="mb-3 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+              TRANSLATION MEMORY
+            </p>
+            <p className="mb-2 font-newsreader text-[3.25rem] font-bold leading-none text-dash-teal">
+              60%
+            </p>
+            <span className="mb-3 inline-block rounded-full bg-dash-teal/20 px-2.5 py-0.5 font-inter text-[0.6875rem] font-medium text-dash-teal">
+              High Reuse · High Efficiency
+            </span>
+            <p className="font-inter text-[0.8125rem] leading-normal text-[#c8c0b0]">
+              Approved translations are automatically surfaced for similar content.
+            </p>
+          </div>
         </div>
 
       </div>
+
+      {/* ── Modals ── */}
+      <NewTranslationModal projects={projects} />
+      <NewProjectModal />
     </div>
   );
 }
