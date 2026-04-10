@@ -218,7 +218,7 @@ export default function RegisterPage() {
               Create account
             </h1>
 
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
               <div>
                 <label htmlFor="fullName" style={labelStyle}>
                   Full name <span style={{ opacity: 0.5, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>

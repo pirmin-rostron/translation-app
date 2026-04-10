@@ -236,6 +236,12 @@ Use Tailwind classes consistently for these states:
 
 ---
 
+## Post-Ticket Self-Review Checklist
+
+- After any change to `backend/main.py` — verify all routers are still registered by running: `curl -s http://localhost:8000/openapi.json | python3 -c "import sys,json; [print(p) for p in sorted(json.load(sys.stdin)['paths'])]"`
+
+---
+
 ## MemPalace Memory Protocol
 
 This project uses a MemPalace MCP server as its persistent knowledge graph. Follow this protocol every session.
