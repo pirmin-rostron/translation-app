@@ -614,15 +614,24 @@ function TranslationReviewPageInner() {
     }
   }, [loading, blocks.length]);
 
+  // Keyboard shortcuts — stable ref pattern.
+  // keyHandlerRef.current is reassigned every render so it always closes over current state.
+  // The actual listener is registered once with empty deps and delegates to the ref.
+  // Keyboard shortcuts — stable ref pattern.
+  // Ref + listener registered here (before early returns) to satisfy hooks rules.
+  // The handler body is assigned after early returns where all derived values exist.
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    document.addEventListener("keydown", listener);
+    return () => document.removeEventListener("keydown", listener);
+  }, []);
+
   const announce = useCallback((text: string) => {
     if (liveRegionRef.current) {
       liveRegionRef.current.textContent = text;
     }
   }, []);
-
-  function refocusCanvas() {
-    setTimeout(() => canvasRef.current?.focus(), 0);
-  }
 
   // Announce block changes to screen readers
   useEffect(() => {
@@ -1015,7 +1024,7 @@ function TranslationReviewPageInner() {
       setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setActionLoading(false);
-      refocusCanvas();
+
     }
   }
 
@@ -1076,7 +1085,7 @@ function TranslationReviewPageInner() {
       setError(err instanceof Error ? err.message : "Failed to approve block");
     } finally {
       setActionLoading(false);
-      refocusCanvas();
+
     }
   }
 
@@ -1107,7 +1116,6 @@ function TranslationReviewPageInner() {
     setMessage("Skipped block. Moved to next block.");
     announce("Block skipped");
     setError("");
-    refocusCanvas();
   }
 
   function handlePageChange(newPage: number) {
@@ -1328,72 +1336,6 @@ function TranslationReviewPageInner() {
     }
   }
 
-  // Keyboard shortcuts — useEffect must be before early returns (React hooks rule).
-  // Handlers and derived values are accessed via refs to avoid stale closures.
-  const kbStateRef = useRef({ isReadOnly: false, currentBlockResolved: false, reviewComplete: false, isEditing: false });
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (showExportModal || showPreviewModal) return;
-
-      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
-        e.preventDefault();
-        setShowShortcuts((v) => !v);
-        return;
-      }
-      if (showShortcuts) return;
-
-      const { isReadOnly: ro, currentBlockResolved: resolved, reviewComplete: done, isEditing: editing } = kbStateRef.current;
-
-      switch (e.key) {
-        case "ArrowUp":
-        case "k":
-          e.preventDefault();
-          handlePreviousBlock();
-          break;
-        case "ArrowDown":
-        case "j":
-          e.preventDefault();
-          handleNextBlock();
-          break;
-        case "Enter":
-          if (!ro && !resolved && !done) {
-            e.preventDefault();
-            if (editing) {
-              handleSaveSegmentEdit();
-            } else {
-              handleApproveCurrentBlock();
-            }
-          }
-          break;
-        case "s":
-          if (!ro && !resolved && !done) {
-            e.preventDefault();
-            handleSkipBlock();
-          }
-          break;
-        case "e":
-          if (!ro) {
-            e.preventDefault();
-            handleToggleEdit();
-          }
-          break;
-        case "Escape":
-          e.preventDefault();
-          if (showShortcuts) {
-            setShowShortcuts(false);
-          } else if (editing) {
-            handleToggleEdit();
-          }
-          break;
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showShortcuts, showExportModal, showPreviewModal]);
-
   if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Loading…</div>;
   if (error && !job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>{error}</div>;
   if (!job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Job not found</div>;
@@ -1433,7 +1375,6 @@ function TranslationReviewPageInner() {
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
-  kbStateRef.current = { isReadOnly, currentBlockResolved, reviewComplete, isEditing };
   const resolvedAmbiguity = Boolean(selectedSegment?.ambiguity_detected && isAcceptableFinalStatus(selectedSegment?.review_status ?? ""));
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
@@ -1494,6 +1435,63 @@ function TranslationReviewPageInner() {
   const progressPercent = reviewCounts.total_blocks > 0 ? Math.round((reviewCounts.completed_blocks / reviewCounts.total_blocks) * 100) : 0;
   const sourceLanguageLabel = job.source_language.slice(0, 3).toUpperCase();
   const targetLanguageLabel = job.target_language.slice(0, 3).toUpperCase();
+
+  // Update keyboard handler ref — always has current state, no stale closures.
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (showExportModal || showPreviewModal) return;
+
+    if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+      e.preventDefault();
+      setShowShortcuts((v) => !v);
+      return;
+    }
+    if (showShortcuts) return;
+
+    switch (e.key) {
+      case "ArrowUp":
+      case "k":
+        e.preventDefault();
+        handlePreviousBlock();
+        break;
+      case "ArrowDown":
+      case "j":
+        e.preventDefault();
+        handleNextBlock();
+        break;
+      case "Enter":
+        if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
+          e.preventDefault();
+          if (isEditing) {
+            handleSaveSegmentEdit();
+          } else {
+            handleApproveCurrentBlock();
+          }
+        }
+        break;
+      case "s":
+        if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
+          e.preventDefault();
+          handleSkipBlock();
+        }
+        break;
+      case "e":
+        if (!isReadOnly) {
+          e.preventDefault();
+          handleToggleEdit();
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        if (showShortcuts) {
+          setShowShortcuts(false);
+        } else if (isEditing) {
+          handleToggleEdit();
+        }
+        break;
+    }
+  };
 
   return (
     <div className="flex h-screen flex-col bg-brand-bg">
