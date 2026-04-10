@@ -28,30 +28,30 @@ export function SplitButton() {
           closeSplitButton();
           openTranslationModal();
         }}
-        className="cursor-pointer rounded-l-full border-none bg-dash-forest px-5 py-2.5 pr-5 pl-6 font-inter text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        className="cursor-pointer rounded-l-full border-none bg-brand-accent px-5 py-2.5 pr-5 pl-6 font-sans text-sm font-semibold text-white transition-opacity hover:opacity-90"
       >
         + New Translation
       </button>
       <button
         onClick={toggleSplitButton}
-        className="cursor-pointer rounded-r-full border-none border-l border-l-white/20 bg-dash-forest px-3.5 py-2.5 font-inter text-xs text-white transition-opacity hover:opacity-90"
+        className="cursor-pointer rounded-r-full border-none border-l border-l-white/20 bg-brand-accent px-3.5 py-2.5 font-sans text-xs text-white transition-opacity hover:opacity-90"
         aria-label="More actions"
       >
         ▾
       </button>
 
       {dropdownOpen && (
-        <div className="absolute right-0 top-[calc(100%+4px)] z-10 min-w-[220px] overflow-hidden rounded bg-dash-surface border border-dash-border shadow-md">
+        <div className="absolute right-0 top-[calc(100%+4px)] z-10 min-w-[220px] overflow-hidden rounded bg-brand-surface border border-brand-border shadow-md">
           <button
             onClick={() => {
               closeSplitButton();
               openTranslationModal();
             }}
-            className="block w-full cursor-pointer border-none border-b border-dash-border-light bg-transparent px-4 py-3 text-left font-inter text-[0.8125rem] font-medium text-dash-text-dark hover:bg-dash-bg"
+            className="block w-full cursor-pointer border-none border-b border-brand-border-light bg-transparent px-4 py-3 text-left font-sans text-[0.8125rem] font-medium text-brand-text hover:bg-brand-bg"
           >
             <span className="font-semibold">New Translation</span>
             <br />
-            <span className="text-[0.6875rem] text-dash-text-muted">
+            <span className="text-[0.6875rem] text-brand-subtle">
               Upload a document to translate
             </span>
           </button>
@@ -60,11 +60,11 @@ export function SplitButton() {
               closeSplitButton();
               openProjectModal();
             }}
-            className="block w-full cursor-pointer border-none bg-transparent px-4 py-3 text-left font-inter text-[0.8125rem] font-medium text-dash-text-dark hover:bg-dash-bg"
+            className="block w-full cursor-pointer border-none bg-transparent px-4 py-3 text-left font-sans text-[0.8125rem] font-medium text-brand-text hover:bg-brand-bg"
           >
             <span className="font-semibold">New Project</span>
             <br />
-            <span className="text-[0.6875rem] text-dash-text-muted">
+            <span className="text-[0.6875rem] text-brand-subtle">
               Group translations together
             </span>
           </button>

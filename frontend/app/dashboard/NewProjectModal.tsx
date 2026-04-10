@@ -45,16 +45,16 @@ export function NewProjectModal() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h2 className="m-0 font-newsreader text-2xl font-bold text-dash-forest">
+          <h2 className="m-0 font-display text-2xl font-bold text-brand-text">
             New Project
           </h2>
-          <p className="mt-1 font-inter text-[0.8125rem] text-dash-text-muted">
+          <p className="mt-1 font-sans text-[0.8125rem] text-brand-subtle">
             Group translations together
           </p>
         </div>
         <button
           onClick={handleClose}
-          className="cursor-pointer border-none bg-transparent p-1 text-xl text-dash-text-muted"
+          className="cursor-pointer border-none bg-transparent p-1 text-xl text-brand-subtle"
         >
           ×
         </button>
@@ -62,7 +62,7 @@ export function NewProjectModal() {
 
       {/* Project name */}
       <div className="mb-4">
-        <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
           Project name <span className="text-status-error">*</span>
         </label>
         <input
@@ -70,13 +70,13 @@ export function NewProjectModal() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Legal Docs Q2"
-          className="box-border w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          className="box-border w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
         />
       </div>
 
       {/* Description */}
       <div className="mb-4">
-        <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
           Description
         </label>
         <textarea
@@ -84,19 +84,19 @@ export function NewProjectModal() {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional description"
           rows={3}
-          className="box-border w-full resize-y rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          className="box-border w-full resize-y rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
         />
       </div>
 
       {/* Connected glossary */}
       <div className="mb-6">
-        <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
           Connected glossary
         </label>
         <select
           value={glossary}
           onChange={(e) => setGlossary(e.target.value)}
-          className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
         >
           <option value="">None</option>
           <option value="legal">Legal &amp; Compliance Terms</option>
@@ -104,21 +104,21 @@ export function NewProjectModal() {
       </div>
 
       {error && (
-        <p className="mb-4 font-inter text-[0.8125rem] text-status-error">{error}</p>
+        <p className="mb-4 font-sans text-[0.8125rem] text-status-error">{error}</p>
       )}
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <button
           onClick={handleClose}
-          className="cursor-pointer border-none bg-transparent px-4 py-2 font-inter text-[0.8125rem] text-dash-text-mid"
+          className="cursor-pointer border-none bg-transparent px-4 py-2 font-sans text-[0.8125rem] text-brand-muted"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={submitting || !name.trim()}
-          className="cursor-pointer rounded-full border-none bg-dash-forest px-6 py-2 font-inter text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2 font-sans text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Creating…" : "Create Project"}
         </button>

@@ -30,7 +30,7 @@ export function ModalOverlay({
       }}
     >
       <div
-        className="w-full max-w-[520px] max-h-[90vh] overflow-auto rounded-lg bg-dash-surface p-8 shadow-xl"
+        className="w-full max-w-[520px] max-h-[90vh] overflow-auto rounded-lg bg-brand-surface p-8 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

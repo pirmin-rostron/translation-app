@@ -236,6 +236,49 @@ Use Tailwind classes consistently for these states:
 
 ---
 
+## MemPalace Memory Protocol
+
+This project uses a MemPalace MCP server as its persistent knowledge graph. Follow this protocol every session.
+
+### On Startup
+- Query the MemPalace KG (`mempalace_kg_query`) for recent decisions, architecture changes, and open issues related to the current task context.
+- Use retrieved facts to inform suggestions and avoid re-litigating settled decisions.
+
+### During Session
+- Record architectural decisions to the KG via `mempalace_kg_add` (e.g. "Pirmin decided_to use X over Y").
+- Record significant file changes (created, deleted, renamed) as KG facts with `valid_from` set to today's date.
+- When a KG fact becomes outdated, invalidate it via `mempalace_kg_invalidate` rather than leaving stale data.
+- Keep triples clean: no special characters (dashes, colons, commas) in the object field — split complex facts into multiple triples if needed.
+
+### On Session End
+- Remind Pirmin to run `mempalace mine` so the palace indexes any new file changes from the session.
+
+---
+
+## Obsidian Documentation Protocol
+
+The Obsidian vault at `/Users/pirmin/Documents/Projects/Helvara_obsidian_vault` is the source of truth for all structural platform documentation.
+
+### Write to Obsidian when:
+- A new router, service, or data model is created
+- An architectural decision is made (why X over Y)
+- A component's ownership or responsibility changes
+- A new integration is added (external APIs, services, tools)
+- A significant bug is found and fixed — document root cause and fix
+- Any change that would affect how a new developer understands the system
+
+### What to write:
+- Create or update a `.md` file in the vault under the relevant folder
+- Keep it current — if something changes, update the existing doc, don't create a duplicate
+- Link related docs using Obsidian `[[wikilinks]]`
+
+### What NOT to write:
+- Implementation details that are obvious from the code
+- Temporary decisions or WIP notes — those go in the KG
+- Anything that changes every session
+
+---
+
 ## Golden Rule
 
 If uncertain, prioritise architecture + UX guardrails over shortcuts.

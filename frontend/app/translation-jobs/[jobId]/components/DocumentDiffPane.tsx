@@ -37,126 +37,106 @@ type DocumentDiffPaneProps = {
   renderNode: (node: DocumentNode, side: "source" | "target") => ReactNode;
   segmentRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
   blockMemoryStates: Map<string, BlockMemoryState>;
+  sourceLanguageLabel: string;
+  targetLanguageLabel: string;
 };
 
-const COLOR_PRIORITY = ["unresolved-ambiguity", "approved-ambiguity", "approved", "memory-match"];
-
-function getBlockColorState(segments: SegmentRef[], segmentColorStates: Map<number, string>): string {
-  let best = "pending";
-  let bestPriority = -1;
-  for (const s of segments) {
-    const state = segmentColorStates.get(s.id) ?? "pending";
-    const priority = COLOR_PRIORITY.indexOf(state);
-    if (priority !== -1 && (bestPriority === -1 || priority < bestPriority)) {
-      best = state;
-      bestPriority = priority;
-    }
-  }
-  return best;
-}
-
 export function DocumentDiffPane({
-  activeFilter,
-  onFilterChange,
-  filterChips,
   displayedNodes,
-  displayedBlocksCount,
-  totalBlocksCount,
   selectedSegmentId,
-  segmentColorStates,
   renderNode,
   segmentRefs,
-  blockMemoryStates,
+  sourceLanguageLabel,
+  targetLanguageLabel,
 }: DocumentDiffPaneProps) {
+  const activeIndex = displayedNodes.findIndex((node) => {
+    const segments = node.block?.segments ?? [];
+    return selectedSegmentId != null && segments.some((s) => s.id === selectedSegmentId);
+  });
+
+  function getOpacityClass(nodeIndex: number): string {
+    if (activeIndex === -1) return "opacity-100";
+    const distance = Math.abs(nodeIndex - activeIndex);
+    if (distance === 0) return "opacity-100";
+    if (distance === 1) return "opacity-40";
+    return "opacity-20";
+  }
+
+  if (!displayedNodes.length) {
+    return (
+      <main className="flex-1 overflow-y-auto">
+        <div className="flex h-full items-center justify-center text-brand-subtle">
+          No blocks to display.
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <section className="border border-stone-200 bg-white">
-      <div className="border-b border-stone-200 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {filterChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => onFilterChange(chip.key)}
-              className={`rounded-full px-3 py-1.5 text-sm ${
-                activeFilter === chip.key
-                  ? "bg-[#0D7B6E] text-white"
-                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-200"
-              }`}
-            >
-              {chip.label} ({chip.count})
-            </button>
-          ))}
-        </div>
+    <main className="flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-5xl px-8 py-8">
+        <div className="space-y-6">
+          {displayedNodes.map((node, nodeIndex) => {
+            const segments = node.block?.segments ?? [];
+            const isActive = activeIndex === nodeIndex;
+            const opacityClass = getOpacityClass(nodeIndex);
 
-      </div>
-
-      {!displayedNodes.length ? (
-        <div className="p-8 text-stone-500">
-          No blocks match this filter. Switch to All Blocks for full document context.
-        </div>
-      ) : (
-        <div className="h-[74vh] overflow-y-auto bg-stone-50/30">
-          <div className="sticky top-0 z-20 grid border-b border-stone-200 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="bg-stone-50 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-stone-500">SOURCE</div>
-            <div className="border-l border-stone-200 bg-white px-6 py-3 text-xs font-semibold uppercase tracking-widest" style={{ color: "#0D7B6E" }}>TRANSLATED</div>
-          </div>
-          <div className="space-y-4 px-6 py-6">
-          {displayedNodes.map((node) => {
-            const nodeSegments = node.block?.segments ?? [];
-            const isActive = selectedSegmentId != null && nodeSegments.some((segment) => segment.id === selectedSegmentId);
-            const blockLabel = node.block ? `Block ${node.block.block_index + 1}` : "Block";
-            const blockColorState = getBlockColorState(nodeSegments, segmentColorStates);
-            const rowClass =
-              blockColorState === "unresolved-ambiguity"
-                ? "border-amber-300 bg-amber-50"
-                : blockColorState === "approved-ambiguity"
-                  ? "border-stone-100 bg-stone-50 opacity-60"
-                  : blockColorState === "approved"
-                    ? "border-stone-100 bg-stone-50 opacity-60"
-                    : blockColorState === "memory-match"
-                      ? "border-stone-100 bg-stone-50 opacity-60"
-                      : isActive
-                        ? "border-[#0D7B6E] bg-white"
-                        : "border-stone-200 bg-white";
-            const memoryState = blockMemoryStates.get(node.key);
-            const memoryBadge = memoryState?.hasExact ? (
-              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium" style={{ color: "#0D7B6E" }}>
-                Exact Match
-              </span>
-            ) : memoryState?.hasSemantic ? (
-              <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium" style={{ color: "#0D7B6E" }}>
-                Memory{typeof memoryState.similarityScore === "number" ? ` ~${Math.round(memoryState.similarityScore * 100)}%` : ""}
-              </span>
-            ) : null;
             return (
               <div
                 key={node.key}
-                className={`overflow-hidden border ${rowClass}`}
+                className={`transition-opacity duration-200 ${opacityClass}`}
                 ref={(el) => {
-                  nodeSegments.forEach((s) => {
+                  segments.forEach((s) => {
                     segmentRefs.current[s.id] = el;
                   });
                 }}
               >
-                <div className="flex items-center justify-between gap-2 border-b border-stone-200/80 bg-white px-4 py-2">
-                  <p className="text-xs font-medium uppercase tracking-widest text-stone-400">{blockLabel}</p>
-                  {memoryBadge}
-                </div>
-                <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-posthog-mask>
-                  <div className="min-w-0 bg-stone-50 px-4 py-4">{renderNode(node, "source")}</div>
-                  <div className="min-w-0 border-l border-stone-200 bg-white px-4 py-4">
+                <div
+                  className={`relative flex items-start gap-32 ${
+                    isActive ? "rounded-lg bg-brand-bg/30" : ""
+                  }`}
+                >
+                  {/* Source column */}
+                  <div
+                    className={`min-w-0 flex-1 py-4 pl-6 pr-2 ${
+                      isActive
+                        ? "border-l-4 border-brand-accent"
+                        : "border-l-4 border-transparent"
+                    }`}
+                  >
+                    {isActive && (
+                      <p className="mb-2 text-xs font-bold uppercase tracking-widest text-brand-subtle">
+                        {sourceLanguageLabel}
+                      </p>
+                    )}
+                    {renderNode(node, "source")}
+                  </div>
+
+                  {/* Centre guideline — purely visual */}
+                  <div className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-brand-border" />
+
+                  {/* Target column */}
+                  <div className="min-w-0 flex-1 py-4 pl-2 pr-6">
+                    {isActive && (
+                      <p className="mb-2 text-xs font-bold uppercase tracking-widest text-brand-subtle">
+                        {targetLanguageLabel}
+                      </p>
+                    )}
                     {renderNode(node, "target")}
+                    {isActive && (
+                      <div className="mt-3">
+                        <span className="inline-flex items-center rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
+                          Suggestion
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             );
           })}
-          </div>
         </div>
-      )}
-      <div className="border-t border-stone-200 px-6 py-3 text-sm text-stone-500">
-        Showing {displayedBlocksCount} of {totalBlocksCount} blocks
       </div>
-    </section>
+    </main>
   );
 }

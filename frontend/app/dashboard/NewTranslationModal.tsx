@@ -84,16 +84,16 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h2 className="m-0 font-newsreader text-2xl font-bold text-dash-forest">
+          <h2 className="m-0 font-display text-2xl font-bold text-brand-text">
             New Translation
           </h2>
-          <p className="mt-1 font-inter text-[0.8125rem] text-dash-text-muted">
+          <p className="mt-1 font-sans text-[0.8125rem] text-brand-subtle">
             Upload a document to translate
           </p>
         </div>
         <button
           onClick={handleClose}
-          className="cursor-pointer border-none bg-transparent p-1 text-xl text-dash-text-muted"
+          className="cursor-pointer border-none bg-transparent p-1 text-xl text-brand-subtle"
         >
           ×
         </button>
@@ -116,16 +116,16 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
         }}
         className={`mb-5 cursor-pointer rounded p-8 text-center transition-colors ${
           isDragging
-            ? "border-2 border-dashed border-dash-teal bg-dash-teal/5"
+            ? "border-2 border-dashed border-brand-accent bg-brand-accentMid"
             : "border-2 border-dashed border-[#d4d0c8] bg-[#faf8f3]"
         }`}
       >
         {file ? (
           <div>
-            <p className="m-0 font-inter text-sm font-medium text-dash-text-dark">
+            <p className="m-0 font-sans text-sm font-medium text-brand-text">
               {file.name}
             </p>
-            <p className="mt-1 font-inter text-xs text-dash-text-muted">
+            <p className="mt-1 font-sans text-xs text-brand-subtle">
               Click to change file
             </p>
           </div>
@@ -136,7 +136,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
               height="28"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={isDragging ? "#4a8a82" : "#8a9a8a"}
+              stroke={isDragging ? "#0D7B6E" : "#9E9189"}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -146,10 +146,10 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <p className="m-0 font-inter text-[0.8125rem] font-medium text-dash-text-mid">
+            <p className="m-0 font-sans text-[0.8125rem] font-medium text-brand-muted">
               Drop file here or click to browse
             </p>
-            <p className="mt-1 font-inter text-[0.6875rem] text-dash-text-muted">
+            <p className="mt-1 font-sans text-[0.6875rem] text-brand-subtle">
               DOCX, PDF, TXT — max 10 MB
             </p>
           </div>
@@ -169,13 +169,13 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       {/* Language selectors */}
       <div className="mb-4 grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+          <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
             Source language
           </label>
           <select
             value={sourceLang}
             onChange={(e) => setSourceLang(e.target.value)}
-            className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+            className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -183,13 +183,13 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
           </select>
         </div>
         <div>
-          <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+          <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
             Target language
           </label>
           <select
             value={targetLang}
             onChange={(e) => setTargetLang(e.target.value)}
-            className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+            className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -200,13 +200,13 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
 
       {/* Project selector */}
       <div className="mb-6">
-        <label className="mb-1 block font-inter text-xs font-medium text-dash-text-mid">
+        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
           Add to project
         </label>
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d0c8] bg-dash-surface px-3 py-2 font-inter text-[0.8125rem] text-dash-text-dark outline-none focus:border-dash-teal"
+          className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
         >
           <option value="">No project (standalone)</option>
           {projects.map((p) => (
@@ -217,21 +217,21 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       </div>
 
       {error && (
-        <p className="mb-4 font-inter text-[0.8125rem] text-status-error">{error}</p>
+        <p className="mb-4 font-sans text-[0.8125rem] text-status-error">{error}</p>
       )}
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <button
           onClick={handleClose}
-          className="cursor-pointer border-none bg-transparent px-4 py-2 font-inter text-[0.8125rem] text-dash-text-mid"
+          className="cursor-pointer border-none bg-transparent px-4 py-2 font-sans text-[0.8125rem] text-brand-muted"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={submitting || !file}
-          className="cursor-pointer rounded-full border-none bg-dash-forest px-6 py-2 font-inter text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2 font-sans text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Uploading…" : "Upload & Translate"}
         </button>

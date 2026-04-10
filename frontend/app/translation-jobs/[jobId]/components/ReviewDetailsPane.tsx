@@ -77,21 +77,14 @@ export function ReviewDetailsPane({
   selectedSegment,
   selectedBlock,
   reviewComplete,
-  onFocusReviewGuidance,
   orderedBlocksLength,
   completedBlocks,
   selectedBlockPosition,
-  onPreviousBlock,
-  onNextBlock,
-  isLastBlock,
-  unresolvedBlocks,
   selectedSegmentIsSafe,
   isSafeDecisionOnlyMode,
   cleanPanelText,
   hasAmbiguityChoice,
   ambiguityExplanation,
-  blockAmbiguityIssuesLength,
-  activeBlockAmbiguityPosition,
   ambiguityChoiceIndex,
   isAmbiguityChoiceUserSelected,
   previousAmbiguityChoiceIndex,
@@ -110,15 +103,7 @@ export function ReviewDetailsPane({
   semanticChoice,
   onSemanticChoiceChange,
   currentBlockResolved,
-  resolvedAmbiguity,
-  onGoToNextUnresolved,
-  onApproveCurrentBlock,
-  primaryActionDisabled,
   onToggleEdit,
-  actionLoading,
-  onSkipBlock,
-  hasDraftChanges,
-  onSaveSegmentEdit,
   exactMemoryUsed,
   semanticMemoryUsed,
   memorySimilarityScore,
@@ -127,15 +112,11 @@ export function ReviewDetailsPane({
   sourceLanguage,
   targetLanguage,
 }: ReviewDetailsPaneProps) {
-  const primaryDecisionLabel = hasSemanticChoice && !hasAmbiguityChoice ? "Confirm selection" : "Approve";
-
-  // Glossary form state
   const [showGlossaryForm, setShowGlossaryForm] = useState(false);
   const [glossarySource, setGlossarySource] = useState("");
   const [glossaryTarget, setGlossaryTarget] = useState("");
   const [glossarySaving, setGlossarySaving] = useState(false);
 
-  // Reset glossary form when block becomes unresolved
   useEffect(() => {
     if (!currentBlockResolved) setShowGlossaryForm(false);
   }, [currentBlockResolved]);
@@ -150,429 +131,351 @@ export function ReviewDetailsPane({
     }
   }
 
-  if (reviewComplete) {
-    return (
-      <aside className="border border-stone-200 bg-white p-6">
-        <h2 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Review details</h2>
-        <div className="mt-3 border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-semibold" style={{ color: "#1A110A" }}>Review complete</p>
-          <p className="mt-1 text-sm text-stone-600">
-            {completedBlocks} of {orderedBlocksLength} blocks reviewed. Block-level decisions are now locked.
-          </p>
-        </div>
-        <p className="mt-4 text-sm text-stone-500">Continue in Review Guidance to preview your document, then export.</p>
-        <button
-          type="button"
-          onClick={onFocusReviewGuidance}
-          className="mt-3 border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-600 hover:bg-stone-50"
-        >
-          Go to Review Guidance
-        </button>
-      </aside>
-    );
-  }
+  const healthPercent = orderedBlocksLength > 0 ? Math.round((completedBlocks / orderedBlocksLength) * 100) : 0;
 
   return (
-    <aside className="border border-stone-200 bg-white p-6">
-      {!selectedSegment || !selectedBlock ? (
-        <div className="text-sm text-stone-500">Select highlighted text to review details.</div>
-      ) : (
-        <>
-          <h2 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Review details</h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Reviewing Block {selectedBlockPosition + 1} of {orderedBlocksLength}
-          </p>
-
-          {isLastBlock && (unresolvedBlocks === 0 || !currentBlockResolved) && (
-            <div className="mt-3 border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
-              {unresolvedBlocks === 0 ? (
-                <span>Review complete. Continue in Review Guidance.</span>
-              ) : (
-                <span>{unresolvedBlocks} blocks still unresolved.</span>
-              )}
+    <aside className="flex w-72 shrink-0 flex-col border-l border-brand-border bg-brand-surface">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {/* Semantic Insights — placeholder */}
+        <section className="mb-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-subtle">Linguistic Insights</p>
+          <div className="mt-3 space-y-2">
+            <div className="rounded-lg border border-brand-border bg-brand-bg p-3">
+              <p className="text-[0.6875rem] font-medium text-brand-muted">Tone</p>
+              <p className="mt-1 text-sm text-brand-text">Formal — legal register</p>
             </div>
-          )}
-          {selectedSegmentIsSafe && (
-            <div className="mt-3 border border-stone-200 bg-stone-50 p-3">
-              <p className="text-sm text-stone-600">No issues detected.</p>
+            <div className="rounded-lg border border-brand-border bg-brand-bg p-3">
+              <p className="text-[0.6875rem] font-medium text-brand-muted">Register</p>
+              <p className="mt-1 text-sm text-brand-text">Technical — domain specific</p>
             </div>
-          )}
+          </div>
+        </section>
 
-          {/* State 1: choose a translation */}
-          {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex === null && (
-            <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-sm">
-              <p className="font-medium text-amber-900">Choose a Translation</p>
-              {ambiguityExplanation && (
-                <p className="mt-2 text-xs text-stone-600">{cleanPanelText(ambiguityExplanation)}</p>
-              )}
-              <div className="mt-3 space-y-2">
-                {ambiguityOptions.map((option, idx) => {
-                  const isPrevChoice = previousAmbiguityChoiceIndex === idx;
-                  return (
-                    <label
-                      key={`${option.meaning}-${idx}`}
-                      className={`block cursor-pointer border px-3 py-2 ${
-                        isPrevChoice ? "border-amber-400 bg-amber-50" : "border-amber-200 bg-white"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="radio"
-                          name="ambiguity-choice"
-                          value={`option-${idx}`}
-                          checked={previousAmbiguityChoiceIndex === idx}
-                          onChange={() => onAmbiguityChoiceChange(idx)}
-                          disabled={isReadOnly}
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                            {cleanPanelText(option.meaning)}
-                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
+        {/* Glossary section */}
+        {glossaryMatches.length > 0 && !isSafeDecisionOnlyMode && (
+          <section className="mb-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-subtle">Glossary</p>
+            <ul className="mt-3 space-y-1.5">
+              {glossaryMatches.map((m, i) => (
+                <li
+                  key={`${m.source_term}-${m.target_term}-${i}`}
+                  className="rounded-lg border border-status-warning/30 bg-status-warningBg p-2.5 text-sm"
+                >
+                  <span className="font-medium text-status-warning">{m.source_term}</span>
+                  <span className="mx-1.5 text-brand-subtle">→</span>
+                  <span className="text-brand-text">{m.target_term}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Review complete state */}
+        {reviewComplete && !selectedSegment && (
+          <div className="rounded-lg border border-brand-accent/20 bg-brand-accentMid p-4">
+            <p className="text-sm font-medium text-brand-accent">Review complete</p>
+            <p className="mt-1 text-xs text-brand-muted">
+              {completedBlocks} of {orderedBlocksLength} blocks reviewed. Export your document.
+            </p>
+          </div>
+        )}
+
+        {/* Active block controls */}
+        {selectedBlock && selectedSegment && (
+          <div className="space-y-4">
+            <p className="text-xs font-medium text-brand-muted">
+              Block {selectedBlockPosition + 1} of {orderedBlocksLength}
+            </p>
+
+            {selectedSegmentIsSafe && (
+              <div className="rounded-lg border border-brand-border bg-brand-bg p-3">
+                <p className="text-sm text-brand-muted">No issues detected.</p>
               </div>
-              {previousAmbiguityChoiceIndex !== null && (
-                <p className="mt-2 text-xs text-stone-500">
-                  You previously selected this option. Select a different option to change.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* State 2: choice made, not yet approved */}
-          {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex !== null && (
-            <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-sm">
-              <p className="font-medium text-amber-900">
-                {isAmbiguityChoiceUserSelected ? "Accepted Translation" : "Suggested Translation"}
-              </p>
-              <p className="mt-2" style={{ color: "#1A110A" }}>{ambiguityOptions[ambiguityChoiceIndex]?.translation ?? ""}</p>
-              {ambiguityExplanation && (
-                <p className="mt-3 text-xs text-stone-600">{cleanPanelText(ambiguityExplanation)}</p>
-              )}
-              <div className="mt-3 space-y-2">
-                {ambiguityOptions.map((option, idx) => {
-                  const isSelected = ambiguityChoiceIndex === idx;
-                  return (
-                    <label
-                      key={`${option.meaning}-${idx}`}
-                      className={`block cursor-pointer border px-3 py-2 ${
-                        isSelected ? "border-amber-400 bg-amber-50" : "border-amber-200 bg-white"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="radio"
-                          name="ambiguity-choice-state2"
-                          value={`option-${idx}`}
-                          checked={isSelected}
-                          onChange={() => onAmbiguityChoiceChange(idx)}
-                          disabled={isReadOnly}
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                            {cleanPanelText(option.meaning)}
-                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {isEditing && canEditSelectedSegment && (
-            <div className="mt-4 border border-stone-200 bg-white p-3">
-              <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Edit selected translation</p>
-              <textarea
-                value={draftTranslation}
-                onChange={(e) => onDraftTranslationChange(e.target.value)}
-                rows={6}
-                className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm focus:border-[#0D7B6E] focus:outline-none"
-                style={{ color: "#1A110A" }}
-              />
-            </div>
-          )}
-
-          {glossaryMatches.length > 0 && !isSafeDecisionOnlyMode && (
-            <div className="mt-4 border border-stone-200 bg-stone-50 p-3 text-sm">
-              <p className="font-medium text-xs uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Glossary matches</p>
-              <ul className="mt-2 space-y-1 text-stone-600">
-                {glossaryMatches.map((m, i) => (
-                  <li key={`${m.source_term}-${m.target_term}-${i}`}>
-                    {m.source_term} → {m.target_term}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {hasSemanticChoice && !hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
-            <div className="mt-4 border border-stone-200 bg-stone-50 p-3 text-sm">
-              <p className="font-medium" style={{ color: "#1A110A" }}>Semantic translation choice available</p>
-              <p className="mt-1 text-xs text-stone-500">
-                Suggested from similar previous translation
-                {typeof semanticSimilarityScore === "number" ? ` (${Math.round(semanticSimilarityScore * 100)}%)` : ""}
-              </p>
-              <div className="mt-3 space-y-2">
-                <label className="block cursor-pointer border border-stone-200 bg-white px-3 py-2">
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="semantic-choice"
-                      value="current"
-                      checked={semanticChoice === "current"}
-                      onChange={() => onSemanticChoiceChange("current")}
-                      disabled={isReadOnly}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                        Use current translation decision
-                      </p>
-                    </div>
-                  </div>
-                </label>
-                <label className="block cursor-pointer border bg-white px-3 py-2" style={{ borderColor: "#0D7B6E" }}>
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="semantic-choice"
-                      value="suggested"
-                      checked={semanticChoice === "suggested"}
-                      onChange={() => onSemanticChoiceChange("suggested")}
-                      disabled={isReadOnly}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "#0D7B6E" }}>
-                        Use previous similar approved translation
-                      </p>
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {exactMemoryUsed && (
-            <div className="mt-4 border border-stone-200 bg-stone-50 p-3 text-sm">
-              <p className="font-medium text-xs uppercase tracking-widest" style={{ color: "#0D7B6E" }}>Translation Memory: Exact Match</p>
-              <p className="mt-1 text-xs text-stone-500">
-                This translation was recalled from a previous approved decision.
-              </p>
-            </div>
-          )}
-          {!exactMemoryUsed && semanticMemoryUsed && (
-            <div className="mt-4 border border-stone-200 bg-stone-50 p-3 text-sm">
-              <p className="font-medium text-xs uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
-                Translation Memory: Semantic Match
-                {typeof memorySimilarityScore === "number"
-                  ? ` (~${Math.round(memorySimilarityScore * 100)}%)`
-                  : ""}
-              </p>
-              {memorySourceText && (
-                <p className="mt-1 text-xs text-stone-500">
-                  Original source: <span className="italic">{memorySourceText}</span>
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="mt-6 space-y-3">
-            {!isReadOnly && !currentBlockResolved && !isEditing && (
-              <>
-                {hasAmbiguityChoice && ambiguityChoiceIndex !== null && (
-                  <button
-                    type="button"
-                    onClick={onApproveCurrentBlock}
-                    disabled={primaryActionDisabled}
-                    className="w-full rounded-full px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                    style={{ backgroundColor: "#0D7B6E" }}
-                  >
-                    {primaryDecisionLabel}
-                  </button>
-                )}
-                <div className={`grid gap-2 ${!hasAmbiguityChoice ? "grid-cols-3" : "grid-cols-2"}`}>
-                  {!hasAmbiguityChoice && (
-                    <button
-                      type="button"
-                      onClick={onApproveCurrentBlock}
-                      disabled={primaryActionDisabled}
-                      className="rounded-full px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: "#0D7B6E" }}
-                    >
-                      {primaryDecisionLabel}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={hasAmbiguityChoice && ambiguityChoiceIndex !== null ? onClearAmbiguityChoice : onToggleEdit}
-                    disabled={actionLoading || (!hasAmbiguityChoice && !canEditSelectedSegment)}
-                    className="rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-60"
-                  >
-                    {hasAmbiguityChoice && ambiguityChoiceIndex !== null ? "Change choice" : "Edit"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onSkipBlock}
-                    disabled={actionLoading}
-                    className="rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-400 hover:bg-stone-50 disabled:opacity-60"
-                  >
-                    Skip
-                  </button>
-                </div>
-              </>
             )}
-            {!isReadOnly && currentBlockResolved && !isEditing && (
-              <>
-                <div className="border border-teal-200 bg-teal-50 px-3 py-2 text-sm" style={{ color: "#0D7B6E" }}>
-                  Translation approved.
-                </div>
-                {unresolvedBlocks > 0 && (
-                  <button
-                    type="button"
-                    onClick={onGoToNextUnresolved}
-                    disabled={actionLoading}
-                    className="w-full rounded-full px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                    style={{ backgroundColor: "#0D7B6E" }}
-                  >
-                    Go to next unresolved block
-                  </button>
+
+            {/* Ambiguity: choose */}
+            {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex === null && (
+              <div className="rounded-lg border border-status-warning/30 bg-status-warningBg p-3 text-sm">
+                <p className="font-medium text-status-warning">Choose a Translation</p>
+                {ambiguityExplanation && (
+                  <p className="mt-2 text-xs text-brand-muted">{cleanPanelText(ambiguityExplanation)}</p>
                 )}
+                <div className="mt-3 space-y-2">
+                  {ambiguityOptions.map((option, idx) => {
+                    const isPrevChoice = previousAmbiguityChoiceIndex === idx;
+                    return (
+                      <label
+                        key={`${option.meaning}-${idx}`}
+                        className={`block cursor-pointer rounded-lg border p-2.5 ${
+                          isPrevChoice ? "border-status-warning bg-status-warningBg" : "border-brand-border bg-brand-surface"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="ambiguity-choice"
+                            value={`option-${idx}`}
+                            checked={previousAmbiguityChoiceIndex === idx}
+                            onChange={() => onAmbiguityChoiceChange(idx)}
+                            disabled={isReadOnly}
+                            className="mt-0.5"
+                          />
+                          <p className="text-xs font-semibold uppercase tracking-wide text-status-warning">
+                            {cleanPanelText(option.meaning)}
+                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Ambiguity: chosen */}
+            {hasAmbiguityChoice && !isSafeDecisionOnlyMode && ambiguityChoiceIndex !== null && (
+              <div className="rounded-lg border border-status-warning/30 bg-status-warningBg p-3 text-sm">
+                <p className="font-medium text-status-warning">
+                  {isAmbiguityChoiceUserSelected ? "Accepted Translation" : "Suggested Translation"}
+                </p>
+                <p className="mt-2 text-brand-text">{ambiguityOptions[ambiguityChoiceIndex]?.translation ?? ""}</p>
+                {ambiguityExplanation && (
+                  <p className="mt-3 text-xs text-brand-muted">{cleanPanelText(ambiguityExplanation)}</p>
+                )}
+                <div className="mt-3 space-y-2">
+                  {ambiguityOptions.map((option, idx) => {
+                    const isSelected = ambiguityChoiceIndex === idx;
+                    return (
+                      <label
+                        key={`${option.meaning}-${idx}`}
+                        className={`block cursor-pointer rounded-lg border p-2.5 ${
+                          isSelected ? "border-status-warning bg-status-warningBg" : "border-brand-border bg-brand-surface"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name="ambiguity-choice-state2"
+                            value={`option-${idx}`}
+                            checked={isSelected}
+                            onChange={() => onAmbiguityChoiceChange(idx)}
+                            disabled={isReadOnly}
+                            className="mt-0.5"
+                          />
+                          <p className="text-xs font-semibold uppercase tracking-wide text-status-warning">
+                            {cleanPanelText(option.meaning)}
+                            {idx === currentSuggestionIndex ? " — Suggested" : ""}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClearAmbiguityChoice}
+                  className="mt-2 text-xs font-medium text-status-warning hover:underline"
+                >
+                  Change choice
+                </button>
+              </div>
+            )}
+
+            {/* Edit textarea */}
+            {isEditing && canEditSelectedSegment && (
+              <div className="rounded-lg border border-brand-border bg-brand-surface p-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-brand-accent">Edit translation</p>
+                <textarea
+                  value={draftTranslation}
+                  onChange={(e) => onDraftTranslationChange(e.target.value)}
+                  rows={6}
+                  className="mt-2 w-full rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
+                />
                 <button
                   type="button"
                   onClick={onToggleEdit}
-                  disabled={actionLoading}
-                  className="w-full rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-60"
+                  className="mt-2 text-xs font-medium text-brand-muted hover:text-brand-text"
                 >
-                  Edit
+                  Cancel
                 </button>
-                {/* Add to glossary */}
-                {!showGlossaryForm ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGlossarySource(glossaryMatches[0]?.source_term ?? "");
-                      setGlossaryTarget(glossaryMatches[0]?.target_term ?? "");
-                      setShowGlossaryForm(true);
-                    }}
-                    className="w-full text-sm font-medium"
-                    style={{ color: "#0D7B6E" }}
-                  >
-                    + Add to glossary
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <input
-                      value={glossarySource}
-                      onChange={(e) => setGlossarySource(e.target.value)}
-                      placeholder={`Source term (${sourceLanguage})`}
-                      disabled={glossarySaving}
-                      className="w-full border border-stone-300 px-2 py-1.5 text-sm focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
-                    />
-                    <input
-                      value={glossaryTarget}
-                      onChange={(e) => setGlossaryTarget(e.target.value)}
-                      placeholder={`Target term (${targetLanguage})`}
-                      disabled={glossarySaving}
-                      className="w-full border border-stone-300 px-2 py-1.5 text-sm focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
-                    />
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={glossarySaving || !glossarySource.trim() || !glossaryTarget.trim()}
-                        onClick={() => { void handleSaveGlossary(); }}
-                        className="rounded-full px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-                        style={{ backgroundColor: "#0D7B6E" }}
-                      >
-                        {glossarySaving ? "Saving…" : "Save"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowGlossaryForm(false)}
-                        disabled={glossarySaving}
-                        className="text-xs text-stone-400 hover:text-stone-600 disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
+              </div>
+            )}
+
+            {/* Semantic choice */}
+            {hasSemanticChoice && !hasAmbiguityChoice && !isSafeDecisionOnlyMode && (
+              <div className="rounded-lg border border-brand-border bg-brand-bg p-3 text-sm">
+                <p className="font-medium text-brand-text">Semantic translation choice</p>
+                <p className="mt-1 text-xs text-brand-subtle">
+                  From similar previous translation
+                  {typeof semanticSimilarityScore === "number" ? ` (${Math.round(semanticSimilarityScore * 100)}%)` : ""}
+                </p>
+                <div className="mt-3 space-y-2">
+                  <label className="block cursor-pointer rounded-lg border border-brand-border bg-brand-surface p-2.5">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="semantic-choice"
+                        value="current"
+                        checked={semanticChoice === "current"}
+                        onChange={() => onSemanticChoiceChange("current")}
+                        disabled={isReadOnly}
+                        className="mt-0.5"
+                      />
+                      <p className="text-xs font-medium uppercase tracking-wide text-brand-muted">
+                        Use current translation
+                      </p>
                     </div>
+                  </label>
+                  <label className="block cursor-pointer rounded-lg border border-brand-accent bg-brand-surface p-2.5">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="semantic-choice"
+                        value="suggested"
+                        checked={semanticChoice === "suggested"}
+                        onChange={() => onSemanticChoiceChange("suggested")}
+                        disabled={isReadOnly}
+                        className="mt-0.5"
+                      />
+                      <p className="text-xs font-medium uppercase tracking-wide text-brand-accent">
+                        Use previous approved translation
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Memory info */}
+            {exactMemoryUsed && (
+              <div className="rounded-lg border border-brand-border bg-brand-bg p-3 text-sm">
+                <p className="text-xs font-bold uppercase tracking-widest text-brand-accent">Exact Match</p>
+                <p className="mt-1 text-xs text-brand-subtle">
+                  Recalled from a previous approved decision.
+                </p>
+              </div>
+            )}
+            {!exactMemoryUsed && semanticMemoryUsed && (
+              <div className="rounded-lg border border-brand-border bg-brand-bg p-3 text-sm">
+                <p className="text-xs font-bold uppercase tracking-widest text-brand-accent">
+                  Semantic Match
+                  {typeof memorySimilarityScore === "number" ? ` (~${Math.round(memorySimilarityScore * 100)}%)` : ""}
+                </p>
+                {memorySourceText && (
+                  <p className="mt-1 text-xs text-brand-subtle">
+                    Source: <span className="italic">{memorySourceText}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Resolved state */}
+            {currentBlockResolved && !isEditing && (
+              <div>
+                <div className="rounded-lg border border-brand-accent/20 bg-brand-accentMid p-3 text-sm text-brand-accent">
+                  Translation approved.
+                </div>
+                {!isReadOnly && (
+                  <div className="mt-3 space-y-2">
+                    <button
+                      type="button"
+                      onClick={onToggleEdit}
+                      className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg"
+                    >
+                      Edit
+                    </button>
+                    {!showGlossaryForm ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGlossarySource(glossaryMatches[0]?.source_term ?? "");
+                          setGlossaryTarget(glossaryMatches[0]?.target_term ?? "");
+                          setShowGlossaryForm(true);
+                        }}
+                        className="w-full text-xs font-medium text-brand-accent hover:underline"
+                      >
+                        + Add to glossary
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          value={glossarySource}
+                          onChange={(e) => setGlossarySource(e.target.value)}
+                          placeholder={`Source (${sourceLanguage})`}
+                          disabled={glossarySaving}
+                          className="w-full rounded-lg border border-brand-border px-2 py-1.5 text-sm focus:border-brand-accent focus:outline-none disabled:opacity-50"
+                        />
+                        <input
+                          value={glossaryTarget}
+                          onChange={(e) => setGlossaryTarget(e.target.value)}
+                          placeholder={`Target (${targetLanguage})`}
+                          disabled={glossarySaving}
+                          className="w-full rounded-lg border border-brand-border px-2 py-1.5 text-sm focus:border-brand-accent focus:outline-none disabled:opacity-50"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={glossarySaving || !glossarySource.trim() || !glossaryTarget.trim()}
+                            onClick={() => { void handleSaveGlossary(); }}
+                            className="rounded-full bg-brand-accent px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                          >
+                            {glossarySaving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowGlossaryForm(false)}
+                            disabled={glossarySaving}
+                            className="text-xs text-brand-subtle hover:text-brand-muted disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </>
+              </div>
             )}
-            {!isReadOnly && isEditing && (
-              <>
-                <button
-                  type="button"
-                  onClick={onSaveSegmentEdit}
-                  disabled={actionLoading || !hasDraftChanges || !draftTranslation.trim()}
-                  className="w-full rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: "#0D7B6E" }}
-                >
-                  Save translation
-                </button>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={onToggleEdit}
-                    disabled={actionLoading}
-                    className="rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-60"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onSkipBlock}
-                    disabled={actionLoading}
-                    className="rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-400 hover:bg-stone-50 disabled:opacity-60"
-                  >
-                    Skip
-                  </button>
-                </div>
-              </>
+
+            {/* Unresolved: edit toggle */}
+            {!currentBlockResolved && !isEditing && !isReadOnly && (
+              <button
+                type="button"
+                onClick={onToggleEdit}
+                className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg"
+              >
+                Edit translation
+              </button>
             )}
+
             {isReadOnly && (
-              <p className="border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-500">
-                This document is exported and read-only. Re-open review from the workflow banner to edit.
+              <p className="rounded-lg border border-brand-border bg-brand-bg p-3 text-xs text-brand-subtle">
+                This document is exported and read-only.
               </p>
             )}
-            {!currentBlockResolved && (
-              <p className="text-xs text-stone-400">
-                {unresolvedBlocks <= 1
-                  ? "This is the last block. Approve to complete your review."
-                  : "Review and approve this block to continue."}
-              </p>
-            )}
-            {/* Navigation — bottom of panel */}
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onPreviousBlock}
-                disabled={selectedBlockPosition <= 0}
-                className="border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40"
-              >
-                Previous block
-              </button>
-              <button
-                type="button"
-                onClick={onNextBlock}
-                disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocksLength - 1}
-                className="border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40"
-              >
-                Next block
-              </button>
-            </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
+
+      {/* Health panel — pinned bottom */}
+      <div className="shrink-0 bg-[#082012] p-5">
+        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-brand-accentMid">
+          Session Health
+        </p>
+        <div className="mt-3 flex items-end justify-between">
+          <span className="font-display text-2xl font-bold text-white">{healthPercent}%</span>
+          <span className="text-xs text-brand-accentMid">
+            {completedBlocks}/{orderedBlocksLength} blocks
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/20">
+          <div
+            className="h-full rounded-full bg-brand-accent transition-[width] duration-300"
+            style={{ width: `${healthPercent}%` }}
+          />
+        </div>
+      </div>
     </aside>
   );
 }

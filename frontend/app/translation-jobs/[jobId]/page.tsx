@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DocumentDiffPane } from "./components/DocumentDiffPane";
 import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
-import { ReviewGuidancePanel } from "./components/ReviewGuidancePanel";
 import { getLanguageDisplayName } from "../../utils/language";
 
 import posthog from 'posthog-js';
@@ -1391,180 +1390,255 @@ function TranslationReviewPageInner() {
     : guidanceStatusLabel === "Review Complete" ? "Export document"
     : undefined;
   const isPrimaryGuidanceDisabled = false;
+  const progressPercent = reviewCounts.total_blocks > 0 ? Math.round((reviewCounts.completed_blocks / reviewCounts.total_blocks) * 100) : 0;
+  const sourceLanguageLabel = job.source_language.slice(0, 3).toUpperCase();
+  const targetLanguageLabel = job.target_language.slice(0, 3).toUpperCase();
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-7xl px-6 py-12">
-        <Link
-          href={`/documents/${job.document_id}`}
-          className="mb-6 inline-block text-sm text-stone-500 hover:text-stone-900"
-        >
-          ← Back to document
-        </Link>
-
-        <div className="mb-6">
-          <h1
-            className="text-2xl font-semibold"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
-          >
-            Translation Review
-          </h1>
-          <p className="mt-1 text-sm text-stone-500">
-            {doc?.filename ?? `#${job.document_id}`} • {getLanguageDisplayName(job.source_language)} →{" "}
-            {getLanguageDisplayName(job.target_language)}
-          </p>
-          <p className="mt-2 text-sm text-stone-500">Follow the workflow below to review and export.</p>
-          {job.error_message && <p className="mt-1 text-sm text-red-600">{job.error_message}</p>}
+    <div className="flex h-screen flex-col bg-brand-bg">
+      {/* ── Fixed Top Header ── */}
+      <header className="flex h-14 shrink-0 items-center border-b border-brand-border bg-brand-surface px-6">
+        <div className="flex items-center gap-3">
+          <Link href={`/documents/${job.document_id}`} className="text-brand-subtle hover:text-brand-text">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 12L6 8l4-4" /></svg>
+          </Link>
+          <span className="max-w-[240px] truncate text-sm font-medium text-brand-text">
+            {doc?.filename ?? `Document #${job.document_id}`}
+          </span>
         </div>
-
-        <ReviewGuidancePanel
-          reviewGuidanceRef={reviewGuidanceRef}
-          statusLabel={guidanceStatusLabel}
-          completedBlocks={reviewCounts.completed_blocks}
-          totalBlocks={reviewCounts.total_blocks}
-          unresolvedBlocks={reviewCounts.remaining_blocks}
-          unresolvedAmbiguities={reviewCounts.ambiguity_count}
-          recommendedNextStep={recommendedNextStep}
-          translationStyle={job.translation_style === "literal" ? "literal" : "natural"}
-          primaryActionLabel={primaryGuidanceLabel}
-          isPrimaryActionDisabled={isPrimaryGuidanceDisabled}
-          actionLoading={actionLoading}
-          onPrimaryAction={handlePrimaryGuidanceAction}
-          secondaryActionLabel={secondaryGuidanceLabel}
-          onSecondaryAction={guidanceStatusLabel === "Exported" ? handleOpenPreviewDocument : secondaryGuidanceLabel ? handleOpenExportModal : undefined}
-          message={message || undefined}
-          error={error || undefined}
-        />
-
-        {/* Still-translating banner — shown while job is processing, auto-hides on in_review */}
-        {job.status === "translating" && !translatingBannerDismissed && (
-          <div className="flex items-center justify-between gap-3 rounded border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm text-amber-800">
-              Still translating — more blocks will appear as they complete.
-            </p>
+        <div className="ml-4">
+          <span className="rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
+            {getLanguageDisplayName(job.source_language)} → {getLanguageDisplayName(job.target_language)}
+          </span>
+        </div>
+        <div className="flex-1 text-center">
+          <span className="font-display text-lg font-semibold text-brand-text">{progressPercent}%</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {reviewComplete && (
             <button
               type="button"
-              onClick={() => setTranslatingBannerDismissed(true)}
-              className="shrink-0 text-amber-600 hover:text-amber-900"
-              aria-label="Dismiss"
+              onClick={() => { void handleOpenPreviewDocument(); }}
+              className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg"
             >
-              ✕
+              Preview
             </button>
+          )}
+          <button
+            type="button"
+            onClick={handleOpenExportModal}
+            disabled={!reviewComplete && workflowStatus !== "ready_for_export" && workflowStatus !== "exported"}
+            className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
+          >
+            Export
+          </button>
+        </div>
+      </header>
+
+      {/* ── Translating Banner ── */}
+      {job.status === "translating" && !translatingBannerDismissed && (
+        <div className="flex items-center justify-between gap-3 border-b border-status-warning/20 bg-status-warningBg px-6 py-2">
+          <p className="text-sm text-status-warning">
+            Still translating — more blocks will appear as they complete.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTranslatingBannerDismissed(true)}
+            className="shrink-0 text-status-warning hover:opacity-70"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {job.error_message && (
+        <div className="border-b border-status-error/20 bg-status-errorBg px-6 py-2">
+          <p className="text-sm text-status-error">{job.error_message}</p>
+        </div>
+      )}
+
+      {/* ── Main Area: Canvas + Sidebar ── */}
+      <div className="flex flex-1 overflow-hidden">
+        <DocumentDiffPane
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          filterChips={filterChips}
+          displayedNodes={displayedNodes}
+          displayedBlocksCount={visibleBlocks.length}
+          totalBlocksCount={reviewCounts.total_blocks}
+          selectedSegmentId={selectedSegment?.id ?? null}
+          segmentColorStates={segmentColorStates}
+          renderNode={(node, side) => renderNode(node as DocumentNode, side)}
+          segmentRefs={segmentRefs}
+          blockMemoryStates={blockMemoryStates}
+          sourceLanguageLabel={sourceLanguageLabel}
+          targetLanguageLabel={targetLanguageLabel}
+        />
+
+        <ReviewDetailsPane
+          selectedSegment={selectedSegment}
+          selectedBlock={selectedBlock}
+          reviewComplete={reviewComplete}
+          onFocusReviewGuidance={focusReviewGuidance}
+          orderedBlocksLength={reviewCounts.total_blocks}
+          completedBlocks={reviewCounts.completed_blocks}
+          selectedBlockPosition={selectedBlockPosition}
+          onPreviousBlock={handlePreviousBlock}
+          onNextBlock={handleNextBlock}
+          isLastBlock={isLastBlock}
+          unresolvedBlocks={reviewCounts.remaining_blocks}
+          selectedSegmentIsSafe={selectedSegmentIsSafe}
+          isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
+          cleanPanelText={cleanPanelText}
+          hasAmbiguityChoice={hasAmbiguityChoice}
+          ambiguityExplanation={ambiguityChoiceDetails.explanation}
+          blockAmbiguityIssuesLength={blockAmbiguityIssues.length}
+          activeBlockAmbiguityPosition={activeBlockAmbiguityPosition}
+          ambiguityChoiceIndex={ambiguityChoiceIndex}
+          isAmbiguityChoiceUserSelected={isAmbiguityChoiceUserSelected}
+          ambiguityOptions={ambiguityOptions}
+          currentSuggestionIndex={currentSuggestionIndex}
+          onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
+          onClearAmbiguityChoice={() => {
+            setPrevAmbiguityChoiceIndex(ambiguityChoiceIndex);
+            setAmbiguityChoiceIndex(null);
+            setIsAmbiguityChoiceUserSelected(false);
+          }}
+          previousAmbiguityChoiceIndex={prevAmbiguityChoiceIndex}
+          isReadOnly={isReadOnly}
+          isEditing={isEditing}
+          canEditSelectedSegment={canEditSelectedSegment}
+          draftTranslation={draftTranslation}
+          onDraftTranslationChange={setDraftTranslation}
+          glossaryMatches={glossaryMatches}
+          hasSemanticChoice={hasSemanticChoice}
+          semanticSimilarityScore={semanticSimilarityScore}
+          semanticChoice={semanticChoice}
+          onSemanticChoiceChange={handleSemanticChoiceChange}
+          currentBlockResolved={currentBlockResolved}
+          resolvedAmbiguity={resolvedAmbiguity}
+          onGoToNextUnresolved={() => {
+            const nextId = getNextUnresolvedBlockIdFromCurrent() ?? getNextUnresolvedBlockId();
+            if (nextId != null) moveToBlockById(nextId);
+          }}
+          onApproveCurrentBlock={handleApproveCurrentBlock}
+          primaryActionDisabled={primaryActionDisabled}
+          onToggleEdit={handleToggleEdit}
+          actionLoading={actionLoading}
+          onSkipBlock={handleSkipBlock}
+          hasDraftChanges={hasDraftChanges}
+          onSaveSegmentEdit={handleSaveSegmentEdit}
+          exactMemoryUsed={selectedBlockExactMemory}
+          semanticMemoryUsed={selectedBlockSemanticMemory}
+          memorySimilarityScore={selectedBlockMemorySimilarity}
+          memorySourceText={selectedBlockMemorySourceText}
+          onAddToGlossary={handleAddToGlossary}
+          sourceLanguage={job.source_language}
+          targetLanguage={job.target_language}
+        />
+      </div>
+
+      {/* ── Fixed Bottom Bar ── */}
+      <div className="flex h-16 shrink-0 items-center border-t border-brand-border bg-brand-surface px-6">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-brand-text">
+            Block {selectedBlockPosition + 1} of {reviewCounts.total_blocks}
+          </span>
+          <span className="text-xs text-brand-subtle">
+            {reviewCounts.completed_blocks} reviewed
+          </span>
+        </div>
+        <div className="mx-6 flex-1">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-border">
+            <div
+              className="h-full rounded-full bg-brand-accent transition-[width] duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {reviewCounts.issues_count > 0 && (
+            <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-xs font-medium text-status-warning">
+              {reviewCounts.issues_count} {reviewCounts.issues_count === 1 ? "issue" : "issues"}
+            </span>
+          )}
+          {totalPages > 1 && (
+            <span className="text-xs text-brand-subtle">
+              Page {page}/{totalPages}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handlePreviousBlock}
+            disabled={selectedBlockPosition <= 0}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-border text-brand-muted hover:bg-brand-bg disabled:opacity-30"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10L8 6l-4 4" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={handleNextBlock}
+            disabled={selectedBlockPosition === -1 || selectedBlockPosition >= orderedBlocks.length - 1}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-border text-brand-muted hover:bg-brand-bg disabled:opacity-30"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Floating Action Buttons ── */}
+      <div className="fixed bottom-24 right-80 z-30 flex flex-col gap-2">
+        {!isReadOnly && !currentBlockResolved && !reviewCompleteState && (
+          <>
+            <button
+              type="button"
+              onClick={isEditing ? handleSaveSegmentEdit : handleApproveCurrentBlock}
+              disabled={isEditing ? (actionLoading || !hasDraftChanges || !draftTranslation.trim()) : primaryActionDisabled}
+              className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-brand-accentHov disabled:opacity-50"
+            >
+              {isEditing ? "Save" : "Approve"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSkipBlock}
+              disabled={actionLoading}
+              className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted shadow-sm hover:bg-brand-bg disabled:opacity-50"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted shadow-sm hover:bg-brand-bg"
+            >
+              Flag
+            </button>
+          </>
         )}
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <DocumentDiffPane
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            filterChips={filterChips}
-            displayedNodes={displayedNodes}
-            displayedBlocksCount={visibleBlocks.length}
-            totalBlocksCount={reviewCounts.total_blocks}
-            selectedSegmentId={selectedSegment?.id ?? null}
-            segmentColorStates={segmentColorStates}
-            renderNode={(node, side) => renderNode(node as DocumentNode, side)}
-            segmentRefs={segmentRefs}
-            blockMemoryStates={blockMemoryStates}
-          />
-
-          <ReviewDetailsPane
-            selectedSegment={selectedSegment}
-            selectedBlock={selectedBlock}
-            reviewComplete={reviewComplete}
-            onFocusReviewGuidance={focusReviewGuidance}
-            orderedBlocksLength={reviewCounts.total_blocks}
-            completedBlocks={reviewCounts.completed_blocks}
-            selectedBlockPosition={selectedBlockPosition}
-            onPreviousBlock={handlePreviousBlock}
-            onNextBlock={handleNextBlock}
-            isLastBlock={isLastBlock}
-            unresolvedBlocks={reviewCounts.remaining_blocks}
-            selectedSegmentIsSafe={selectedSegmentIsSafe}
-            isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
-            cleanPanelText={cleanPanelText}
-            hasAmbiguityChoice={hasAmbiguityChoice}
-            ambiguityExplanation={ambiguityChoiceDetails.explanation}
-            blockAmbiguityIssuesLength={blockAmbiguityIssues.length}
-            activeBlockAmbiguityPosition={activeBlockAmbiguityPosition}
-            ambiguityChoiceIndex={ambiguityChoiceIndex}
-            isAmbiguityChoiceUserSelected={isAmbiguityChoiceUserSelected}
-            ambiguityOptions={ambiguityOptions}
-            currentSuggestionIndex={currentSuggestionIndex}
-            onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
-            onClearAmbiguityChoice={() => {
-              setPrevAmbiguityChoiceIndex(ambiguityChoiceIndex);
-              setAmbiguityChoiceIndex(null);
-              setIsAmbiguityChoiceUserSelected(false);
-            }}
-            previousAmbiguityChoiceIndex={prevAmbiguityChoiceIndex}
-            isReadOnly={isReadOnly}
-            isEditing={isEditing}
-            canEditSelectedSegment={canEditSelectedSegment}
-            draftTranslation={draftTranslation}
-            onDraftTranslationChange={setDraftTranslation}
-            glossaryMatches={glossaryMatches}
-            hasSemanticChoice={hasSemanticChoice}
-            semanticSimilarityScore={semanticSimilarityScore}
-            semanticChoice={semanticChoice}
-            onSemanticChoiceChange={handleSemanticChoiceChange}
-            currentBlockResolved={currentBlockResolved}
-            resolvedAmbiguity={resolvedAmbiguity}
-            onGoToNextUnresolved={() => {
+        {!isReadOnly && currentBlockResolved && !reviewCompleteState && (
+          <button
+            type="button"
+            onClick={() => {
               const nextId = getNextUnresolvedBlockIdFromCurrent() ?? getNextUnresolvedBlockId();
               if (nextId != null) moveToBlockById(nextId);
             }}
-            onApproveCurrentBlock={handleApproveCurrentBlock}
-            primaryActionDisabled={primaryActionDisabled}
-            onToggleEdit={handleToggleEdit}
-            actionLoading={actionLoading}
-            onSkipBlock={handleSkipBlock}
-            hasDraftChanges={hasDraftChanges}
-            onSaveSegmentEdit={handleSaveSegmentEdit}
-            exactMemoryUsed={selectedBlockExactMemory}
-            semanticMemoryUsed={selectedBlockSemanticMemory}
-            memorySimilarityScore={selectedBlockMemorySimilarity}
-            memorySourceText={selectedBlockMemorySourceText}
-            onAddToGlossary={handleAddToGlossary}
-            sourceLanguage={job.source_language}
-            targetLanguage={job.target_language}
-          />
+            disabled={actionLoading || reviewCounts.remaining_blocks === 0}
+            className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-brand-accentHov disabled:opacity-50"
+          >
+            Next Block
+          </button>
+        )}
+      </div>
+
+      {/* ── Status Messages ── */}
+      {(message || error) && (
+        <div className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2">
+          {message && <div className="rounded-lg bg-status-successBg px-4 py-2 text-sm text-status-success shadow-md">{message}</div>}
+          {error && <div className="rounded-lg bg-status-errorBg px-4 py-2 text-sm text-status-error shadow-md">{error}</div>}
         </div>
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-between border-t border-stone-200 pt-6">
-            <button
-              type="button"
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ← Previous
-            </button>
-            <div className="text-center">
-              <p className="text-sm text-stone-600">
-                Page {page} of {totalPages}
-              </p>
-              <p className="text-xs text-stone-400">{totalBlocks} blocks total</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next →
-            </button>
-          </div>
-        )}
+      )}
 
-        {/* More blocks translating indicator — shown when on the last available page and job is still running */}
-        {page >= totalPages && ["translation_queued", "translating"].includes(job.status) && (
-          <p className="mt-4 text-center text-xs text-stone-500">
-            More blocks translating… page count will update as they complete.
-          </p>
-        )}
-
+      {/* ── Modals ── */}
         {showExportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4">
             <div className="w-full max-w-lg border border-stone-200 bg-white p-6">
@@ -1734,7 +1808,6 @@ function TranslationReviewPageInner() {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 }

@@ -37,13 +37,13 @@ const SAMPLE_STATS = {
 function statusBadgeClasses(status: string): string {
   switch (status) {
     case "In Review":
-      return "bg-dash-teal/[0.12] text-dash-teal";
+      return "bg-brand-accent/[0.12] text-brand-accent";
     case "In Progress":
-      return "bg-[#f1f1ef] text-dash-text-mid";
+      return "bg-brand-bg text-brand-muted";
     case "Pending":
-      return "bg-[rgba(217,169,56,0.12)] text-[#b08d2a]";
+      return "bg-status-warningBg text-status-warning";
     default:
-      return "bg-[#f1f1ef] text-dash-text-mid";
+      return "bg-brand-bg text-brand-muted";
   }
 }
 
@@ -51,14 +51,14 @@ function statusBadgeClasses(status: string): string {
 
 function StatCard({ label, value, delta }: { label: string; value: string; delta: string }) {
   return (
-    <div className="group rounded-lg border border-dash-border bg-dash-surface p-6 transition-colors hover:border-t-2 hover:border-t-dash-teal">
-      <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+    <div className="group rounded-lg border border-brand-border bg-brand-surface p-6 transition-colors hover:border-t-2 hover:border-t-brand-accent">
+      <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
         {label}
       </p>
-      <p className="mb-1 font-newsreader text-[2.5rem] font-bold leading-[1.1] text-dash-forest">
+      <p className="mb-1 font-display text-[2.5rem] font-bold leading-[1.1] text-brand-accent">
         {value}
       </p>
-      <p className="font-inter text-xs text-dash-teal">
+      <p className="font-sans text-xs text-brand-accent">
         {delta}
       </p>
     </div>
@@ -68,13 +68,13 @@ function StatCard({ label, value, delta }: { label: string; value: string; delta
 function ProgressBar({ percent }: { percent: number }) {
   return (
     <div className="flex min-w-[120px] items-center gap-2">
-      <div className="h-1 flex-1 overflow-hidden rounded-sm bg-dash-border">
+      <div className="h-1 flex-1 overflow-hidden rounded-sm bg-brand-border">
         <div
-          className="h-full rounded-sm bg-dash-teal transition-[width] duration-300 ease-out"
+          className="h-full rounded-sm bg-brand-accent transition-[width] duration-300 ease-out"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="min-w-[2rem] text-right font-inter text-xs text-dash-text-mid">
+      <span className="min-w-[2rem] text-right font-sans text-xs text-brand-muted">
         {percent}%
       </span>
     </div>
@@ -84,7 +84,7 @@ function ProgressBar({ percent }: { percent: number }) {
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 font-inter text-[0.6875rem] font-medium ${statusBadgeClasses(status)}`}
+      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium ${statusBadgeClasses(status)}`}
     >
       {status}
     </span>
@@ -93,20 +93,20 @@ function StatusBadge({ status }: { status: string }) {
 
 function TranslationRow({ t }: { t: DashboardTranslation }) {
   return (
-    <tr className="transition-colors hover:bg-[#faf8f3]">
-      <td className="px-5 py-3.5 font-inter text-sm font-medium text-dash-text-dark">
+    <tr className="transition-colors hover:bg-brand-bg">
+      <td className="px-5 py-3.5 font-sans text-sm font-medium text-brand-text">
         {t.document_name ?? `Document #${t.id}`}
       </td>
       <td
-        className={`px-5 py-3.5 font-inter text-sm ${
+        className={`px-5 py-3.5 font-sans text-sm ${
           t.project_name
-            ? "text-dash-text-mid"
-            : "italic text-dash-text-muted"
+            ? "text-brand-muted"
+            : "italic text-brand-subtle"
         }`}
       >
         {t.project_name ?? "No project"}
       </td>
-      <td className="px-5 py-3.5 font-inter text-[0.8125rem] text-dash-text-mid">
+      <td className="px-5 py-3.5 font-sans text-[0.8125rem] text-brand-muted">
         {t.source_language} → {t.target_language}
       </td>
       <td className="px-5 py-3.5">
@@ -121,7 +121,7 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
 
 function TermChip({ label }: { label: string }) {
   return (
-    <span className="whitespace-nowrap rounded-full bg-dash-teal/[0.08] px-2.5 py-1 font-inter text-[0.6875rem] font-medium text-dash-teal">
+    <span className="whitespace-nowrap rounded-full bg-brand-accent/[0.08] px-2.5 py-1 font-sans text-[0.6875rem] font-medium text-brand-accent">
       {label}
     </span>
   );
@@ -158,19 +158,19 @@ export default function DashboardPage() {
   const hasTranslations = displayTranslations.length > 0;
 
   return (
-    <div className="min-h-screen bg-dash-bg pt-20">
+    <div className="min-h-screen bg-brand-bg pt-20">
       <div className="mx-auto max-w-[1100px] px-10 py-12">
 
         {/* ── Hero + Split Button ── */}
         <div className="mb-10 flex items-start justify-between">
           <div>
-            <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+            <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
               OVERVIEW
             </p>
-            <h1 className="mb-2 font-newsreader text-[clamp(2rem,4vw,2.75rem)] font-bold leading-[1.1] tracking-tight text-dash-forest">
+            <h1 className="mb-2 font-display text-[clamp(2rem,4vw,2.75rem)] font-bold leading-[1.1] tracking-tight text-brand-text">
               Welcome back, <em>{firstName}</em>.
             </h1>
-            <p className="font-inter text-[0.9375rem] text-dash-text-mid">
+            <p className="font-sans text-[0.9375rem] text-brand-muted">
               Here&apos;s what&apos;s happening across your translation workspace.
             </p>
           </div>
@@ -202,28 +202,28 @@ export default function DashboardPage() {
             {/* Section header */}
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h2 className="font-newsreader text-xl font-bold text-dash-forest">
+                <h2 className="font-display text-xl font-bold text-brand-text">
                   Active Translations
                 </h2>
-                <div className="h-0.5 w-8 rounded-sm bg-dash-teal" />
+                <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
               </div>
               <Link
                 href="/documents"
-                className="font-inter text-[0.8125rem] font-medium text-dash-teal no-underline hover:underline"
+                className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
               >
                 View all →
               </Link>
             </div>
 
             {/* Table card */}
-            <div className="overflow-hidden rounded-lg border border-dash-border bg-dash-surface">
+            <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-dash-border-light">
+                  <tr className="border-b border-brand-border">
                     {["Document", "Project", "Language", "Progress", "Status"].map((col) => (
                       <th
                         key={col}
-                        className="px-5 py-3 text-left font-inter text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-dash-text-muted"
+                        className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
                       >
                         {col}
                       </th>
@@ -240,16 +240,16 @@ export default function DashboardPage() {
           </div>
         ) : (
           /* Empty state */
-          <div className="mb-10 rounded-lg border border-dash-border bg-dash-surface px-8 py-16 text-center">
-            <p className="mb-2 font-newsreader text-xl font-bold text-dash-forest">
+          <div className="mb-10 rounded-lg border border-brand-border bg-brand-surface px-8 py-16 text-center">
+            <p className="mb-2 font-display text-xl font-bold text-brand-text">
               No translations yet
             </p>
-            <p className="mb-5 font-inter text-sm text-dash-text-muted">
+            <p className="mb-5 font-sans text-sm text-brand-subtle">
               Upload your first document to get started.
             </p>
             <button
               onClick={openTranslationModal}
-              className="cursor-pointer rounded-full border-none bg-dash-forest px-6 py-2.5 font-inter text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2.5 font-sans text-sm font-semibold text-white transition-opacity hover:bg-brand-accentHov"
             >
               + New Translation
             </button>
@@ -260,14 +260,14 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 gap-4">
 
           {/* Connected Glossary */}
-          <div className="rounded-lg border border-dash-border bg-dash-surface p-6">
-            <p className="mb-2 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+          <div className="rounded-lg border border-brand-border bg-brand-surface p-6">
+            <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
               CONNECTED GLOSSARY
             </p>
-            <h3 className="mb-1.5 font-newsreader text-lg font-bold text-dash-forest">
+            <h3 className="mb-1.5 font-display text-lg font-bold text-brand-text">
               Legal &amp; Compliance Terms
             </h3>
-            <p className="mb-4 font-inter text-[0.8125rem] text-dash-text-mid">
+            <p className="mb-4 font-sans text-[0.8125rem] text-brand-muted">
               218 terms enforced across all active projects.
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -275,24 +275,24 @@ export default function DashboardPage() {
               <TermChip label="Indemnification" />
               <TermChip label="Jurisdiction" />
               <TermChip label="Confidentiality" />
-              <span className="self-center px-2.5 py-1 font-inter text-[0.6875rem] font-medium text-dash-text-muted">
+              <span className="self-center px-2.5 py-1 font-sans text-[0.6875rem] font-medium text-brand-subtle">
                 +214 more
               </span>
             </div>
           </div>
 
           {/* Translation Memory */}
-          <div className="rounded-lg bg-dash-forest p-6">
-            <p className="mb-3 font-inter text-[0.6875rem] font-medium uppercase tracking-widest text-dash-teal">
+          <div className="rounded-lg bg-brand-accent p-6">
+            <p className="mb-3 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accentMid">
               TRANSLATION MEMORY
             </p>
-            <p className="mb-2 font-newsreader text-[3.25rem] font-bold leading-none text-dash-teal">
+            <p className="mb-2 font-display text-[3.25rem] font-bold leading-none text-white">
               60%
             </p>
-            <span className="mb-3 inline-block rounded-full bg-dash-teal/20 px-2.5 py-0.5 font-inter text-[0.6875rem] font-medium text-dash-teal">
+            <span className="mb-3 inline-block rounded-full bg-white/20 px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium text-white">
               High Reuse · High Efficiency
             </span>
-            <p className="font-inter text-[0.8125rem] leading-normal text-[#c8c0b0]">
+            <p className="font-sans text-[0.8125rem] leading-normal text-brand-accentMid">
               Approved translations are automatically surfaced for similar content.
             </p>
           </div>
