@@ -1313,6 +1313,72 @@ function TranslationReviewPageInner() {
     }
   }
 
+  // Keyboard shortcuts — useEffect must be before early returns (React hooks rule).
+  // Handlers and derived values are accessed via refs to avoid stale closures.
+  const kbStateRef = useRef({ isReadOnly: false, currentBlockResolved: false, reviewComplete: false, isEditing: false });
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (showExportModal || showPreviewModal) return;
+
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+        return;
+      }
+      if (showShortcuts) return;
+
+      const { isReadOnly: ro, currentBlockResolved: resolved, reviewComplete: done, isEditing: editing } = kbStateRef.current;
+
+      switch (e.key) {
+        case "ArrowUp":
+        case "k":
+          e.preventDefault();
+          handlePreviousBlock();
+          break;
+        case "ArrowDown":
+        case "j":
+          e.preventDefault();
+          handleNextBlock();
+          break;
+        case "Enter":
+          if (!ro && !resolved && !done) {
+            e.preventDefault();
+            if (editing) {
+              handleSaveSegmentEdit();
+            } else {
+              handleApproveCurrentBlock();
+            }
+          }
+          break;
+        case "s":
+          if (!ro && !resolved && !done) {
+            e.preventDefault();
+            handleSkipBlock();
+          }
+          break;
+        case "e":
+          if (!ro) {
+            e.preventDefault();
+            handleToggleEdit();
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          if (showShortcuts) {
+            setShowShortcuts(false);
+          } else if (editing) {
+            handleToggleEdit();
+          }
+          break;
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showShortcuts, showExportModal, showPreviewModal]);
+
   if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Loading…</div>;
   if (error && !job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>{error}</div>;
   if (!job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Job not found</div>;
@@ -1352,6 +1418,7 @@ function TranslationReviewPageInner() {
   const semanticSimilarityScore = semanticChoiceDetails.similarityScore;
   const isSafeDecisionOnlyMode = selectedSegmentIsSafe;
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
+  kbStateRef.current = { isReadOnly, currentBlockResolved, reviewComplete, isEditing };
   const resolvedAmbiguity = Boolean(selectedSegment?.ambiguity_detected && isAcceptableFinalStatus(selectedSegment?.review_status ?? ""));
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
   const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
@@ -1412,68 +1479,6 @@ function TranslationReviewPageInner() {
   const progressPercent = reviewCounts.total_blocks > 0 ? Math.round((reviewCounts.completed_blocks / reviewCounts.total_blocks) * 100) : 0;
   const sourceLanguageLabel = job.source_language.slice(0, 3).toUpperCase();
   const targetLanguageLabel = job.target_language.slice(0, 3).toUpperCase();
-
-  // Keyboard shortcuts — must be after all derived values
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (showExportModal || showPreviewModal) return;
-
-      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
-        e.preventDefault();
-        setShowShortcuts((v) => !v);
-        return;
-      }
-      if (showShortcuts) return;
-
-      switch (e.key) {
-        case "ArrowUp":
-        case "k":
-          e.preventDefault();
-          handlePreviousBlock();
-          break;
-        case "ArrowDown":
-        case "j":
-          e.preventDefault();
-          handleNextBlock();
-          break;
-        case "Enter":
-          if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
-            e.preventDefault();
-            if (isEditing) {
-              handleSaveSegmentEdit();
-            } else {
-              handleApproveCurrentBlock();
-            }
-          }
-          break;
-        case "s":
-          if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
-            e.preventDefault();
-            handleSkipBlock();
-          }
-          break;
-        case "e":
-          if (!isReadOnly) {
-            e.preventDefault();
-            handleToggleEdit();
-          }
-          break;
-        case "Escape":
-          e.preventDefault();
-          if (showShortcuts) {
-            setShowShortcuts(false);
-          } else if (isEditing) {
-            handleToggleEdit();
-          }
-          break;
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showShortcuts, showExportModal, showPreviewModal, isReadOnly, currentBlockResolved, reviewCompleteState, isEditing]);
 
   return (
     <div className="flex h-screen flex-col bg-brand-bg">
