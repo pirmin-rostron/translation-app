@@ -249,7 +249,8 @@ function LoginPageContent() {
                 <label htmlFor="email" style={labelStyle}>Email</label>
                 <input
                   id="email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   required
                   autoComplete="email"
                   value={email}
