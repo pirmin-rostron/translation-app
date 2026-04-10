@@ -103,7 +103,9 @@ export function ReviewDetailsPane({
   semanticChoice,
   onSemanticChoiceChange,
   currentBlockResolved,
+  unresolvedBlocks,
   onToggleEdit,
+  actionLoading,
   exactMemoryUsed,
   semanticMemoryUsed,
   memorySimilarityScore,
@@ -184,9 +186,14 @@ export function ReviewDetailsPane({
         {/* Active block controls */}
         {selectedBlock && selectedSegment && (
           <div className="space-y-4">
-            <p className="text-xs font-medium text-brand-muted">
-              Block {selectedBlockPosition + 1} of {orderedBlocksLength}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-brand-muted">
+                Block {selectedBlockPosition + 1} of {orderedBlocksLength}
+              </p>
+              {unresolvedBlocks > 0 && (
+                <span className="text-xs text-brand-subtle">{unresolvedBlocks} remaining</span>
+              )}
+            </div>
 
             {selectedSegmentIsSafe && (
               <div className="rounded-lg border border-brand-border bg-brand-bg p-3">
@@ -295,7 +302,8 @@ export function ReviewDetailsPane({
                 <button
                   type="button"
                   onClick={onToggleEdit}
-                  className="mt-2 text-xs font-medium text-brand-muted hover:text-brand-text"
+                  disabled={actionLoading}
+                  className="mt-2 text-xs font-medium text-brand-muted hover:text-brand-text disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -381,7 +389,8 @@ export function ReviewDetailsPane({
                     <button
                       type="button"
                       onClick={onToggleEdit}
-                      className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg"
+                      disabled={actionLoading}
+                      className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
                     >
                       Edit
                     </button>
@@ -443,7 +452,8 @@ export function ReviewDetailsPane({
               <button
                 type="button"
                 onClick={onToggleEdit}
-                className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg"
+                disabled={actionLoading}
+                className="w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
               >
                 Edit translation
               </button>
