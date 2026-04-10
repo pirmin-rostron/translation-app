@@ -210,7 +210,7 @@ export default function DashboardPage() {
                 <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
               </div>
               <Link
-                href="/documents"
+                href="/dashboard"
                 className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
               >
                 View all →

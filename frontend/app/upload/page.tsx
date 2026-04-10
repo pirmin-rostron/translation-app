@@ -815,7 +815,7 @@ function StatusLabel({ entry }: { entry: FileEntry }) {
       <p className="mt-0.5 text-xs text-green-700">
         Ready —{" "}
         <Link
-          href="/documents"
+          href="/dashboard"
           className="font-medium underline hover:text-green-900"
         >
           View all translations

@@ -271,7 +271,7 @@ export default function DocumentDetailPage() {
     <div className="min-h-screen bg-slate-50">
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
-          href="/documents"
+          href="/dashboard"
           className="text-sm text-slate-600 hover:text-slate-900 mb-6 inline-block"
         >
           ← Back to documents
