@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DocumentDiffPane } from "./components/DocumentDiffPane";
 import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
+import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { getLanguageDisplayName } from "../../utils/language";
 
 import posthog from 'posthog-js';
@@ -474,6 +475,8 @@ function TranslationReviewPageInner() {
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<number, HTMLElement | null>>({});
   const reviewGuidanceRef = useRef<HTMLElement>(null);
+  const liveRegionRef = useRef<HTMLDivElement>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
   const allSegments = useMemo(
@@ -602,6 +605,21 @@ function TranslationReviewPageInner() {
     setSelectedId(firstBlock.segments[0]?.id ?? null);
     blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [orderedBlocks, selectedBlockPosition]);
+
+  const announce = useCallback((text: string) => {
+    if (liveRegionRef.current) {
+      liveRegionRef.current.textContent = text;
+    }
+  }, []);
+
+  // Announce block changes to screen readers
+  useEffect(() => {
+    if (selectedBlockPosition === -1 || !reviewCounts.total_blocks) return;
+    const blockNum = selectedBlockPosition + 1;
+    const hasAmbig = selectedBlock?.segments.some((s) => s.ambiguity_detected) ?? false;
+    const suffix = hasAmbig ? " — has ambiguity" : "";
+    announce(`Block ${blockNum} of ${reviewCounts.total_blocks}${suffix}`);
+  }, [selectedBlockPosition, reviewCounts.total_blocks, selectedBlock, announce]);
 
   function selectBlockById(blockId: number, preferredSegmentId?: number) {
     const block = orderedBlocks.find((candidate) => candidate.id === blockId);
@@ -1035,11 +1053,11 @@ function TranslationReviewPageInner() {
       } else {
         // All ambiguous segments in this block are resolved — advance to next unresolved block
         moveToBlockById(nextBlockId);
-        setMessage(
-          toApprove.length > 0
-            ? `Block ${selectedBlock.block_index + 1} approved.`
-            : "Block already reviewed. Moved to next block."
-        );
+        const approveMsg = toApprove.length > 0
+          ? `Block ${selectedBlock.block_index + 1} approved.`
+          : "Block already reviewed. Moved to next block.";
+        setMessage(approveMsg);
+        announce(approveMsg);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve block");
@@ -1073,6 +1091,7 @@ function TranslationReviewPageInner() {
     }
     moveToBlockById(nextBlockId);
     setMessage("Skipped block. Moved to next block.");
+    announce("Block skipped");
     setError("");
   }
 
@@ -1394,6 +1413,68 @@ function TranslationReviewPageInner() {
   const sourceLanguageLabel = job.source_language.slice(0, 3).toUpperCase();
   const targetLanguageLabel = job.target_language.slice(0, 3).toUpperCase();
 
+  // Keyboard shortcuts — must be after all derived values
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (showExportModal || showPreviewModal) return;
+
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+        return;
+      }
+      if (showShortcuts) return;
+
+      switch (e.key) {
+        case "ArrowUp":
+        case "k":
+          e.preventDefault();
+          handlePreviousBlock();
+          break;
+        case "ArrowDown":
+        case "j":
+          e.preventDefault();
+          handleNextBlock();
+          break;
+        case "Enter":
+          if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
+            e.preventDefault();
+            if (isEditing) {
+              handleSaveSegmentEdit();
+            } else {
+              handleApproveCurrentBlock();
+            }
+          }
+          break;
+        case "s":
+          if (!isReadOnly && !currentBlockResolved && !reviewCompleteState) {
+            e.preventDefault();
+            handleSkipBlock();
+          }
+          break;
+        case "e":
+          if (!isReadOnly) {
+            e.preventDefault();
+            handleToggleEdit();
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          if (showShortcuts) {
+            setShowShortcuts(false);
+          } else if (isEditing) {
+            handleToggleEdit();
+          }
+          break;
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showShortcuts, showExportModal, showPreviewModal, isReadOnly, currentBlockResolved, reviewCompleteState, isEditing]);
+
   return (
     <div className="flex h-screen flex-col bg-brand-bg">
       {/* ── Fixed Top Header ── */}
@@ -1584,6 +1665,14 @@ function TranslationReviewPageInner() {
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
           </button>
+          <button
+            type="button"
+            onClick={() => setShowShortcuts(true)}
+            aria-label="Show keyboard shortcuts"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-border font-mono text-xs font-bold text-brand-muted hover:bg-brand-bg"
+          >
+            ?
+          </button>
         </div>
       </div>
 
@@ -1595,6 +1684,7 @@ function TranslationReviewPageInner() {
               type="button"
               onClick={isEditing ? handleSaveSegmentEdit : handleApproveCurrentBlock}
               disabled={isEditing ? (actionLoading || !hasDraftChanges || !draftTranslation.trim()) : primaryActionDisabled}
+              aria-label={isEditing ? "Save edited translation" : "Approve current block"}
               className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-brand-accentHov disabled:opacity-50"
             >
               {isEditing ? "Save" : "Approve"}
@@ -1603,6 +1693,7 @@ function TranslationReviewPageInner() {
               type="button"
               onClick={handleSkipBlock}
               disabled={actionLoading}
+              aria-label="Skip current block"
               className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted shadow-sm hover:bg-brand-bg disabled:opacity-50"
             >
               Skip
@@ -1611,6 +1702,7 @@ function TranslationReviewPageInner() {
               type="button"
               disabled
               title="Flagging coming soon"
+              aria-label="Flag current block (coming soon)"
               className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-subtle shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
             >
               Flag
@@ -1639,6 +1731,12 @@ function TranslationReviewPageInner() {
           {error && <div className="rounded-lg bg-status-errorBg px-4 py-2 text-sm text-status-error shadow-md">{error}</div>}
         </div>
       )}
+
+      {/* ── Aria-live region for screen readers ── */}
+      <div aria-live="polite" className="sr-only" ref={liveRegionRef} />
+
+      {/* ── Keyboard Shortcuts Overlay ── */}
+      <KeyboardShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       {/* ── Modals ── */}
         {showExportModal && (
