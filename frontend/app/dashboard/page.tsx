@@ -93,9 +93,11 @@ function StatusBadge({ status }: { status: string }) {
 
 function TranslationRow({ t }: { t: DashboardTranslation }) {
   return (
-    <tr className="transition-colors hover:bg-brand-bg">
-      <td className="px-5 py-3.5 font-sans text-sm font-medium text-brand-text">
-        {t.document_name ?? `Document #${t.id}`}
+    <tr className="cursor-pointer transition-colors hover:bg-brand-bg">
+      <td className="px-5 py-3.5">
+        <Link href={`/translation-jobs/${t.id}`} className="font-sans text-sm font-medium text-brand-text no-underline hover:underline">
+          {t.document_name ?? `Document #${t.id}`}
+        </Link>
       </td>
       <td
         className={`px-5 py-3.5 font-sans text-sm ${
