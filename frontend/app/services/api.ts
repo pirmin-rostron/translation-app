@@ -220,7 +220,7 @@ export const translationJobsApi = {
 
 export const translationResultsApi = {
   update: <T>(resultId: number, finalTranslation: string, reviewStatus: string) =>
-    apiFetch<T>(`${API_URL}/translation-results/${resultId}`, {
+    apiFetch<T>(`${API_URL}/translation-jobs/translation-results/${resultId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ final_translation: finalTranslation, review_status: reviewStatus }),

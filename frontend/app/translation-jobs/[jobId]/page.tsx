@@ -1609,7 +1609,9 @@ function TranslationReviewPageInner() {
             </button>
             <button
               type="button"
-              className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted shadow-sm hover:bg-brand-bg"
+              disabled
+              title="Flagging coming soon"
+              className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-subtle shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
             >
               Flag
             </button>
