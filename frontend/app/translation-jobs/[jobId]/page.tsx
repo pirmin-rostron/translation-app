@@ -476,6 +476,7 @@ function TranslationReviewPageInner() {
   const blockRefs = useRef<Record<number, HTMLElement | null>>({});
   const reviewGuidanceRef = useRef<HTMLElement>(null);
   const liveRegionRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
@@ -606,11 +607,22 @@ function TranslationReviewPageInner() {
     blockRefs.current[firstBlock.id]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [orderedBlocks, selectedBlockPosition]);
 
+  // Auto-focus canvas so keyboard shortcuts work immediately
+  useEffect(() => {
+    if (!loading && blocks.length > 0) {
+      canvasRef.current?.focus();
+    }
+  }, [loading, blocks.length]);
+
   const announce = useCallback((text: string) => {
     if (liveRegionRef.current) {
       liveRegionRef.current.textContent = text;
     }
   }, []);
+
+  function refocusCanvas() {
+    setTimeout(() => canvasRef.current?.focus(), 0);
+  }
 
   // Announce block changes to screen readers
   useEffect(() => {
@@ -1003,6 +1015,7 @@ function TranslationReviewPageInner() {
       setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setActionLoading(false);
+      refocusCanvas();
     }
   }
 
@@ -1063,6 +1076,7 @@ function TranslationReviewPageInner() {
       setError(err instanceof Error ? err.message : "Failed to approve block");
     } finally {
       setActionLoading(false);
+      refocusCanvas();
     }
   }
 
@@ -1093,6 +1107,7 @@ function TranslationReviewPageInner() {
     setMessage("Skipped block. Moved to next block.");
     announce("Block skipped");
     setError("");
+    refocusCanvas();
   }
 
   function handlePageChange(newPage: number) {
@@ -1560,6 +1575,7 @@ function TranslationReviewPageInner() {
           blockMemoryStates={blockMemoryStates}
           sourceLanguageLabel={sourceLanguageLabel}
           targetLanguageLabel={targetLanguageLabel}
+          canvasRef={canvasRef}
         />
 
         <ReviewDetailsPane

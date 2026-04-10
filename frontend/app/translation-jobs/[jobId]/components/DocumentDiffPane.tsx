@@ -1,6 +1,6 @@
 "use client";
 
-import type { MutableRefObject, ReactNode } from "react";
+import type { MutableRefObject, ReactNode, Ref } from "react";
 
 type ReviewFilter = "all" | "ambiguities" | "glossary" | "memory";
 
@@ -39,6 +39,7 @@ type DocumentDiffPaneProps = {
   blockMemoryStates: Map<string, BlockMemoryState>;
   sourceLanguageLabel: string;
   targetLanguageLabel: string;
+  canvasRef?: Ref<HTMLElement>;
 };
 
 export function DocumentDiffPane({
@@ -48,6 +49,7 @@ export function DocumentDiffPane({
   segmentRefs,
   sourceLanguageLabel,
   targetLanguageLabel,
+  canvasRef,
 }: DocumentDiffPaneProps) {
   const activeIndex = displayedNodes.findIndex((node) => {
     const segments = node.block?.segments ?? [];
@@ -64,7 +66,7 @@ export function DocumentDiffPane({
 
   if (!displayedNodes.length) {
     return (
-      <main className="flex-1 overflow-y-auto">
+      <main ref={canvasRef} tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
         <div className="flex h-full items-center justify-center text-brand-subtle">
           No blocks to display.
         </div>
@@ -73,7 +75,7 @@ export function DocumentDiffPane({
   }
 
   return (
-    <main className="flex-1 overflow-y-auto">
+    <main ref={canvasRef} tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
       <div className="mx-auto max-w-5xl px-8 py-8">
         <div className="space-y-6">
           {displayedNodes.map((node, nodeIndex) => {
