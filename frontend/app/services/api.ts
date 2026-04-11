@@ -311,18 +311,21 @@ export type OverviewResponse = {
   document_name: string;
   review_mode: string;
   tone: string | null;
+  tone_applied: string;
   summary: {
     total_blocks: number;
     issue_count: number;
     glossary_match_count: number;
     ambiguity_count: number;
     quality_score: number;
+    memory_reuse_count: number;
   };
   blocks_preview: {
     source_text: string;
     translated_text: string;
     has_issue: boolean;
   }[];
+  created_at: string | null;
 };
 
 export const overviewApi = {

@@ -1961,6 +1961,7 @@ class OverviewSummary(BaseModel):
     glossary_match_count: int
     ambiguity_count: int
     quality_score: int
+    memory_reuse_count: int = 0
 
 
 class OverviewResponse(BaseModel):
@@ -1971,8 +1972,10 @@ class OverviewResponse(BaseModel):
     document_name: str
     review_mode: str
     tone: Optional[str]
+    tone_applied: str = "natural"
     summary: OverviewSummary
     blocks_preview: list[OverviewBlockPreview]
+    created_at: Optional[str] = None
 
 
 class ReviewModeRequest(BaseModel):
@@ -2021,7 +2024,9 @@ def get_overview(
         elif has_glossary:
             glossary_match_count += 1
 
+    memory_reuse_count = sum(1 for r in results if bool(r.semantic_memory_used))
     quality_score = round(((total_blocks - issue_count) / total_blocks) * 100) if total_blocks > 0 else 100
+    tone_applied = job.tone or job.translation_style or "natural"
 
     # First 3 blocks preview
     blocks_preview = []
@@ -2051,14 +2056,17 @@ def get_overview(
         document_name=document_name,
         review_mode=job.review_mode or "autopilot",
         tone=job.tone,
+        tone_applied=tone_applied,
         summary=OverviewSummary(
             total_blocks=total_blocks,
             issue_count=issue_count,
             glossary_match_count=glossary_match_count,
             ambiguity_count=ambiguity_count,
             quality_score=quality_score,
+            memory_reuse_count=memory_reuse_count,
         ),
         blocks_preview=blocks_preview,
+        created_at=job.created_at.isoformat() if job.created_at else None,
     )
 
 

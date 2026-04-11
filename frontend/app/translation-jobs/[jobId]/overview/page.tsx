@@ -6,15 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "../../../stores/authStore";
 import { API_URL, overviewApi, translationJobsApi } from "../../../services/api";
 import type { OverviewResponse } from "../../../services/api";
-import { TierGate } from "../../../components/TierGate";
 import { getLanguageDisplayName } from "../../../utils/language";
-
-type PreviewData = {
-  job_id: number;
-  document_name: string;
-  content_raw: string;
-  content_display: string;
-};
 
 type ExportResult = {
   job_id: number;
@@ -27,6 +19,37 @@ type ExportResult = {
   version: number;
 };
 
+function ScoreRing({ score }: { score: number }) {
+  const r = 54;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  const color = score >= 90 ? "#15803D" : score >= 70 ? "#B45309" : "#B91C1C";
+  return (
+    <svg width="140" height="140" viewBox="0 0 120 120" className="mx-auto">
+      <circle cx="60" cy="60" r={r} fill="none" stroke="#E5E0D8" strokeWidth="8" />
+      <circle
+        cx="60" cy="60" r={r} fill="none"
+        stroke={color} strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={offset}
+        transform="rotate(-90 60 60)"
+        className="transition-all duration-700"
+      />
+      <text x="60" y="55" textAnchor="middle" className="fill-brand-text font-display text-3xl font-bold">
+        {score}%
+      </text>
+      <text x="60" y="72" textAnchor="middle" className="fill-brand-muted text-[10px]">
+        quality
+      </text>
+    </svg>
+  );
+}
+
+function VerdictTag({ score }: { score: number }) {
+  if (score >= 90) return <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Excellent — ready to use</span>;
+  if (score >= 70) return <span className="rounded-full bg-status-warningBg px-3 py-1 text-xs font-medium text-status-warning">Good — review recommended</span>;
+  return <span className="rounded-full bg-status-errorBg px-3 py-1 text-xs font-medium text-status-error">Needs attention</span>;
+}
+
 export default function OverviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -35,11 +58,8 @@ export default function OverviewPage() {
   const jobId = Number(params.jobId);
 
   const [data, setData] = useState<OverviewResponse | null>(null);
-  const [preview, setPreview] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedMode, setSelectedMode] = useState<"autopilot" | "manual">("autopilot");
-  const [modeLoading, setModeLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -48,40 +68,20 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (!token || Number.isNaN(jobId)) return;
-    Promise.all([
-      overviewApi.get(jobId),
-      translationJobsApi.getPreview<PreviewData>(jobId).catch(() => null),
-    ])
-      .then(([overviewRes, previewRes]) => {
-        setData(overviewRes);
-        setPreview(previewRes);
-        setSelectedMode((overviewRes.review_mode as "autopilot" | "manual") ?? "autopilot");
-      })
+    overviewApi
+      .get(jobId)
+      .then(setData)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load overview"))
       .finally(() => setLoading(false));
   }, [jobId, token]);
-
-  async function handleModeChange(mode: "autopilot" | "manual") {
-    setSelectedMode(mode);
-    setModeLoading(true);
-    try {
-      await overviewApi.setReviewMode(jobId, mode);
-    } catch {
-      setSelectedMode(selectedMode);
-    } finally {
-      setModeLoading(false);
-    }
-  }
 
   async function triggerExport(approveAll: boolean) {
     setExporting(true);
     setError("");
     try {
       if (approveAll) {
-        // "Download anyway" — force-approve ALL segments including ambiguous ones
         await translationJobsApi.approveAllSegments<unknown>(jobId);
       } else {
-        // Clean download — only approve safe (non-ambiguous) segments
         await translationJobsApi.approveSafeSegments<unknown>(jobId);
       }
       await translationJobsApi.markReady<unknown>(jobId);
@@ -108,12 +108,20 @@ export default function OverviewPage() {
   }
 
   if (!hasHydrated || !token) return null;
-  if (loading) return <div className="min-h-screen bg-brand-bg pt-20 px-6">Loading…</div>;
+  if (loading) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-brand-muted">Loading…</div>;
   if (error && !data) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">{error}</div>;
   if (!data) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">Not found</div>;
 
   const { summary } = data;
   const hasIssues = summary.issue_count > 0;
+  const reviewMode = data.review_mode ?? "autopilot";
+  const toneLabel = (data.tone_applied ?? "natural").charAt(0).toUpperCase() + (data.tone_applied ?? "natural").slice(1);
+  const memoryPercent = summary.total_blocks > 0
+    ? Math.round((summary.memory_reuse_count / summary.total_blocks) * 100)
+    : 0;
+  const formattedDate = data.created_at
+    ? new Date(data.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
     <div className="min-h-screen bg-brand-bg">
@@ -131,141 +139,167 @@ export default function OverviewPage() {
         </span>
       </header>
 
-      <div className="mx-auto flex max-w-[1200px] gap-8 px-8 py-10">
-        {/* Left column — full translated document */}
-        <div className="min-w-0 flex-[3]">
-          <h2 className="mb-6 font-display text-2xl font-bold text-brand-text">Translation Overview</h2>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-8 px-8 py-10 lg:flex-row">
+        {/* ── Left column ── */}
+        <div className="min-w-0 flex-[3] space-y-6">
+          {/* Score hero */}
+          <div className="rounded-xl border border-brand-border bg-brand-surface p-8 text-center">
+            <ScoreRing score={summary.quality_score} />
+            <div className="mt-4">
+              <VerdictTag score={summary.quality_score} />
+            </div>
+          </div>
 
-          <div className="rounded-xl border border-brand-border bg-brand-surface p-8">
-            {preview?.content_display ? (
-              <article className="whitespace-pre-wrap text-[15px] leading-7 text-brand-text">
-                {preview.content_display}
-              </article>
-            ) : (
-              <p className="text-sm text-brand-muted">Translation preview not available.</p>
-            )}
+          {/* Translation Integrity Report */}
+          <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-brand-subtle">
+              Translation Integrity Report
+            </h3>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2.5 text-sm">
+                <span className="mt-0.5 text-status-success">✓</span>
+                <span className="text-brand-text">
+                  <strong>{summary.total_blocks}</strong> blocks translated
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5 text-sm">
+                <span className="mt-0.5 text-status-success">✓</span>
+                <span className="text-brand-text">
+                  <strong>{toneLabel}</strong> register applied
+                </span>
+              </li>
+              {summary.glossary_match_count > 0 && (
+                <li className="flex items-start gap-2.5 text-sm">
+                  <span className="mt-0.5 text-status-success">✓</span>
+                  <span className="text-brand-text">
+                    <strong>{summary.glossary_match_count}</strong> glossary terms applied consistently
+                  </span>
+                </li>
+              )}
+              {summary.memory_reuse_count > 0 && (
+                <li className="flex items-start gap-2.5 text-sm">
+                  <span className="mt-0.5 text-status-success">✓</span>
+                  <span className="text-brand-text">
+                    <strong>{memoryPercent}%</strong> translation memory match
+                  </span>
+                </li>
+              )}
+              {summary.issue_count > 0 && (
+                <li className="flex items-start gap-2.5 text-sm">
+                  <span className="mt-0.5 text-status-warning">⚠</span>
+                  <span className="text-status-warning">
+                    <strong>{summary.issue_count}</strong> blocks have ambiguous terms
+                  </span>
+                </li>
+              )}
+            </ul>
           </div>
         </div>
 
-        {/* Right column — summary + mode + CTA */}
-        <div className="w-[340px] shrink-0 space-y-6">
-          {/* Quality score */}
-          <div className="rounded-xl border border-brand-border bg-brand-surface p-6 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-brand-subtle">Quality Score</p>
-            <p className={`mt-2 font-display text-5xl font-bold ${
-              summary.quality_score >= 90 ? "text-status-success" : summary.quality_score >= 70 ? "text-status-warning" : "text-status-error"
-            }`}>
-              {summary.quality_score}%
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-left">
-              <div className="rounded-lg bg-brand-bg p-3">
-                <p className="text-lg font-semibold text-brand-text">{summary.total_blocks}</p>
-                <p className="text-xs text-brand-muted">Blocks</p>
-              </div>
-              <div className="rounded-lg bg-brand-bg p-3">
-                <p className="text-lg font-semibold text-status-warning">{summary.issue_count}</p>
-                <p className="text-xs text-brand-muted">Issues</p>
-              </div>
-              <div className="rounded-lg bg-brand-bg p-3">
-                <p className="text-lg font-semibold text-brand-accent">{summary.glossary_match_count}</p>
-                <p className="text-xs text-brand-muted">Glossary</p>
-              </div>
-              <div className="rounded-lg bg-brand-bg p-3">
-                <p className="text-lg font-semibold text-status-warning">{summary.ambiguity_count}</p>
-                <p className="text-xs text-brand-muted">Ambiguities</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Mode selector */}
+        {/* ── Right column ── */}
+        <div className="w-full space-y-6 lg:w-80 lg:shrink-0">
+          {/* Action hub */}
           <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
-            <p className="text-xs font-bold uppercase tracking-widest text-brand-subtle">Review Mode</p>
-            <div className="mt-3 space-y-2">
-              <button
-                type="button"
-                onClick={() => handleModeChange("autopilot")}
-                disabled={modeLoading}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  selectedMode === "autopilot"
-                    ? "border-brand-accent bg-brand-accentMid"
-                    : "border-brand-border bg-brand-surface hover:bg-brand-bg"
-                }`}
-              >
-                <p className="text-sm font-medium text-brand-text">Autopilot</p>
-                <p className="mt-0.5 text-xs text-brand-muted">Export when ready — minimal review</p>
-              </button>
-              <TierGate
-                feature="manual_review"
-                tier="pro"
-                fallback={
-                  <div className="w-full rounded-lg border border-brand-border bg-brand-bg p-3 opacity-60">
-                    <p className="text-sm font-medium text-brand-text">Manual review</p>
-                    <p className="mt-0.5 text-xs text-brand-muted">Upgrade to Pro to review each block</p>
-                  </div>
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => handleModeChange("manual")}
-                  disabled={modeLoading}
-                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                    selectedMode === "manual"
-                      ? "border-brand-accent bg-brand-accentMid"
-                      : "border-brand-border bg-brand-surface hover:bg-brand-bg"
-                  }`}
-                >
-                  <p className="text-sm font-medium text-brand-text">Manual review</p>
-                  <p className="mt-0.5 text-xs text-brand-muted">Review each block before export</p>
-                </button>
-              </TierGate>
-            </div>
-          </div>
-
-          {/* CTA */}
-          <div className="space-y-3">
-            {selectedMode === "autopilot" && !hasIssues && (
-              <button
-                type="button"
-                onClick={() => triggerExport(false)}
-                disabled={exporting}
-                className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
-              >
-                {exporting ? "Exporting…" : "Download Translation"}
-              </button>
-            )}
-            {selectedMode === "autopilot" && hasIssues && (
-              <>
+            <h3 className="text-sm font-semibold text-brand-text">
+              {hasIssues ? "Review Required" : reviewMode === "manual" ? "Manual Review" : "Ready to Export"}
+            </h3>
+            <p className="mt-1 text-xs text-brand-muted">
+              {hasIssues
+                ? `${summary.issue_count} ${summary.issue_count === 1 ? "block needs" : "blocks need"} attention before export.`
+                : reviewMode === "manual"
+                  ? "Review each block before exporting."
+                  : "Your translation is ready. Download or review."}
+            </p>
+            <div className="mt-5 space-y-2.5">
+              {reviewMode === "autopilot" && !hasIssues && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => triggerExport(false)}
+                    disabled={exporting}
+                    className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
+                  >
+                    {exporting ? "Exporting…" : "Download Translation"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/translation-jobs/${jobId}`)}
+                    className="w-full rounded-full py-2.5 text-center text-sm font-medium text-brand-muted hover:text-brand-text"
+                  >
+                    Switch to full review
+                  </button>
+                </>
+              )}
+              {reviewMode === "autopilot" && hasIssues && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/translation-jobs/${jobId}`)}
+                    className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
+                  >
+                    Review {summary.issue_count} {summary.issue_count === 1 ? "issue" : "issues"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerExport(true)}
+                    disabled={exporting}
+                    className="w-full rounded-full border border-brand-border bg-brand-surface py-2.5 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
+                  >
+                    {exporting ? "Exporting…" : "Download anyway"}
+                  </button>
+                </>
+              )}
+              {reviewMode === "manual" && (
                 <button
                   type="button"
                   onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                  className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
+                  className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
                 >
-                  Review {summary.issue_count} {summary.issue_count === 1 ? "issue" : "issues"}
+                  Start Review
                 </button>
-                <button
-                  type="button"
-                  onClick={() => triggerExport(true)}
-                  disabled={exporting}
-                  className="w-full rounded-full border border-brand-border bg-brand-surface py-3 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
-                >
-                  {exporting ? "Exporting…" : "Download anyway"}
-                </button>
-              </>
-            )}
-            {selectedMode === "manual" && (
-              <button
-                type="button"
-                onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
-              >
-                Start review
-              </button>
-            )}
+              )}
+            </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-status-error">{error}</p>
-          )}
+          {/* Metadata */}
+          <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-brand-subtle">Details</h3>
+            <dl className="space-y-2.5 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-brand-muted">Tone applied</dt>
+                <dd className="font-medium text-brand-text">{toneLabel}</dd>
+              </div>
+              {memoryPercent > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-brand-muted">Memory match</dt>
+                  <dd className="font-medium text-brand-text">{memoryPercent}%</dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-brand-muted">Review priority</dt>
+                <dd className="font-medium text-brand-text">
+                  {summary.issue_count === 0 ? "None" : summary.issue_count <= 2 ? "Low" : summary.issue_count <= 5 ? "Medium" : "High"}
+                </dd>
+              </div>
+              {summary.glossary_match_count > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-brand-muted">Glossary terms</dt>
+                  <dd className="font-medium text-brand-text">{summary.glossary_match_count}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center gap-2 px-1 text-xs text-brand-subtle">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-accent" />
+            </span>
+            <span>Translated by Helvara{formattedDate ? ` · ${formattedDate}` : ""}</span>
+          </div>
+
+          {error && <p className="text-sm text-status-error">{error}</p>}
         </div>
       </div>
     </div>
