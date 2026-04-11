@@ -18,7 +18,7 @@ const LANGUAGE_OPTIONS = [
   { value: "Thai",     label: "Thai" },
 ];
 
-const ALLOWED_EXTS = new Set(["docx", "pdf", "txt"]);
+const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export function NewTranslationModal({ projects }: { projects: ProjectListItem[] }) {
@@ -40,7 +40,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
     const f = files[0];
     const ext = f.name.toLowerCase().split(".").pop() ?? "";
     if (!ALLOWED_EXTS.has(ext)) {
-      setError("Only DOCX, PDF, and TXT files are allowed.");
+      setError("Only DOCX, TXT, and RTF files are allowed.");
       return;
     }
     if (f.size > MAX_FILE_SIZE) {
@@ -158,7 +158,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".docx,.pdf,.txt"
+        accept=".docx,.txt,.rtf"
         className="hidden"
         onChange={(e) => {
           handleFiles(e.target.files);
