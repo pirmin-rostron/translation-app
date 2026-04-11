@@ -64,8 +64,15 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       fd.append("target_language", targetLang);
       fd.append("translation_style", "natural");
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+      // Invalidate immediately, then again after Celery creates the job
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
       handleClose();
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+      }, 2000);
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+      }, 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setSubmitting(false);
