@@ -78,12 +78,12 @@ const FEATURES: Feature[] = [
   {
     category: "Review",
     name: "Diff view",
-    description: "See exactly what changed between source and translated text at the segment level.",
+    description: "See exactly what changed between source and translated text at the block level.",
   },
   {
     category: "Review",
     name: "Ambiguity flags",
-    description: "Ambiguous segments are highlighted automatically so nothing slips through.",
+    description: "Ambiguous blocks are highlighted automatically so nothing slips through.",
   },
   // Export
   {
