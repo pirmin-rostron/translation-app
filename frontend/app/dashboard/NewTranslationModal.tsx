@@ -63,16 +63,19 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       fd.append("file", file);
       fd.append("target_language", targetLang);
       fd.append("translation_style", "natural");
+      const prevCount = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
-      // Invalidate immediately, then again after Celery creates the job
-      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
       handleClose();
-      setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-      }, 2000);
-      setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-      }, 5000);
+      // Poll until the new job appears in the list (Celery creates it async)
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        await queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+        const current = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
+        if (current > prevCount || attempts >= 10) {
+          clearInterval(poll);
+        }
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setSubmitting(false);

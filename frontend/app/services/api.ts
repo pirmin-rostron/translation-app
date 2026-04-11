@@ -339,6 +339,20 @@ export const overviewApi = {
     }),
 };
 
+export type JobEvent = {
+  id: number;
+  job_id: number;
+  event_type: string;
+  message: string | null;
+  metadata_json: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export const eventsApi = {
+  list: (jobId: number) =>
+    apiFetch<JobEvent[]>(`${API_URL}/translation-jobs/${jobId}/events`),
+};
+
 export const projectsApi = {
   create: (body: CreateProjectRequest) =>
     apiFetch<ProjectResponse>(`${API_URL}/projects`, {

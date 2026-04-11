@@ -149,6 +149,19 @@ class Project(Base):
     documents = relationship("Document", back_populates="project")
 
 
+class JobEvent(Base):
+    __tablename__ = "job_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("translation_jobs.id"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    message = Column(Text, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    job = relationship("TranslationJob", backref="events")
+
+
 class Document(Base):
     __tablename__ = "documents"
 

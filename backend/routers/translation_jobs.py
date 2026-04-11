@@ -140,6 +140,9 @@ def _run_translation_pipeline(translation_job_id: int, user_id: int | None = Non
         job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
         if not job:
             return
+        from services.events import record_job_event
+        record_job_event(db, job.id, "translation_started", "Translation pipeline started")
+        db.commit()
         while True:
             stage_job = (
                 db.query(ProcessingStageJob)
@@ -185,6 +188,9 @@ def _run_translation_pipeline(translation_job_id: int, user_id: int | None = Non
                     stage_job.document_id,
                     translation_job_id,
                 )
+                if stage_job.stage_name == RECONSTRUCTION_STAGE:
+                    record_job_event(db, translation_job_id, "translation_complete", "All stages complete, ready for review")
+                    db.commit()
                 if stage_job.stage_name == TRANSLATION_STAGE:
                     _job = db.query(TranslationJob).filter(TranslationJob.id == translation_job_id).first()
                     word_count = 0
@@ -214,6 +220,7 @@ def _run_translation_pipeline(translation_job_id: int, user_id: int | None = Non
                     failed_stage.status = "failed"
                     failed_stage.error_message = str(exc)
                     failed_stage.finished_at = datetime.utcnow()
+                record_job_event(db, translation_job_id, "error", str(exc), {"stage": stage_job.stage_name})
                 db.commit()
                 logger.exception(
                     "Stage failure: stage=%s document_id=%d translation_job_id=%d",
@@ -1838,6 +1845,8 @@ def mark_ready_for_export(
         )
 
     job.status = JOB_STATUS_READY_FOR_EXPORT
+    from services.events import record_job_event
+    record_job_event(db, job.id, "review_complete", "All blocks resolved, ready for export")
     db.commit()
     db.refresh(job)
     if job.org_id is not None:
@@ -1926,6 +1935,8 @@ def export_translation_job(
     )
     job.status = JOB_STATUS_EXPORTED
     job.last_saved_at = exported_at
+    from services.events import record_job_event
+    record_job_event(db, job.id, "export_complete", f"Exported as {normalized_export_format}", {"filename": filename, "format": normalized_export_format, "mode": effective_export_mode})
     db.commit()
     uid = current_user.id if current_user is not None else None
     record_event(db, JOB_EXPORTED, user_id=uid, job_id=job_id, document_id=job.document_id, org_id=job.org_id)
@@ -2091,6 +2102,53 @@ def update_review_mode(
     return {"id": job.id, "review_mode": job.review_mode}
 
 
+class JobEventResponse(BaseModel):
+    id: int
+    job_id: int
+    event_type: str
+    message: Optional[str]
+    metadata_json: Optional[dict]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{job_id}/events", response_model=list[JobEventResponse])
+def get_job_events(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return chronological event log for a translation job."""
+    from models import JobEvent
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    events = (
+        db.query(JobEvent)
+        .filter(JobEvent.job_id == job_id)
+        .order_by(JobEvent.created_at.asc())
+        .all()
+    )
+    return [
+        JobEventResponse(
+            id=e.id,
+            job_id=e.job_id,
+            event_type=e.event_type,
+            message=e.message,
+            metadata_json=e.metadata_json,
+            created_at=e.created_at.isoformat() if e.created_at else "",
+        )
+        for e in events
+    ]
+
+
+
 @router.get("/{job_id}/preview", response_model=PreviewResponse)
 def preview_translation_job(
     job_id: int,
@@ -2224,6 +2282,9 @@ def update_translation_result(
 
     uid = current_user.id if current_user is not None else None
     if review_status in {"approved", "edited"}:
+        from services.events import record_job_event
+        record_job_event(db, result.job_id, "block_approved", f"Result {result.id} {review_status}", {"result_id": result.id, "review_status": review_status})
+        db.commit()
         logger.info(
             "Saved reviewed translation result_id=%d review_status=%s and stored translation memory",
             result.id,
