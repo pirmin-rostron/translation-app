@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { documentsApi } from "../services/api";
+import { documentsApi, queryKeys } from "../services/api";
 import type { ProjectListItem } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 
@@ -22,7 +22,7 @@ const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export function NewTranslationModal({ projects }: { projects: ProjectListItem[] }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.translationModalOpen);
   const closeModal = useDashboardStore((s) => s.closeTranslationModal);
 
@@ -63,9 +63,9 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       fd.append("file", file);
       fd.append("target_language", targetLang);
       fd.append("translation_style", "natural");
-      const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      await documentsApi.uploadAndTranslate<{ id: number }>(fd);
       handleClose();
-      router.push(`/processing/${result.id}`);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setSubmitting(false);

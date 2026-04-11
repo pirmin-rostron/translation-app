@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries";
@@ -11,7 +11,6 @@ import { TierGate } from "../components/TierGate";
 import { SplitButton } from "./SplitButton";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
-import type { ProjectListItem } from "../services/api";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,18 +19,14 @@ function getFirstName(fullName: string | null | undefined, email: string): strin
   return email.split("@")[0];
 }
 
-function formatNumber(n: number): string {
-  if (n >= 1000) return `${Math.round(n / 1000)}k`;
-  return String(n);
-}
+// ─── Processing status helpers ──────────────────────────────────────────────
 
-// ─── Sample stats (placeholder until API endpoint exists) ────────────────────
-
-const SAMPLE_STATS = {
-  activeProjects: 10,
-  wordsTranslated: 84000,
-  pendingReview: 3,
-} as const;
+const PROCESSING_STATUSES = new Set([
+  "queued",
+  "parsing",
+  "translating",
+  "translation_queued",
+]);
 
 // ─── Status badge classes ────────────────────────────────────────────────────
 
@@ -39,18 +34,25 @@ function statusBadgeClasses(status: string): string {
   switch (status) {
     case "In Review":
       return "bg-brand-accent/[0.12] text-brand-accent";
-    case "In Progress":
+    case "Completed":
+    case "Ready for Export":
+      return "bg-green-50 text-green-700";
+    case "Failed":
+      return "bg-status-errorBg text-status-error";
+    case "Translating…":
       return "bg-brand-bg text-brand-muted";
-    case "Pending":
-      return "bg-status-warningBg text-status-warning";
     default:
       return "bg-brand-bg text-brand-muted";
   }
 }
 
+function isProcessing(rawStatus: string): boolean {
+  return PROCESSING_STATUSES.has(rawStatus);
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatCard({ label, value, delta }: { label: string; value: string; delta: string }) {
+function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle: string }) {
   return (
     <div className="group rounded-lg border border-brand-border bg-brand-surface p-6 transition-colors hover:border-t-2 hover:border-t-brand-accent">
       <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
@@ -60,73 +62,68 @@ function StatCard({ label, value, delta }: { label: string; value: string; delta
         {value}
       </p>
       <p className="font-sans text-xs text-brand-accent">
-        {delta}
+        {subtitle}
       </p>
     </div>
   );
 }
 
-function ProgressBar({ percent }: { percent: number }) {
-  return (
-    <div className="flex min-w-[120px] items-center gap-2">
-      <div className="h-1 flex-1 overflow-hidden rounded-sm bg-brand-border">
-        <div
-          className="h-full rounded-sm bg-brand-accent transition-[width] duration-300 ease-out"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      <span className="min-w-[2rem] text-right font-sans text-xs text-brand-muted">
-        {percent}%
-      </span>
-    </div>
-  );
-}
-
 function StatusBadge({ status }: { status: string }) {
+  const processing = status === "Translating…";
   return (
     <span
-      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium ${statusBadgeClasses(status)}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium ${statusBadgeClasses(status)} ${processing ? "animate-pulse" : ""}`}
     >
+      {processing && (
+        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
       {status}
     </span>
   );
 }
 
 function TranslationRow({ t }: { t: DashboardTranslation }) {
+  const processing = isProcessing(t.raw_status);
+
+  if (processing) {
+    return (
+      <tr className="cursor-not-allowed opacity-60">
+        <td className="px-5 py-3.5 font-sans text-sm font-medium text-brand-text">
+          {t.document_name ?? `Document #${t.id}`}
+        </td>
+        <td className={`px-5 py-3.5 font-sans text-sm ${t.project_name ? "text-brand-muted" : "italic text-brand-subtle"}`}>
+          {t.project_name ?? "No project"}
+        </td>
+        <td className="px-5 py-3.5 font-sans text-[0.8125rem] text-brand-muted">
+          {t.source_language} → {t.target_language}
+        </td>
+        <td className="px-5 py-3.5">
+          <StatusBadge status={t.status} />
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr className="cursor-pointer transition-colors hover:bg-brand-bg">
       <td className="px-5 py-3.5">
-        <Link href={`/translation-jobs/${t.id}`} className="font-sans text-sm font-medium text-brand-text no-underline hover:underline">
+        <Link href={`/translation-jobs/${t.id}/overview`} className="font-sans text-sm font-medium text-brand-text no-underline hover:underline">
           {t.document_name ?? `Document #${t.id}`}
         </Link>
       </td>
-      <td
-        className={`px-5 py-3.5 font-sans text-sm ${
-          t.project_name
-            ? "text-brand-muted"
-            : "italic text-brand-subtle"
-        }`}
-      >
+      <td className={`px-5 py-3.5 font-sans text-sm ${t.project_name ? "text-brand-muted" : "italic text-brand-subtle"}`}>
         {t.project_name ?? "No project"}
       </td>
       <td className="px-5 py-3.5 font-sans text-[0.8125rem] text-brand-muted">
         {t.source_language} → {t.target_language}
       </td>
       <td className="px-5 py-3.5">
-        <ProgressBar percent={t.progress} />
-      </td>
-      <td className="px-5 py-3.5">
         <StatusBadge status={t.status} />
       </td>
     </tr>
-  );
-}
-
-function TermChip({ label }: { label: string }) {
-  return (
-    <span className="whitespace-nowrap rounded-full bg-brand-accent/[0.08] px-2.5 py-1 font-sans text-[0.6875rem] font-medium text-brand-accent">
-      {label}
-    </span>
   );
 }
 
@@ -145,13 +142,22 @@ export default function DashboardPage() {
     if (hasHydrated && !token) router.replace("/login");
   }, [hasHydrated, token, router]);
 
-  // Server state via React Query — placeholderData ensures page always renders
-  const { data: translations } = useDashboardTranslations();
+  // Server state via React Query — poll faster when jobs are processing
+  const [hasProcessingJobs, setHasProcessingJobs] = useState(false);
+  const { data: translations } = useDashboardTranslations(hasProcessingJobs);
   const { data: tierData } = useTier();
   const { data: projectList } = useProjects();
 
-  // Stats — placeholder until endpoint exists
-  const stats = SAMPLE_STATS;
+  useEffect(() => {
+    const processing = (translations ?? []).some((t) => isProcessing(t.raw_status));
+    setHasProcessingJobs(processing);
+  }, [translations]);
+
+  // Compute real stats from fetched data
+  const activeProjectCount = projectList?.length ?? 0;
+  const pendingReviewCount = (translations ?? []).filter(
+    (t) => t.raw_status === "in_review" || t.raw_status === "review"
+  ).length;
 
   if (!hasHydrated) return null;
   if (!token) return null;
@@ -181,21 +187,16 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="mb-10 grid grid-cols-3 gap-4">
+        <div className="mb-10 grid grid-cols-2 gap-4">
           <StatCard
             label="Active Projects"
-            value={String(stats.activeProjects)}
-            delta="↑ 2 this month"
-          />
-          <StatCard
-            label="Words Translated"
-            value={formatNumber(stats.wordsTranslated)}
-            delta="↑ 12,400 this week"
+            value={String(activeProjectCount)}
+            subtitle={activeProjectCount === 1 ? "1 project" : `${activeProjectCount} projects`}
           />
           <StatCard
             label="Pending Review"
-            value={String(stats.pendingReview)}
-            delta="Awaiting approval"
+            value={String(pendingReviewCount)}
+            subtitle="Awaiting approval"
           />
         </div>
 
@@ -289,19 +290,11 @@ export default function DashboardPage() {
         {hasTranslations ? (
           <div className="mb-10">
             {/* Section header */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="font-display text-xl font-bold text-brand-text">
-                  Active Translations
-                </h2>
-                <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
-              </div>
-              <Link
-                href="/dashboard"
-                className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
-              >
-                View all →
-              </Link>
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="font-display text-xl font-bold text-brand-text">
+                Active Translations
+              </h2>
+              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
             </div>
 
             {/* Table card */}
@@ -309,7 +302,7 @@ export default function DashboardPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-brand-border">
-                    {["Document", "Project", "Language", "Progress", "Status"].map((col) => (
+                    {["Document", "Project", "Language", "Status"].map((col) => (
                       <th
                         key={col}
                         className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
@@ -345,47 +338,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Bottom Cards ── */}
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* Connected Glossary */}
-          <div className="rounded-lg border border-brand-border bg-brand-surface p-6">
-            <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
-              CONNECTED GLOSSARY
-            </p>
-            <h3 className="mb-1.5 font-display text-lg font-bold text-brand-text">
-              Legal &amp; Compliance Terms
-            </h3>
-            <p className="mb-4 font-sans text-[0.8125rem] text-brand-muted">
-              218 terms enforced across all active projects.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              <TermChip label="Force Majeure" />
-              <TermChip label="Indemnification" />
-              <TermChip label="Jurisdiction" />
-              <TermChip label="Confidentiality" />
-              <span className="self-center px-2.5 py-1 font-sans text-[0.6875rem] font-medium text-brand-subtle">
-                +214 more
-              </span>
-            </div>
-          </div>
-
-          {/* Translation Memory */}
-          <div className="rounded-lg bg-brand-accent p-6">
-            <p className="mb-3 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accentMid">
-              TRANSLATION MEMORY
-            </p>
-            <p className="mb-2 font-display text-[3.25rem] font-bold leading-none text-white">
-              60%
-            </p>
-            <span className="mb-3 inline-block rounded-full bg-white/20 px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium text-white">
-              High Reuse · High Efficiency
-            </span>
-            <p className="font-sans text-[0.8125rem] leading-normal text-brand-accentMid">
-              Approved translations are automatically surfaced for similar content.
-            </p>
-          </div>
-        </div>
 
       </div>
 
