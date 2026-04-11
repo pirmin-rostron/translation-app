@@ -285,6 +285,22 @@ The Obsidian vault at `/Users/pirmin/Documents/Projects/Helvara_obsidian_vault` 
 
 ---
 
+## Terminology
+
+Always use these terms consistently in code, comments, UI copy, and conversation. See Obsidian vault/Helvara Terminology.md for the full glossary.
+
+### Key terms
+- **Block** — not segment, not content unit
+- **Translation Job** — not translation (when referring to the job object)
+- **Autopilot mode** — not auto, not quick mode
+- **Manual review mode** — not expert mode, not full review
+- **Overview** — the post-processing screen (PIR-69)
+- **Human override** — when a user rewrites a translated block
+- **Reference Document** — training material uploaded by user, not translated
+- **Project** — named container for documents + settings
+
+---
+
 ## Golden Rule
 
 If uncertain, prioritise architecture + UX guardrails over shortcuts.
