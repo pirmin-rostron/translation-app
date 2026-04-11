@@ -77,8 +77,9 @@ export default function OverviewPage() {
     setExporting(true);
     setError("");
     try {
-      // Mark ready for export if needed, then export
-      await translationJobsApi.markReady<unknown>(jobId).catch(() => {});
+      // Autopilot flow: bulk-approve safe segments → mark ready → export
+      await translationJobsApi.approveSafeSegments<unknown>(jobId);
+      await translationJobsApi.markReady<unknown>(jobId);
       const result = await translationJobsApi.export<ExportResult>(jobId, "docx", "preserve_formatting");
       // Trigger download
       if (result.download_url) {
