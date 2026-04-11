@@ -318,6 +318,11 @@ This has caused migration failures twice. Check every new non-nullable column be
 ### API path mismatches
 Always verify the full URL path including router prefix when writing frontend API calls. The translation jobs router has prefix /translation-jobs — endpoints under it are /translation-jobs/{endpoint}, not /{endpoint}. Check main.py for the registered prefix before writing any new API call.
 
+### init_db create_all vs Alembic migrations
+init_db() calls Base.metadata.create_all() on startup, which creates tables that don't exist. If a new model is added and the server restarts before the migration runs, the table already exists. The migration will then fail with "table already exists".
+Fix: ssh to production and run: `docker compose exec -T backend alembic stamp {revision_id}`
+This marks the migration as applied without running it.
+
 ---
 
 ## Golden Rule
