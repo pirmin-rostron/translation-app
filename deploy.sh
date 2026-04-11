@@ -20,15 +20,17 @@ echo "=== Deploying Helvara ==="
 
 # ── Step 1: Build images locally ──────────────────────────────────────────────
 
-echo "--- Building frontend image locally ---"
-docker build \
+PLATFORM="linux/amd64"
+
+echo "--- Building frontend image locally (${PLATFORM}) ---"
+docker build --platform "$PLATFORM" \
   --build-arg NEXT_PUBLIC_API_URL=/api \
   --build-arg NEXT_PUBLIC_POSTHOG_KEY="${NEXT_PUBLIC_POSTHOG_KEY:-}" \
   --build-arg NEXT_PUBLIC_POSTHOG_HOST="${NEXT_PUBLIC_POSTHOG_HOST:-https://eu.i.posthog.com}" \
   -t app-frontend:latest "$PROJECT_DIR/frontend"
 
-echo "--- Building backend image locally ---"
-docker build -t app-backend:latest "$PROJECT_DIR/backend"
+echo "--- Building backend image locally (${PLATFORM}) ---"
+docker build --platform "$PLATFORM" -t app-backend:latest "$PROJECT_DIR/backend"
 
 # ── Step 2: Transfer images to server ─────────────────────────────────────────
 
