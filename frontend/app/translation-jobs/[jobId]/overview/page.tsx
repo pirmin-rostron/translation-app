@@ -73,15 +73,19 @@ export default function OverviewPage() {
     }
   }
 
-  async function handleDownload() {
+  async function triggerExport(approveAll: boolean) {
     setExporting(true);
     setError("");
     try {
-      // Autopilot flow: bulk-approve safe segments → mark ready → export
-      await translationJobsApi.approveSafeSegments<unknown>(jobId);
+      if (approveAll) {
+        // "Download anyway" — force-approve ALL segments including ambiguous ones
+        await translationJobsApi.approveAllSegments<unknown>(jobId);
+      } else {
+        // Clean download — only approve safe (non-ambiguous) segments
+        await translationJobsApi.approveSafeSegments<unknown>(jobId);
+      }
       await translationJobsApi.markReady<unknown>(jobId);
       const result = await translationJobsApi.export<ExportResult>(jobId, "docx", "preserve_formatting");
-      // Trigger download
       if (result.download_url) {
         const { useAuthStore } = await import("../../../stores/authStore");
         const authToken = useAuthStore.getState().token;
@@ -222,7 +226,7 @@ export default function OverviewPage() {
             {selectedMode === "autopilot" && !hasIssues && (
               <button
                 type="button"
-                onClick={handleDownload}
+                onClick={() => triggerExport(false)}
                 disabled={exporting}
                 className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
               >
@@ -240,7 +244,7 @@ export default function OverviewPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleDownload}
+                  onClick={() => triggerExport(true)}
                   disabled={exporting}
                   className="w-full rounded-full border border-brand-border bg-brand-surface py-3 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
                 >

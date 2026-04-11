@@ -1782,6 +1782,42 @@ def approve_safe_segments(
     return _calculate_review_summary(db, job)
 
 
+@router.post("/{job_id}/approve-all-segments", response_model=ReviewSummaryResponse)
+def approve_all_segments(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Force-approve all segments regardless of ambiguity or memory status.
+
+    Used by Autopilot 'Download anyway' when the user accepts the translation
+    despite unresolved issues.
+    """
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.status == JOB_STATUS_EXPORTED:
+        raise HTTPException(status_code=400, detail="Cannot approve segments after export")
+
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    changed = 0
+    for result in results:
+        if _is_acceptable_final_status(result.review_status):
+            continue
+        if not (result.final_translation or "").strip():
+            continue
+        result.review_status = "approved"
+        changed += 1
+
+    if changed > 0 and job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
+        summary = _calculate_review_summary(db, job)
+        job.status = JOB_STATUS_REVIEW_COMPLETE if summary.review_complete else JOB_STATUS_IN_REVIEW
+
+    db.commit()
+    logger.info("Force-approved all segments for translation_job_id=%d count=%d", job.id, changed)
+    return _calculate_review_summary(db, job)
+
+
 @router.post("/{job_id}/ready-for-export", response_model=ReviewSummaryResponse)
 def mark_ready_for_export(
     job_id: int,

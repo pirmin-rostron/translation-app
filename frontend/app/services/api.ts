@@ -209,6 +209,9 @@ export const translationJobsApi = {
   markReady: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/mark-ready`, { method: "POST" }),
 
+  approveAllSegments: <T>(jobId: number) =>
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/approve-all-segments`, { method: "POST" }),
+
   approveSafeSegments: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/approve-safe-segments`, { method: "POST" }),
 
