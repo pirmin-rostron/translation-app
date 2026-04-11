@@ -18,27 +18,48 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Deploying Helvara ==="
 
-# ── Step 1: Build images locally ──────────────────────────────────────────────
+# ── Step 1: Build images locally (in parallel) ──────────────────────────────
 
 PLATFORM="linux/amd64"
 
+# Check if backend files changed since last deploy
+BACKEND_CHANGED=true
+if git diff HEAD~1 --name-only 2>/dev/null | grep -q "^backend/"; then
+  BACKEND_CHANGED=true
+else
+  BACKEND_CHANGED=false
+fi
+
 echo "--- Building frontend image locally (${PLATFORM}) ---"
 docker build --platform "$PLATFORM" \
+  --cache-from app-frontend:latest \
   --build-arg NEXT_PUBLIC_API_URL=/api \
   --build-arg NEXT_PUBLIC_POSTHOG_KEY="${NEXT_PUBLIC_POSTHOG_KEY:-}" \
   --build-arg NEXT_PUBLIC_POSTHOG_HOST="${NEXT_PUBLIC_POSTHOG_HOST:-https://eu.i.posthog.com}" \
-  -t app-frontend:latest "$PROJECT_DIR/frontend"
+  -t app-frontend:latest "$PROJECT_DIR/frontend" &
 
-echo "--- Building backend image locally (${PLATFORM}) ---"
-docker build --platform "$PLATFORM" -t app-backend:latest "$PROJECT_DIR/backend"
+if [ "$BACKEND_CHANGED" = true ]; then
+  echo "--- Building backend image locally (${PLATFORM}) ---"
+  docker build --platform "$PLATFORM" \
+    --cache-from app-backend:latest \
+    -t app-backend:latest "$PROJECT_DIR/backend" &
+else
+  echo "--- Skipping backend build (no backend files changed) ---"
+fi
+
+wait
 
 # ── Step 2: Transfer images to server ─────────────────────────────────────────
 
 echo "--- Transferring frontend image to server ---"
 docker save app-frontend:latest | gzip | $SSH "docker load"
 
-echo "--- Transferring backend image to server ---"
-docker save app-backend:latest | gzip | $SSH "docker load"
+if [ "$BACKEND_CHANGED" = true ]; then
+  echo "--- Transferring backend image to server ---"
+  docker save app-backend:latest | gzip | $SSH "docker load"
+else
+  echo "--- Skipping backend image transfer (no changes) ---"
+fi
 
 # ── Step 3: Pull code and restart on server ───────────────────────────────────
 
