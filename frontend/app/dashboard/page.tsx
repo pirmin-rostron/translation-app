@@ -154,6 +154,7 @@ export default function DashboardPage() {
   }, [translations]);
 
   // Compute real stats from fetched data
+  const totalDocuments = (translations ?? []).length;
   const activeProjectCount = projectList?.length ?? 0;
   const pendingReviewCount = (translations ?? []).filter(
     (t) => t.raw_status === "in_review" || t.raw_status === "review"
@@ -187,7 +188,12 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="mb-10 grid grid-cols-2 gap-4">
+        <div className="mb-10 grid grid-cols-3 gap-4">
+          <StatCard
+            label="Total Documents"
+            value={String(totalDocuments)}
+            subtitle={totalDocuments === 1 ? "1 document" : `${totalDocuments} documents`}
+          />
           <StatCard
             label="Active Projects"
             value={String(activeProjectCount)}

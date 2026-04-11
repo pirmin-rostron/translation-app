@@ -64,8 +64,8 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       fd.append("target_language", targetLang);
       fd.append("translation_style", "natural");
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
       handleClose();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setSubmitting(false);
