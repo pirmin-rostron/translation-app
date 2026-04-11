@@ -4,10 +4,28 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../../../stores/authStore";
-import { overviewApi } from "../../../services/api";
+import { API_URL, overviewApi, translationJobsApi } from "../../../services/api";
 import type { OverviewResponse } from "../../../services/api";
 import { TierGate } from "../../../components/TierGate";
 import { getLanguageDisplayName } from "../../../utils/language";
+
+type PreviewData = {
+  job_id: number;
+  document_name: string;
+  content_raw: string;
+  content_display: string;
+};
+
+type ExportResult = {
+  job_id: number;
+  status: string;
+  export_format: string;
+  export_mode: string;
+  filename: string;
+  download_url: string;
+  generated_at: string;
+  version: number;
+};
 
 export default function OverviewPage() {
   const params = useParams();
@@ -17,10 +35,12 @@ export default function OverviewPage() {
   const jobId = Number(params.jobId);
 
   const [data, setData] = useState<OverviewResponse | null>(null);
+  const [preview, setPreview] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedMode, setSelectedMode] = useState<"autopilot" | "manual">("autopilot");
   const [modeLoading, setModeLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -28,11 +48,14 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (!token || Number.isNaN(jobId)) return;
-    overviewApi
-      .get(jobId)
-      .then((res) => {
-        setData(res);
-        setSelectedMode((res.review_mode as "autopilot" | "manual") ?? "autopilot");
+    Promise.all([
+      overviewApi.get(jobId),
+      translationJobsApi.getPreview<PreviewData>(jobId).catch(() => null),
+    ])
+      .then(([overviewRes, previewRes]) => {
+        setData(overviewRes);
+        setPreview(previewRes);
+        setSelectedMode((overviewRes.review_mode as "autopilot" | "manual") ?? "autopilot");
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load overview"))
       .finally(() => setLoading(false));
@@ -44,16 +67,44 @@ export default function OverviewPage() {
     try {
       await overviewApi.setReviewMode(jobId, mode);
     } catch {
-      // Revert on failure
       setSelectedMode(selectedMode);
     } finally {
       setModeLoading(false);
     }
   }
 
+  async function handleDownload() {
+    setExporting(true);
+    setError("");
+    try {
+      // Mark ready for export if needed, then export
+      await translationJobsApi.markReady<unknown>(jobId).catch(() => {});
+      const result = await translationJobsApi.export<ExportResult>(jobId, "docx", "preserve_formatting");
+      // Trigger download
+      if (result.download_url) {
+        const { useAuthStore } = await import("../../../stores/authStore");
+        const authToken = useAuthStore.getState().token;
+        const headers: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+        const res = await fetch(`${API_URL}${result.download_url}`, { headers });
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = result.filename ?? "export.docx";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (!hasHydrated || !token) return null;
   if (loading) return <div className="min-h-screen bg-brand-bg pt-20 px-6">Loading…</div>;
-  if (error) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">{error}</div>;
+  if (error && !data) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">{error}</div>;
   if (!data) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">Not found</div>;
 
   const { summary } = data;
@@ -63,10 +114,11 @@ export default function OverviewPage() {
     <div className="min-h-screen bg-brand-bg">
       {/* Header */}
       <header className="sticky top-0 z-10 flex h-14 items-center border-b border-brand-border bg-brand-surface px-6">
-        <Link href="/dashboard" className="text-brand-subtle hover:text-brand-text no-underline">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 12L6 8l4-4" /></svg>
+        <Link href="/dashboard" className="text-sm text-brand-subtle no-underline hover:text-brand-text">
+          ← Dashboard
         </Link>
-        <span className="ml-3 max-w-[240px] truncate text-sm font-medium text-brand-text">
+        <span className="mx-3 text-brand-border">|</span>
+        <span className="max-w-[240px] truncate text-sm font-medium text-brand-text">
           {data.document_name}
         </span>
         <span className="ml-4 rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
@@ -75,33 +127,17 @@ export default function OverviewPage() {
       </header>
 
       <div className="mx-auto flex max-w-[1200px] gap-8 px-8 py-10">
-        {/* Left column — document preview */}
-        <div className="flex-[3] min-w-0">
+        {/* Left column — full translated document */}
+        <div className="min-w-0 flex-[3]">
           <h2 className="mb-6 font-display text-2xl font-bold text-brand-text">Translation Overview</h2>
 
-          <div className="space-y-4">
-            {data.blocks_preview.map((block, i) => (
-              <div
-                key={i}
-                className={`rounded-lg border p-5 ${
-                  block.has_issue
-                    ? "border-status-warning/30 bg-status-warningBg"
-                    : "border-brand-border bg-brand-surface"
-                }`}
-              >
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-subtle">Block {i + 1}</p>
-                <p className="mt-2 text-sm leading-relaxed text-brand-text">{block.translated_text || "—"}</p>
-                {block.has_issue && (
-                  <span className="mt-2 inline-block rounded-full bg-status-warning/10 px-2.5 py-0.5 text-xs font-medium text-status-warning">
-                    Needs review
-                  </span>
-                )}
-              </div>
-            ))}
-            {summary.total_blocks > 3 && (
-              <p className="text-center text-xs text-brand-subtle">
-                + {summary.total_blocks - 3} more blocks
-              </p>
+          <div className="rounded-xl border border-brand-border bg-brand-surface p-8">
+            {preview?.content_display ? (
+              <article className="whitespace-pre-wrap text-[15px] leading-7 text-brand-text">
+                {preview.content_display}
+              </article>
+            ) : (
+              <p className="text-sm text-brand-muted">Translation preview not available.</p>
             )}
           </div>
         </div>
@@ -185,10 +221,11 @@ export default function OverviewPage() {
             {selectedMode === "autopilot" && !hasIssues && (
               <button
                 type="button"
-                onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
+                onClick={handleDownload}
+                disabled={exporting}
+                className="w-full rounded-full bg-brand-accent py-3 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
               >
-                Download Translation
+                {exporting ? "Exporting…" : "Download Translation"}
               </button>
             )}
             {selectedMode === "autopilot" && hasIssues && (
@@ -202,10 +239,11 @@ export default function OverviewPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                  className="w-full rounded-full border border-brand-border bg-brand-surface py-3 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg"
+                  onClick={handleDownload}
+                  disabled={exporting}
+                  className="w-full rounded-full border border-brand-border bg-brand-surface py-3 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
                 >
-                  Download anyway
+                  {exporting ? "Exporting…" : "Download anyway"}
                 </button>
               </>
             )}
@@ -219,6 +257,10 @@ export default function OverviewPage() {
               </button>
             )}
           </div>
+
+          {error && (
+            <p className="text-sm text-status-error">{error}</p>
+          )}
         </div>
       </div>
     </div>
