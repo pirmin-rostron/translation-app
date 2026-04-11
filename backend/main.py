@@ -13,7 +13,7 @@ from sqlalchemy import text
 from database import SessionLocal, engine, init_db
 from limiter import limiter
 from models import Document, TranslationJob
-from routers import auth, documents, glossary_terms, stats, translation_jobs, waitlist
+from routers import auth, documents, glossary_terms, projects, stats, translation_jobs, waitlist
 from seeds import seed_initial_admin
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
@@ -45,6 +45,7 @@ Path("uploads").mkdir(exist_ok=True)
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(glossary_terms.router)
+app.include_router(projects.router)
 app.include_router(translation_jobs.router)
 app.include_router(waitlist.router)
 app.include_router(stats.router)

@@ -273,6 +273,52 @@ export const tierApi = {
   get: () => apiFetch<TierResponse>(`${API_URL}/auth/tier`),
 };
 
+export type ProjectResponse = {
+  id: number;
+  org_id: number;
+  name: string;
+  target_languages: string[];
+  default_tone: string;
+  document_count: number;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type ProjectDetailResponse = ProjectResponse & {
+  documents: {
+    id: number;
+    filename: string;
+    status: string;
+    target_language: string;
+    created_at: string;
+  }[];
+};
+
+export type CreateProjectRequest = {
+  name: string;
+  target_languages?: string[];
+  default_tone?: string;
+};
+
+export const projectsApi = {
+  create: (body: CreateProjectRequest) =>
+    apiFetch<ProjectResponse>(`${API_URL}/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  list: () => apiFetch<ProjectResponse[]>(`${API_URL}/projects`),
+  get: (id: number) => apiFetch<ProjectDetailResponse>(`${API_URL}/projects/${id}`),
+  update: (id: number, body: Partial<CreateProjectRequest>) =>
+    apiFetch<ProjectResponse>(`${API_URL}/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  delete: (id: number) =>
+    apiFetch<void>(`${API_URL}/projects/${id}`, { method: "DELETE" }),
+};
+
 // --- admin types and api ---
 
 export type WaitlistEntry = {

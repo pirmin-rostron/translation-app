@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations, useTier } from "../hooks/queries";
+import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
+import { TierGate } from "../components/TierGate";
 import { SplitButton } from "./SplitButton";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
@@ -137,6 +138,7 @@ export default function DashboardPage() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
+  const openProjectModal = useDashboardStore((s) => s.openProjectModal);
 
   // Redirect to login if unauthenticated
   useEffect(() => {
@@ -146,12 +148,10 @@ export default function DashboardPage() {
   // Server state via React Query — placeholderData ensures page always renders
   const { data: translations } = useDashboardTranslations();
   const { data: tierData } = useTier();
+  const { data: projectList } = useProjects();
 
   // Stats — placeholder until endpoint exists
   const stats = SAMPLE_STATS;
-
-  // Projects — placeholder until endpoint exists
-  const projects: ProjectListItem[] = [];
 
   if (!hasHydrated) return null;
   if (!token) return null;
@@ -198,6 +198,64 @@ export default function DashboardPage() {
             delta="Awaiting approval"
           />
         </div>
+
+        {/* ── Projects ── */}
+        {(projectList && projectList.length > 0) && (
+          <div className="mb-10">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-xl font-bold text-brand-text">Projects</h2>
+                <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+              </div>
+              <TierGate feature="create_projects" tier={tierData?.tier ?? "free"}>
+                <button
+                  type="button"
+                  onClick={openProjectModal}
+                  className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
+                >
+                  + New Project
+                </button>
+              </TierGate>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {projectList.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/projects/${p.id}`}
+                  className="group rounded-lg border border-brand-border bg-brand-surface p-5 no-underline transition-colors hover:border-brand-accent"
+                >
+                  <p className="font-sans text-sm font-medium text-brand-text group-hover:text-brand-accent">{p.name}</p>
+                  <div className="mt-2 flex items-center gap-3 text-xs text-brand-muted">
+                    <span>{p.document_count} {p.document_count === 1 ? "doc" : "docs"}</span>
+                    {p.target_languages.length > 0 && (
+                      <span>{p.target_languages.join(", ")}</span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-brand-subtle">
+                    {p.default_tone.charAt(0).toUpperCase() + p.default_tone.slice(1)} tone
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {(!projectList || projectList.length === 0) && tierData && tierData.tier !== "free" && (
+          <div className="mb-10">
+            <TierGate feature="create_projects" tier={tierData.tier}>
+              <div className="rounded-lg border border-brand-border bg-brand-surface px-8 py-10 text-center">
+                <p className="font-display text-lg font-bold text-brand-text">No projects yet</p>
+                <p className="mt-1 font-sans text-sm text-brand-muted">Create a project to group documents together.</p>
+                <button
+                  type="button"
+                  onClick={openProjectModal}
+                  className="mt-4 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
+                >
+                  + New Project
+                </button>
+              </div>
+            </TierGate>
+          </div>
+        )}
 
         {/* ── Usage Indicator ── */}
         {tierData && tierData.limits.max_jobs !== null && tierData.jobs_this_month > tierData.limits.max_jobs * 0.5 && (
@@ -332,7 +390,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Modals ── */}
-      <NewTranslationModal projects={projects} />
+      <NewTranslationModal projects={[]} />
       <NewProjectModal />
     </div>
   );

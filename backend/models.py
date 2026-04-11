@@ -132,6 +132,21 @@ class GlossaryTerm(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    target_languages = Column(JSONB, nullable=False, default=list)
+    default_tone = Column(String(30), nullable=False, default="neutral")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
+    documents = relationship("Document", back_populates="project")
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -145,12 +160,15 @@ class Document(Base):
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
     org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True, index=True)
+    tone_override = Column(String(30), nullable=True)
     content_hash = Column(String, nullable=True, index=True)
     status = Column(String(50), nullable=False, default="uploaded")
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     deleted_at = Column(DateTime, nullable=True, default=None)
 
+    project = relationship("Project", back_populates="documents")
     blocks = relationship("DocumentBlock", back_populates="document")
     segments = relationship("DocumentSegment", back_populates="document")
     stage_jobs = relationship("ProcessingStageJob", back_populates="document")

@@ -9,11 +9,13 @@ import {
   translationResultsApi,
   usageApi,
   tierApi,
+  projectsApi,
 } from "../services/api";
 import type {
   TranslationJobListItem,
   UsageResponse,
   TierResponse,
+  ProjectResponse,
 } from "../services/api";
 
 // ---------------------------------------------------------------------------
@@ -301,6 +303,14 @@ export function useTier() {
     queryKey: ["tier"],
     queryFn: () => tierApi.get(),
     staleTime: 60_000,
+  });
+}
+
+export function useProjects() {
+  return useQuery<ProjectResponse[]>({
+    queryKey: ["projects"],
+    queryFn: () => projectsApi.list(),
+    staleTime: 30_000,
   });
 }
 
