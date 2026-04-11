@@ -63,6 +63,8 @@ class TranslationJob(Base):
     industry = Column(String(100), nullable=True)
     domain = Column(String(100), nullable=True)
     translation_style = Column(String(20), nullable=False, default="natural")
+    review_mode = Column(String(20), nullable=False, default="autopilot")
+    tone = Column(String(30), nullable=True)
     status = Column(String(50), nullable=False, default="queued")
     error_message = Column(Text, nullable=True)
     last_saved_at = Column(DateTime, nullable=True)

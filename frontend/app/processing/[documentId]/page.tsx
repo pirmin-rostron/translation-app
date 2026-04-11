@@ -321,13 +321,13 @@ export default function ProcessingPage() {
   useEffect(() => {
     if (!latestJob || translationDone) return;
     if (!translationProgress || translationProgress.blocks_completed < 10) return;
-    router.replace(`/translation-jobs/${latestJob.id}?page=1`);
+    router.replace(`/translation-jobs/${latestJob.id}/overview`);
   }, [latestJob, translationDone, translationProgress, router]);
 
   useEffect(() => {
     if (!translationDone || !latestJob) return;
     const timer = window.setTimeout(() => {
-      router.replace(`/translation-jobs/${latestJob.id}?page=1`);
+      router.replace(`/translation-jobs/${latestJob.id}/overview`);
     }, 2200);
     return () => window.clearTimeout(timer);
   }, [latestJob, router, translationDone]);
@@ -490,7 +490,7 @@ export default function ProcessingPage() {
               </p>
               <button
                 type="button"
-                onClick={() => router.replace(`/translation-jobs/${latestJob.id}`)}
+                onClick={() => router.replace(`/translation-jobs/${latestJob.id}/overview`)}
                 style={{ ...pillButton, marginTop: "0.75rem" }}
               >
                 Open review now

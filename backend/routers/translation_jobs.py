@@ -3,6 +3,9 @@ import logging
 import math
 import os
 import re
+from typing import Optional
+
+from pydantic import BaseModel, Field
 import threading
 from pathlib import Path
 from datetime import datetime
@@ -1908,6 +1911,140 @@ def export_translation_job(
         generated_at=exported_at,
         version=version,
     )
+
+
+class OverviewBlockPreview(BaseModel):
+    source_text: str
+    translated_text: str
+    has_issue: bool
+
+
+class OverviewSummary(BaseModel):
+    total_blocks: int
+    issue_count: int
+    glossary_match_count: int
+    ambiguity_count: int
+    quality_score: int
+
+
+class OverviewResponse(BaseModel):
+    job_id: int
+    status: str
+    source_language: str
+    target_language: str
+    document_name: str
+    review_mode: str
+    tone: Optional[str]
+    summary: OverviewSummary
+    blocks_preview: list[OverviewBlockPreview]
+
+
+class ReviewModeRequest(BaseModel):
+    review_mode: str = Field(..., pattern="^(autopilot|manual)$")
+
+
+@router.get("/{job_id}/overview", response_model=OverviewResponse)
+def get_overview(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return overview data for the translation overview stage."""
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    document_name = doc.filename if doc else f"Document #{job.document_id}"
+
+    blocks = (
+        db.query(DocumentBlock)
+        .filter(DocumentBlock.document_id == job.document_id)
+        .order_by(DocumentBlock.block_index)
+        .all()
+    )
+    results = db.query(TranslationResult).filter(TranslationResult.job_id == job.id).all()
+    results_by_segment = {r.segment_id: r for r in results}
+
+    total_blocks = len(blocks)
+    issue_count = 0
+    glossary_match_count = 0
+    ambiguity_count = 0
+
+    for r in results:
+        has_ambiguity = bool(r.ambiguity_detected)
+        has_glossary = bool(r.glossary_applied)
+        is_resolved = _is_acceptable_final_status(r.review_status)
+        if has_ambiguity and not is_resolved:
+            ambiguity_count += 1
+            issue_count += 1
+        elif has_glossary:
+            glossary_match_count += 1
+
+    quality_score = round(((total_blocks - issue_count) / total_blocks) * 100) if total_blocks > 0 else 100
+
+    # First 3 blocks preview
+    blocks_preview = []
+    for block in blocks[:3]:
+        segs = db.query(DocumentSegment).filter(DocumentSegment.block_id == block.id).all()
+        translated_parts = []
+        block_has_issue = False
+        for seg in segs:
+            result = results_by_segment.get(seg.id)
+            if result:
+                translated_parts.append(result.final_translation or "")
+                if bool(result.ambiguity_detected) and not _is_acceptable_final_status(result.review_status):
+                    block_has_issue = True
+            else:
+                translated_parts.append("")
+        blocks_preview.append(OverviewBlockPreview(
+            source_text=block.text_original or "",
+            translated_text=" ".join(translated_parts).strip(),
+            has_issue=block_has_issue,
+        ))
+
+    return OverviewResponse(
+        job_id=job.id,
+        status=job.status,
+        source_language=job.source_language,
+        target_language=job.target_language,
+        document_name=document_name,
+        review_mode=job.review_mode or "autopilot",
+        tone=job.tone,
+        summary=OverviewSummary(
+            total_blocks=total_blocks,
+            issue_count=issue_count,
+            glossary_match_count=glossary_match_count,
+            ambiguity_count=ambiguity_count,
+            quality_score=quality_score,
+        ),
+        blocks_preview=blocks_preview,
+    )
+
+
+@router.patch("/{job_id}/review-mode")
+def update_review_mode(
+    job_id: int,
+    body: ReviewModeRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Update the review mode for a translation job."""
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    job.review_mode = body.review_mode
+    db.commit()
+    db.refresh(job)
+    return {"id": job.id, "review_mode": job.review_mode}
 
 
 @router.get("/{job_id}/preview", response_model=PreviewResponse)

@@ -300,6 +300,39 @@ export type CreateProjectRequest = {
   default_tone?: string;
 };
 
+export type OverviewResponse = {
+  job_id: number;
+  status: string;
+  source_language: string;
+  target_language: string;
+  document_name: string;
+  review_mode: string;
+  tone: string | null;
+  summary: {
+    total_blocks: number;
+    issue_count: number;
+    glossary_match_count: number;
+    ambiguity_count: number;
+    quality_score: number;
+  };
+  blocks_preview: {
+    source_text: string;
+    translated_text: string;
+    has_issue: boolean;
+  }[];
+};
+
+export const overviewApi = {
+  get: (jobId: number) =>
+    apiFetch<OverviewResponse>(`${API_URL}/translation-jobs/${jobId}/overview`),
+  setReviewMode: (jobId: number, reviewMode: string) =>
+    apiFetch<{ id: number; review_mode: string }>(`${API_URL}/translation-jobs/${jobId}/review-mode`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_mode: reviewMode }),
+    }),
+};
+
 export const projectsApi = {
   create: (body: CreateProjectRequest) =>
     apiFetch<ProjectResponse>(`${API_URL}/projects`, {
