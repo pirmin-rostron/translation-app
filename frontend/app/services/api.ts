@@ -106,7 +106,7 @@ export const documentsApi = {
     apiFetch<T>(`${API_URL}/documents/${id}/segments`),
 
   getTranslationJobs: <T>(id: number) =>
-    apiFetch<T>(`${API_URL}/documents/${id}/translation-jobs`),
+    apiFetch<T>(`${API_URL}/translation-jobs/documents/${id}/translation-jobs`),
 
   getStages: <T>(id: number) =>
     apiFetch<T>(`${API_URL}/documents/${id}/stages`),

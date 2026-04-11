@@ -1498,9 +1498,10 @@ function TranslationReviewPageInner() {
       {/* ── Fixed Top Header ── */}
       <header className="flex h-14 shrink-0 items-center border-b border-brand-border bg-brand-surface px-6">
         <div className="flex items-center gap-3">
-          <Link href={`/documents/${job.document_id}`} className="text-brand-subtle hover:text-brand-text">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 12L6 8l4-4" /></svg>
+          <Link href="/dashboard" className="text-sm text-brand-subtle no-underline hover:text-brand-text">
+            ← Dashboard
           </Link>
+          <span className="text-brand-border">|</span>
           <span className="max-w-[240px] truncate text-sm font-medium text-brand-text">
             {doc?.filename ?? `Document #${job.document_id}`}
           </span>
@@ -1511,18 +1512,20 @@ function TranslationReviewPageInner() {
           </span>
         </div>
         <div className="flex-1 text-center">
-          <span className="font-display text-lg font-semibold text-brand-text">{progressPercent}%</span>
+          {reviewCompleteState ? (
+            <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Review complete</span>
+          ) : (
+            <span className="font-display text-lg font-semibold text-brand-text">{progressPercent}%</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {reviewComplete && (
-            <button
-              type="button"
-              onClick={() => { void handleOpenPreviewDocument(); }}
-              className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg"
-            >
-              Preview
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => { void handleOpenPreviewDocument(); }}
+            className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg"
+          >
+            Preview
+          </button>
           <button
             type="button"
             onClick={handleOpenExportModal}
