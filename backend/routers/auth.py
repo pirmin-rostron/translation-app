@@ -98,6 +98,8 @@ class UsageResponse(BaseModel):
 class OrgOut(BaseModel):
     id: int
     name: str
+    tier: str = "free"
+    jobs_this_month: int = 0
     created_at: datetime
 
     class Config:
@@ -107,6 +109,12 @@ class OrgOut(BaseModel):
 class OrgResponse(BaseModel):
     org: OrgOut
     role: str
+
+
+class TierResponse(BaseModel):
+    tier: str
+    jobs_this_month: int
+    limits: dict
 
 
 class OrgCreateRequest(BaseModel):
@@ -423,6 +431,19 @@ def get_org(
 ):
     """Return the current user's organisation and their role within it."""
     return OrgResponse(org=current_org, role=membership.role)
+
+
+@router.get("/tier", response_model=TierResponse)
+def get_tier(
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return the org's current tier, usage, and feature limits."""
+    from services.tier import get_tier_limits
+    return TierResponse(
+        tier=current_org.tier,
+        jobs_this_month=current_org.jobs_this_month or 0,
+        limits=get_tier_limits(current_org.tier),
+    )
 
 
 @router.get("/usage", response_model=UsageResponse)

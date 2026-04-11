@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations } from "../hooks/queries";
+import { useDashboardTranslations, useTier } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
 import { SplitButton } from "./SplitButton";
 import { NewTranslationModal } from "./NewTranslationModal";
@@ -145,6 +145,7 @@ export default function DashboardPage() {
 
   // Server state via React Query — placeholderData ensures page always renders
   const { data: translations } = useDashboardTranslations();
+  const { data: tierData } = useTier();
 
   // Stats — placeholder until endpoint exists
   const stats = SAMPLE_STATS;
@@ -197,6 +198,34 @@ export default function DashboardPage() {
             delta="Awaiting approval"
           />
         </div>
+
+        {/* ── Usage Indicator ── */}
+        {tierData && tierData.limits.max_jobs !== null && tierData.jobs_this_month > tierData.limits.max_jobs * 0.5 && (
+          <div className={`mb-6 flex items-center justify-between rounded-lg border px-5 py-3 ${
+            tierData.jobs_this_month >= tierData.limits.max_jobs
+              ? "border-status-error/30 bg-status-errorBg"
+              : tierData.jobs_this_month >= tierData.limits.max_jobs * 0.8
+                ? "border-status-warning/30 bg-status-warningBg"
+                : "border-brand-border bg-brand-surface"
+          }`}>
+            <div>
+              <p className="text-sm font-medium text-brand-text">
+                {tierData.jobs_this_month} of {tierData.limits.max_jobs} translation jobs used this month
+              </p>
+              <p className="mt-0.5 text-xs text-brand-muted">
+                {tierData.tier.charAt(0).toUpperCase() + tierData.tier.slice(1)} plan
+              </p>
+            </div>
+            {tierData.jobs_this_month >= tierData.limits.max_jobs && (
+              <button
+                type="button"
+                className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov"
+              >
+                Upgrade
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Active Translations ── */}
         {hasTranslations ? (

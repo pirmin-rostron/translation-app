@@ -255,6 +255,24 @@ export const usageApi = {
   get: () => apiFetch<UsageResponse>(`${API_URL}/auth/usage`),
 };
 
+export type TierResponse = {
+  tier: string;
+  jobs_this_month: number;
+  limits: {
+    max_jobs: number | null;
+    max_languages: number | null;
+    can_manual_review: boolean;
+    can_create_projects: boolean;
+    can_reference_docs: boolean;
+    max_projects: number | null;
+    max_team_members: number | null;
+  };
+};
+
+export const tierApi = {
+  get: () => apiFetch<TierResponse>(`${API_URL}/auth/tier`),
+};
+
 // --- admin types and api ---
 
 export type WaitlistEntry = {
