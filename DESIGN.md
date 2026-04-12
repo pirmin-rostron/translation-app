@@ -328,3 +328,24 @@ Iteration rules:
 - Blue accent — teal only
 - bg-green-50, text-red-700 etc — always status.* tokens
 - Shadow as primary depth — use borders and bg contrast instead
+
+---
+
+## 9. Modal Checklist (apply to every modal)
+
+Every modal must follow this pattern exactly:
+
+- **Backdrop:** `fixed inset-0 z-50 flex items-center justify-center bg-black/40`
+- **Panel:** `w-full max-w-md rounded-xl bg-brand-surface p-6 shadow-xl`
+- **Title:** `font-display text-lg font-bold text-brand-text mb-2`
+- **Description:** `text-sm text-brand-muted mb-6`
+- **Footer:** `flex justify-end gap-3 mt-6`
+
+- **Submit button:** `rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50`
+- **Cancel button:** `rounded-full border border-brand-border px-4 py-2 text-sm font-medium text-brand-muted hover:bg-brand-bg`
+
+- **Drop zones inside modals:** `rounded-xl border-2 border-dashed border-brand-border bg-brand-bg p-8 text-center`
+- **Selects inside modals:** `rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20`
+- **Inputs inside modals:** same as selects above
+
+- **File type copy:** always DOCX, RTF, TXT — never PDF (PDF is not supported)
