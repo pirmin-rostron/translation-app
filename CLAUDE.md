@@ -318,6 +318,17 @@ This has caused migration failures twice. Check every new non-nullable column be
 ### API path mismatches
 Always verify the full URL path including router prefix when writing frontend API calls. The translation jobs router has prefix /translation-jobs — endpoints under it are /translation-jobs/{endpoint}, not /{endpoint}. Check main.py for the registered prefix before writing any new API call.
 
+### Auth state lost on page refresh
+Zustand stores are in-memory — they reset on every page refresh. Auth tokens must be persisted to localStorage AND cookies:
+- localStorage: for Zustand to rehydrate on load (use persist middleware from 'zustand/middleware')
+- Cookie: for Next.js middleware to read before Zustand hydrates (middleware runs server-side and can't access localStorage)
+
+On login: set token in Zustand store + document.cookie
+On logout: clear both
+Middleware reads the cookie, not Zustand
+
+This has happened multiple times. Always check both persistence layers when implementing auth.
+
 ### init_db create_all vs Alembic migrations
 init_db() calls Base.metadata.create_all() on startup, which creates tables that don't exist. If a new model is added and the server restarts before the migration runs, the table already exists. The migration will then fail with "table already exists".
 Fix: ssh to production and run: `docker compose exec -T backend alembic stamp {revision_id}`
