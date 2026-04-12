@@ -991,10 +991,12 @@ function TranslationReviewPageInner() {
               >
                 <div className="group/source">
                   {side === "source" && renderSourceChangedLabel(block)}
-                  <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
-                    {renderInlineSegments(block, side)}
-                    {side === "source" && renderPencilIcon(block)}
-                  </p>
+                  {!(side === "source" && editingSourceBlockId === block.id) && (
+                    <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+                      {renderInlineSegments(block, side)}
+                      {side === "source" && renderPencilIcon(block)}
+                    </p>
+                  )}
                   {side === "source" && renderSourceEditControls(block)}
                 </div>
               </li>
@@ -1016,10 +1018,12 @@ function TranslationReviewPageInner() {
           className="group/source p-1"
         >
           {side === "source" && renderSourceChangedLabel(block)}
-          <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>
-            {body}
-            {side === "source" && renderPencilIcon(block)}
-          </H>
+          {!(side === "source" && editingSourceBlockId === block.id) && (
+            <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>
+              {body}
+              {side === "source" && renderPencilIcon(block)}
+            </H>
+          )}
           {side === "source" && renderSourceEditControls(block)}
         </div>
       );
@@ -1032,10 +1036,12 @@ function TranslationReviewPageInner() {
         className="group/source p-1"
       >
         {side === "source" && renderSourceChangedLabel(block)}
-        <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
-          {body}
-          {side === "source" && renderPencilIcon(block)}
-        </p>
+        {!(side === "source" && editingSourceBlockId === block.id) && (
+          <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+            {body}
+            {side === "source" && renderPencilIcon(block)}
+          </p>
+        )}
         {side === "source" && renderSourceEditControls(block)}
       </div>
     );
