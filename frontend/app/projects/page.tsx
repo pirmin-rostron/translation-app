@@ -7,6 +7,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useProjects } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
+import { NewProjectModal } from "../dashboard/NewProjectModal";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -80,6 +81,7 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
+      <NewProjectModal />
     </AppShell>
   );
 }
