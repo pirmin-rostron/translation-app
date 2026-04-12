@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
+import { projectsApi } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 
 export function NewProjectModal() {
+  const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.projectModalOpen);
   const closeModal = useDashboardStore((s) => s.closeProjectModal);
 
@@ -22,8 +25,8 @@ export function NewProjectModal() {
     setSubmitting(true);
     setError("");
     try {
-      // TODO: wire to POST /api/projects when endpoint exists
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await projectsApi.create({ name: name.trim() });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
