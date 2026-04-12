@@ -131,7 +131,7 @@ function FeatureCard({ title, body }: { title: string; body: string }) {
       style={{
         backgroundColor: hovered ? T.primaryContainer : "#ffffff",
         padding: "2rem",
-        borderRadius: "4px",
+        borderRadius: "16px",
         transition: "background-color 0.25s ease",
         cursor: "default",
       }}
@@ -340,26 +340,71 @@ export default function LandingPage() {
             alignItems: "center",
             justifyContent: "space-between",
           }}>
+            {/* Left: Wordmark */}
             <span style={{ ...display, fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.01em", color: T.onSurface }}>
               Helvara
             </span>
-            <a
-              href="/login"
-              style={{
-                ...inter,
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                color: T.accent,
-                textDecoration: "none",
-                padding: "0.375rem 1rem",
-                borderRadius: "9999px",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(13,123,110,0.08)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
-            >
-              Log in
-            </a>
+
+            {/* Centre: Nav links */}
+            <nav style={{ display: "flex", alignItems: "center", gap: "1.5rem", ...inter, fontSize: "0.875rem" }}>
+              <a
+                href="/features"
+                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
+              >
+                Features
+              </a>
+              <a
+                href="#how-it-works"
+                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
+              >
+                How it works
+              </a>
+              <span className="cursor-default text-brand-subtle">
+                FAQ{" "}
+                <span className="rounded-full bg-brand-bg px-1.5 py-0.5 text-[0.625rem] font-medium text-brand-muted">Soon</span>
+              </span>
+            </nav>
+
+            {/* Right: Auth links */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <a
+                href="/login"
+                style={{
+                  ...inter,
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: T.onSurfaceVariant,
+                  textDecoration: "none",
+                  transition: "color 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
+              >
+                Log in
+              </a>
+              <a
+                href="/register"
+                style={{
+                  ...inter,
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  background: T.accent,
+                  padding: "0.375rem 1.125rem",
+                  borderRadius: "9999px",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
+              >
+                Start free
+              </a>
+            </div>
           </div>
         </header>
 
@@ -410,7 +455,7 @@ export default function LandingPage() {
             </p>
             <div style={{ marginLeft: "16.666%", marginTop: "2.5rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
               <a
-                href="#waitlist"
+                href="/register"
                 style={{
                   background: T.primaryContainer,
                   color: "#ffffff",
@@ -426,10 +471,10 @@ export default function LandingPage() {
                 onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
               >
-                Request early access
+                Start translating free
               </a>
               <p style={{ ...inter, fontSize: "0.75rem", color: T.onSurfaceVariant, margin: 0 }}>
-                No commitment. We&apos;ll be in touch.
+                Free to start. No credit card required.
               </p>
             </div>
           </div>
@@ -572,7 +617,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── How it works ── */}
-        <section style={{ backgroundColor: T.surface, padding: "7rem 1.5rem" }}>
+        <section id="how-it-works" style={{ backgroundColor: T.surface, padding: "7rem 1.5rem" }}>
           <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: "4rem" }}>
               <p style={eyebrow}>The Helvara Workflow</p>
@@ -595,7 +640,7 @@ export default function LandingPage() {
                     background: "#ffffff",
                     borderTop: `3px solid ${T.accent}`,
                     padding: "2rem",
-                    borderRadius: "4px",
+                    borderRadius: "16px",
                   }}
                 >
                   <div style={{
@@ -655,7 +700,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Stats ── */}
-        <section style={{ backgroundColor: "#ede9e1", padding: "5rem 1.5rem" }}>
+        <section style={{ backgroundColor: T.surfaceContainerLow, padding: "5rem 1.5rem" }}>
           <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
             <div style={{ marginBottom: "3rem", textAlign: "center" }}>
               <p style={eyebrow}>Built for accuracy</p>
@@ -779,19 +824,12 @@ export default function LandingPage() {
                   <button
                     type="submit"
                     disabled={formState === "loading" || !email.trim()}
+                    className="rounded-full border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-50"
                     style={{
-                      background: T.surface,
-                      color: T.primaryContainer,
-                      border: "none",
-                      borderRadius: "9999px",
-                      padding: "0.75rem 1.5rem",
                       ...inter,
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
                       cursor: "pointer",
                       whiteSpace: "nowrap",
-                      opacity: formState === "loading" || !email.trim() ? 0.6 : 1,
-                      transition: "opacity 0.15s",
+                      transition: "background 0.15s",
                     }}
                   >
                     {formState === "loading" ? "Joining…" : "Request access"}
