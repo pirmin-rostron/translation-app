@@ -33,7 +33,7 @@ function Toggle({
   return (
     <div className="flex items-start justify-between gap-4 py-4">
       <div className="flex-1">
-        <p className="text-sm font-medium" style={{ color: "#1A110A" }}>
+        <p className="text-sm font-medium" >
           {label}
         </p>
         {description && <p className="mt-0.5 text-xs text-brand-subtle">{description}</p>}
@@ -73,7 +73,7 @@ function Section({
     <section className={`border border-brand-border bg-white px-6 py-6 ${className ?? ""}`}>
       <h2
         className="mb-5 text-base font-semibold"
-        style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+        
       >
         {title}
       </h2>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>
+      <div className="min-h-screen bg-brand-bg p-6">
         Loading…
       </div>
     );
@@ -173,11 +173,11 @@ export default function SettingsPage() {
   const deleteConfirmValid = deleteConfirmText === "DELETE";
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-2xl px-6 py-12" style={{ paddingTop: "6rem" }}>
+    <div className="min-h-screen bg-brand-bg">
+      <main className="mx-auto max-w-2xl px-8 py-12 pt-24">
         <h1
           className="mb-1 text-2xl font-semibold"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+          
         >
           Settings
         </h1>
@@ -203,7 +203,7 @@ export default function SettingsPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full border border-brand-border bg-white px-3 py-2 text-sm text-brand-text placeholder:text-brand-subtle focus:border-[#0D7B6E] focus:outline-none"
+                  className="w-full border border-brand-border bg-white px-3 py-2 text-sm text-brand-text placeholder:text-brand-subtle focus:border-brand-accent focus:outline-none"
                 />
               </div>
 
@@ -235,8 +235,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void handleSaveProfile()}
                 disabled={profileSaving}
-                className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#082012" }}
+                className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
               >
                 {profileSaving ? "Saving…" : "Save changes"}
               </button>
@@ -283,8 +282,7 @@ export default function SettingsPage() {
                 type="button"
                 disabled
                 title="Email preference saving is not yet available"
-                className="rounded-full px-4 py-2 text-sm font-medium text-white opacity-40 cursor-not-allowed"
-                style={{ backgroundColor: "#082012" }}
+                className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white opacity-40 cursor-not-allowed"
               >
                 Save preferences
               </button>
@@ -324,7 +322,7 @@ export default function SettingsPage() {
           <div className="w-full max-w-md border border-brand-border bg-white px-6 py-6">
             <h3
               className="mb-1 text-lg font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+              
             >
               Delete your account?
             </h3>

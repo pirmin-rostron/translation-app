@@ -259,9 +259,23 @@ function mapJobStatusLabel(status: string): string {
   return "Pending";
 }
 
+const LANG_CODE_MAP: Record<string, string> = {
+  english: "EN", german: "DE", french: "FR", dutch: "NL", spanish: "ES",
+  japanese: "JA", korean: "KO", thai: "TH", chinese: "ZH", italian: "IT",
+  portuguese: "PT", arabic: "AR", en: "EN", de: "DE", fr: "FR", nl: "NL",
+  es: "ES", ja: "JA", ko: "KO", th: "TH", zh: "ZH", it: "IT", pt: "PT", ar: "AR",
+};
+
+function toLangCode(lang: string | null | undefined): string {
+  if (!lang) return "??";
+  const code = LANG_CODE_MAP[lang.toLowerCase()];
+  if (code) return code;
+  return lang.length <= 3 ? lang.toUpperCase() : lang.substring(0, 2).toUpperCase();
+}
+
 function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
-  const src = j.source_language?.substring(0, 2).toUpperCase() ?? "EN";
-  const tgt = j.target_language?.substring(0, 2).toUpperCase() ?? "";
+  const src = toLangCode(j.source_language);
+  const tgt = toLangCode(j.target_language);
   return {
     id: j.id,
     document_name: j.document_name,

@@ -33,7 +33,7 @@ const PROCESSING_STATUSES = new Set([
 function statusBadgeClasses(status: string): string {
   switch (status) {
     case "In Review":
-      return "bg-brand-accent/[0.12] text-brand-accent";
+      return "bg-brand-accentMid text-brand-accent";
     case "Completed":
     case "Ready for Export":
       return "bg-status-successBg text-status-success";
