@@ -328,18 +328,27 @@ export default function DashboardPage() {
           </div>
         ) : (
           /* Empty state */
-          <div className="mb-10 rounded-lg border border-brand-border bg-brand-surface px-8 py-16 text-center">
-            <p className="mb-2 font-display text-xl font-bold text-brand-text">
-              No translations yet
+          <div className="mb-10 rounded-lg border border-brand-border bg-brand-surface px-8 py-20 text-center">
+            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-brand-muted">
+                <rect x="8" y="4" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M14 14h12M14 20h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <rect x="16" y="12" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M22 26h12M22 32h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M32 18l4-4m0 0l-2 6-4-2 6-4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="mb-2 font-display text-2xl font-bold text-brand-text">
+              Translate your first document
             </p>
-            <p className="mb-5 font-sans text-sm text-brand-subtle">
-              Upload your first document to get started.
+            <p className="mx-auto mb-6 max-w-sm font-sans text-sm text-brand-muted">
+              Upload a document and Helvara will translate it, check for ambiguities, and apply your glossary — automatically.
             </p>
             <button
               onClick={openTranslationModal}
               className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2.5 font-sans text-sm font-semibold text-white transition-opacity hover:bg-brand-accentHov"
             >
-              + New Translation
+              Upload a document
             </button>
           </div>
         )}
