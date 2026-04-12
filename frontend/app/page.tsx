@@ -234,7 +234,7 @@ export default function LandingPage() {
   useEffect(() => {
     const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
     if (match) {
-      router.replace("/upload");
+      router.replace("/dashboard");
     }
   }, [router]);
 

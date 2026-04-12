@@ -18,11 +18,6 @@ const navItems: NavItem[] = [
     match: (pathname) => pathname === "/dashboard",
   },
   {
-    label: "Translate",
-    href: "/upload",
-    match: (pathname) => pathname.startsWith("/upload"),
-  },
-  {
     label: "Glossary",
     href: "/glossary",
     match: (pathname) => pathname.startsWith("/glossary") || pathname.startsWith("/imports"),
