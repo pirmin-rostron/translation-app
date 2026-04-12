@@ -259,8 +259,8 @@ export default function DocumentDetailPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
-  if (error && !doc) return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
+  if (loading) return <div className="min-h-screen bg-brand-bg p-6">Loading…</div>;
+  if (error && !doc) return <div className="min-h-screen bg-brand-bg p-6 text-status-error">{error}</div>;
   if (!doc) return null;
   const latestDocStage = docStages[docStages.length - 1];
   const latestJob = jobs[0];
@@ -268,32 +268,32 @@ export default function DocumentDetailPage() {
   const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-brand-bg">
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
           href="/dashboard"
-          className="text-sm text-slate-600 hover:text-slate-900 mb-6 inline-block"
+          className="text-sm text-brand-muted hover:text-brand-text mb-6 inline-block"
         >
           ← Back to documents
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">{doc.filename}</h1>
+        <h1 className="text-2xl font-bold text-brand-text mb-6">{doc.filename}</h1>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Metadata</h2>
+        <div className="bg-brand-surface rounded-xl border border-brand-border p-6  mb-8">
+          <h2 className="text-lg font-semibold text-brand-text mb-4">Metadata</h2>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-slate-500">Type</dt>
+              <dt className="text-brand-subtle">Type</dt>
               <dd className="font-medium">{doc.file_type}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Source</dt>
+              <dt className="text-brand-subtle">Source</dt>
               <dd className="font-medium flex items-center gap-2">
                 {editingSourceLanguage ? (
                   <>
                     <select
                       value={sourceLanguageEdit}
                       onChange={(e) => setSourceLanguageEdit(e.target.value)}
-                      className="rounded border border-slate-300 px-2 py-1 text-sm bg-white"
+                      className="rounded border border-brand-border px-2 py-1 text-sm bg-brand-surface"
                     >
                       {SOURCE_LANGUAGE_OVERRIDE_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -303,7 +303,7 @@ export default function DocumentDetailPage() {
                     </select>
                     <button
                       onClick={handleSaveSourceLanguage}
-                      className="text-xs px-2 py-1 bg-slate-900 text-white rounded hover:bg-slate-800"
+                      className="text-xs px-2 py-1 bg-brand-accent text-white rounded hover:bg-brand-accentHov"
                     >
                       Save
                     </button>
@@ -312,7 +312,7 @@ export default function DocumentDetailPage() {
                         setEditingSourceLanguage(false);
                         setSourceLanguageEdit("");
                       }}
-                      className="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-50"
+                      className="text-xs px-2 py-1 border border-brand-border rounded hover:bg-brand-bg"
                     >
                       Cancel
                     </button>
@@ -327,7 +327,7 @@ export default function DocumentDetailPage() {
                         setSourceLanguageEdit(match ? match.value : "en");
                         setEditingSourceLanguage(true);
                       }}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline"
+                      className="text-xs text-brand-subtle hover:text-brand-text underline"
                     >
                       Edit
                     </button>
@@ -336,76 +336,76 @@ export default function DocumentDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Target</dt>
+              <dt className="text-brand-subtle">Target</dt>
               <dd className="font-medium">{getLanguageDisplayName(doc.target_language)}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Industry</dt>
+              <dt className="text-brand-subtle">Industry</dt>
               <dd className="font-medium">{doc.industry ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Domain</dt>
+              <dt className="text-brand-subtle">Domain</dt>
               <dd className="font-medium">{doc.domain ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Document status</dt>
+              <dt className="text-brand-subtle">Document status</dt>
               <dd>
-                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">
+                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-brand-bg text-brand-text">
                   {doc.status}
                 </span>
-                {doc.error_message && <p className="mt-1 text-xs text-red-600">{doc.error_message}</p>}
+                {doc.error_message && <p className="mt-1 text-xs text-status-error">{doc.error_message}</p>}
                 {latestDocStage && (
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-brand-subtle">
                     Stage: {latestDocStage.stage_name} ({latestDocStage.status})
                   </p>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Translation lifecycle</dt>
+              <dt className="text-brand-subtle">Translation lifecycle</dt>
               <dd>
-                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">
+                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-brand-bg text-brand-text">
                   {latestJob?.status ?? "no_translation_job"}
                 </span>
-                {latestJob?.error_message && <p className="mt-1 text-xs text-red-600">{latestJob.error_message}</p>}
+                {latestJob?.error_message && <p className="mt-1 text-xs text-status-error">{latestJob.error_message}</p>}
                 {latestJob && (
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-brand-subtle">
                     Style: {latestJob.translation_style === "literal" ? "Literal" : "Natural"}
                   </p>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Created</dt>
+              <dt className="text-brand-subtle">Created</dt>
               <dd className="font-medium">{formatDate(doc.created_at)}</dd>
             </div>
           </dl>
           {showActiveParsing && docProgress && (
-            <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4">
+            <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
               <p className="text-sm font-medium text-indigo-900">Parsing document…</p>
-              <p className="mt-1 text-sm text-slate-700">{docProgress.stage_label}</p>
+              <p className="mt-1 text-sm text-brand-text">{docProgress.stage_label}</p>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
                 <div
                   className="h-full rounded-full bg-indigo-500 transition-all"
                   style={{ width: `${Math.max(0, Math.min(100, docProgress.percentage))}%` }}
                 />
               </div>
-              <p className="mt-2 text-xs text-slate-600">
+              <p className="mt-2 text-xs text-brand-muted">
                 {docProgress.percentage.toFixed(0)}% • {formatEta(docProgress.eta_seconds)}
               </p>
             </div>
           )}
           {translationProgress && !translationProgress.is_complete && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
               <p className="text-sm font-medium text-emerald-900">Translating document…</p>
-              <p className="mt-1 text-sm text-slate-700">{translationProgress.stage_label}</p>
+              <p className="mt-1 text-sm text-brand-text">{translationProgress.stage_label}</p>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-all"
                   style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
                 />
               </div>
-              <p className="mt-2 text-xs text-slate-600">
+              <p className="mt-2 text-xs text-brand-muted">
                 {translationProgress.percentage.toFixed(0)}% • {translationProgress.completed_segments}/
                 {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
               </p>
@@ -413,10 +413,10 @@ export default function DocumentDetailPage() {
           )}
           <div className="mt-4 flex flex-wrap gap-3">
             {doc.status === "parsed" && segments.length > 0 && (
-              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Translation style</p>
+              <div className="w-full rounded-xl border border-brand-border bg-brand-bg p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">Translation style</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text">
                     <input
                       type="radio"
                       name="translation-style"
@@ -426,7 +426,7 @@ export default function DocumentDetailPage() {
                     />
                     <span>Natural (recommended)</span>
                   </label>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text">
                     <input
                       type="radio"
                       name="translation-style"
@@ -442,7 +442,7 @@ export default function DocumentDetailPage() {
             {(doc.status === "uploaded" || parseFailed) && (
               <button
                 onClick={parseFailed ? handleRetryDoc : handleParse}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
+                className="px-4 py-2 bg-brand-accent text-white rounded-full font-medium hover:bg-brand-accentHov"
               >
                 {parseFailed ? "Retry document processing" : "Parse document"}
               </button>
@@ -450,7 +450,7 @@ export default function DocumentDetailPage() {
             {doc.status === "parsed" && segments.length > 0 && (
               <button
                 onClick={handleCreateJob}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
+                className="px-4 py-2 bg-brand-accent text-white rounded-full font-medium hover:bg-brand-accentHov"
               >
                 Create Translation Job
               </button>
@@ -458,26 +458,26 @@ export default function DocumentDetailPage() {
             {jobs.length > 0 && (
               <Link
                 href={`/translation-jobs/${jobs[0].id}`}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 inline-block"
+                className="px-4 py-2 border border-brand-border text-brand-text rounded-full font-medium hover:bg-brand-bg inline-block"
               >
                 View translation results
               </Link>
             )}
-            {latestJob?.error_message && <p className="text-red-600 text-sm w-full">{latestJob.error_message}</p>}
-            {error && <p className="text-red-600 text-sm w-full">{error}</p>}
+            {latestJob?.error_message && <p className="text-status-error text-sm w-full">{latestJob.error_message}</p>}
+            {error && <p className="text-status-error text-sm w-full">{error}</p>}
             {sourceLanguageSuccess && <p className="text-green-600 text-sm w-full">{sourceLanguageSuccess}</p>}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Parsed blocks</h2>
+        <div className="bg-brand-surface rounded-xl border border-brand-border p-6 ">
+          <h2 className="text-lg font-semibold text-brand-text mb-4">Parsed blocks</h2>
           {blocks.length === 0 && (doc.status === "uploaded" || parseFailed) && (
-            <p className="text-slate-600">
+            <p className="text-brand-muted">
               Parse the document to view headings, paragraphs, and bullet items.
             </p>
           )}
           {blocks.length === 0 && doc.status === "parsed" && (
-            <p className="text-slate-600">No parsed blocks (document may be empty).</p>
+            <p className="text-brand-muted">No parsed blocks (document may be empty).</p>
           )}
           {doc.status === "parsed" && segments.length > 0 && (
             <p className="mb-3 text-sm text-emerald-700">
@@ -489,20 +489,20 @@ export default function DocumentDetailPage() {
               {blocks.map((block) => (
                 <li
                   key={block.id}
-                  className="border-l-2 border-slate-200 pl-4 py-2"
+                  className="border-l-2 border-brand-border pl-4 py-2"
                 >
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-xs text-brand-subtle font-mono">
                     Block {block.block_index + 1} ({block.block_type})
                   </span>
                   {block.block_type === "heading" ? (
-                    <h3 className="mt-1 text-lg font-semibold text-slate-900">{block.text_original}</h3>
+                    <h3 className="mt-1 text-lg font-semibold text-brand-text">{block.text_original}</h3>
                   ) : block.block_type === "bullet_item" ? (
-                    <div className="mt-1 flex gap-3 text-slate-900">
-                      <span className="text-slate-400">{String(block.formatting_json?.marker ?? "\u2022")}</span>
+                    <div className="mt-1 flex gap-3 text-brand-text">
+                      <span className="text-brand-subtle">{String(block.formatting_json?.marker ?? "\u2022")}</span>
                       <p>{block.text_original}</p>
                     </div>
                   ) : (
-                    <p className="mt-1 text-slate-900">{block.text_original}</p>
+                    <p className="mt-1 text-brand-text">{block.text_original}</p>
                   )}
                 </li>
               ))}

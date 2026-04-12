@@ -32,11 +32,11 @@ export default function UsageDashboardPage() {
   const { data, isLoading, error } = useUsage();
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-brand-bg">
       <main className="mx-auto max-w-5xl px-6 py-12">
-        <h1 className="mb-8 text-2xl font-bold text-slate-900">Usage Dashboard</h1>
+        <h1 className="mb-8 text-2xl font-bold text-brand-text">Usage Dashboard</h1>
 
-        {isLoading && <p className="text-slate-600">Loading…</p>}
+        {isLoading && <p className="text-brand-muted">Loading…</p>}
         {error && (
           <p className="text-status-error">
             {error instanceof Error ? error.message : "Failed to load usage data"}
@@ -50,12 +50,12 @@ export default function UsageDashboardPage() {
               {STAT_CARDS.map(({ label, key }) => (
                 <div
                   key={key}
-                  className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm"
+                  className="rounded-xl border border-brand-border bg-brand-surface px-5 py-4 "
                 >
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-medium uppercase tracking-wide text-brand-subtle">
                     {label}
                   </p>
-                  <p className="mt-1 text-3xl font-semibold text-slate-900">
+                  <p className="mt-1 text-3xl font-semibold text-brand-text">
                     {data.totals[key].toLocaleString()}
                   </p>
                 </div>
@@ -63,18 +63,18 @@ export default function UsageDashboardPage() {
             </div>
 
             {/* Recent events table */}
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-brand-subtle">
               Recent Events
             </h2>
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
+            <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface ">
+              <table className="min-w-full divide-y divide-brand-border text-sm">
+                <thead className="bg-brand-bg">
                   <tr>
                     {["Time", "Event Type", "User ID", "Job ID", "Document ID", "Meta"].map(
                       (col) => (
                         <th
                           key={col}
-                          className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
+                          className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-brand-subtle"
                         >
                           {col}
                         </th>
@@ -82,26 +82,26 @@ export default function UsageDashboardPage() {
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-brand-border">
                   {data.recent.map((event: UsageEvent) => (
-                    <tr key={event.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                    <tr key={event.id} className="hover:bg-brand-bg">
+                      <td className="whitespace-nowrap px-4 py-3 text-brand-muted">
                         {formatDateTime(event.created_at)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-brand-text">
                         {toTitleCase(event.event_type)}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{event.user_id ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{event.job_id ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{event.document_id ?? "—"}</td>
-                      <td className="max-w-xs truncate px-4 py-3 font-mono text-xs text-slate-500">
+                      <td className="px-4 py-3 text-brand-muted">{event.user_id ?? "—"}</td>
+                      <td className="px-4 py-3 text-brand-muted">{event.job_id ?? "—"}</td>
+                      <td className="px-4 py-3 text-brand-muted">{event.document_id ?? "—"}</td>
+                      <td className="max-w-xs truncate px-4 py-3 font-mono text-xs text-brand-subtle">
                         {formatMeta(event.meta)}
                       </td>
                     </tr>
                   ))}
                   {data.recent.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                      <td colSpan={6} className="px-4 py-6 text-center text-brand-subtle">
                         No events recorded yet.
                       </td>
                     </tr>
