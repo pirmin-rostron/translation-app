@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { projectsApi } from "../services/api";
+import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 
 export function NewProjectModal() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.projectModalOpen);
   const closeModal = useDashboardStore((s) => s.closeProjectModal);
@@ -25,9 +28,10 @@ export function NewProjectModal() {
     setSubmitting(true);
     setError("");
     try {
-      await projectsApi.create({ name: name.trim() });
+      const created = await projectsApi.create({ name: name.trim() }) as ProjectResponse;
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       handleClose();
+      router.push(`/projects/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
       setSubmitting(false);
