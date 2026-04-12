@@ -191,6 +191,9 @@ export const translationJobsApi = {
   listRecent: (limit = 10) =>
     apiFetch<TranslationJobListItem[]>(`${API_URL}/translation-jobs?limit=${limit}&order=desc`),
 
+  listByProject: (projectId: number, limit = 50) =>
+    apiFetch<TranslationJobListItem[]>(`${API_URL}/translation-jobs?project_id=${projectId}&limit=${limit}&order=desc`),
+
   getById: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}`),
 

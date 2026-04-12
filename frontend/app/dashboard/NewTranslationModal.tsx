@@ -25,6 +25,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export function NewTranslationModal({ projects }: { projects: ProjectResponse[] }) {
   const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.translationModalOpen);
+  const preselectedProjectId = useDashboardStore((s) => s.preselectedProjectId);
   const closeModal = useDashboardStore((s) => s.closeTranslationModal);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,6 +36,16 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   const [projectId, setProjectId] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Pre-select project when modal opens with a project context
+  const prevPreselected = useRef<number | null>(null);
+  if (open && preselectedProjectId !== null && prevPreselected.current !== preselectedProjectId) {
+    prevPreselected.current = preselectedProjectId;
+    setProjectId(String(preselectedProjectId));
+  }
+  if (!open && prevPreselected.current !== null) {
+    prevPreselected.current = null;
+  }
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -63,7 +74,14 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
       const fd = new FormData();
       fd.append("file", file);
       fd.append("target_language", targetLang);
-      fd.append("translation_style", "natural");
+      // Inherit tone from selected project, fallback to "natural"
+      const selectedProject = projectId && projectId !== "__new__"
+        ? projects.find((p) => String(p.id) === projectId)
+        : null;
+      fd.append("translation_style", selectedProject?.default_tone ?? "natural");
+      if (selectedProject) {
+        fd.append("project_id", String(selectedProject.id));
+      }
       const prevCount = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
       trackEvent("flow.upload_started", { target_language: targetLang });
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
@@ -87,6 +105,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
 
   function handleClose() {
     setFile(null);
+    setProjectId("");
     setError("");
     setSubmitting(false);
     closeModal();

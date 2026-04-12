@@ -4,9 +4,10 @@ import { create } from "zustand";
 
 interface DashboardUIState {
   translationModalOpen: boolean;
+  preselectedProjectId: number | null;
   projectModalOpen: boolean;
   splitButtonOpen: boolean;
-  openTranslationModal: () => void;
+  openTranslationModal: (projectId?: number) => void;
   closeTranslationModal: () => void;
   openProjectModal: () => void;
   closeProjectModal: () => void;
@@ -16,10 +17,11 @@ interface DashboardUIState {
 
 export const useDashboardStore = create<DashboardUIState>()((set) => ({
   translationModalOpen: false,
+  preselectedProjectId: null,
   projectModalOpen: false,
   splitButtonOpen: false,
-  openTranslationModal: () => set({ translationModalOpen: true }),
-  closeTranslationModal: () => set({ translationModalOpen: false }),
+  openTranslationModal: (projectId?: number) => set({ translationModalOpen: true, preselectedProjectId: projectId ?? null }),
+  closeTranslationModal: () => set({ translationModalOpen: false, preselectedProjectId: null }),
   openProjectModal: () => set({ projectModalOpen: true }),
   closeProjectModal: () => set({ projectModalOpen: false }),
   toggleSplitButton: () => set((s) => ({ splitButtonOpen: !s.splitButtonOpen })),

@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import Document, DocumentBlock, DocumentSegment, Organisation, ProcessingStageJob, SegmentAnnotation, TranslationJob
+from models import Document, DocumentBlock, DocumentSegment, Organisation, ProcessingStageJob, Project, SegmentAnnotation, TranslationJob
 from schemas import (
     DocumentProgressResponse,
     DocumentBlockResponse,
@@ -512,6 +512,7 @@ def upload_and_translate_document(
     domain: str | None = Form(None, max_length=100),
     translation_style: str = Form("natural", min_length=1, max_length=20),
     customer_id: str | None = Form(None, max_length=100),
+    project_id: int | None = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_user),
     current_org: Organisation = Depends(get_current_org),
@@ -527,6 +528,18 @@ def upload_and_translate_document(
     style_value = translation_style.strip().lower()
     if style_value not in {"natural", "formal", "literal"}:
         raise HTTPException(status_code=400, detail="translation_style must be one of: formal, literal, natural")
+
+    # Validate project belongs to org
+    validated_project_id: int | None = None
+    if project_id is not None:
+        proj = db.query(Project).filter(
+            Project.id == project_id,
+            Project.org_id == current_org.id,
+            Project.deleted_at.is_(None),
+        ).first()
+        if not proj:
+            raise HTTPException(status_code=404, detail="Project not found")
+        validated_project_id = proj.id
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
@@ -582,6 +595,7 @@ def upload_and_translate_document(
                 industry=industry_val,
                 domain=domain_val,
                 org_id=current_org.id,
+                project_id=validated_project_id,
                 content_hash=content_hash,
                 status="uploaded",
             )
@@ -605,6 +619,10 @@ def upload_and_translate_document(
         db=db,
         current_org=current_org,
     )
+    if validated_project_id is not None:
+        doc.project_id = validated_project_id
+        db.commit()
+        db.refresh(doc)
     uid = current_user.id if current_user is not None else None
     run_document_pipeline.delay(doc.id, uid, current_org.id, style_value)
     return doc

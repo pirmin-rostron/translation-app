@@ -4,17 +4,49 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
-import { projectsApi } from "../../services/api";
-import type { ProjectDetailResponse } from "../../services/api";
+import { useDashboardStore } from "../../stores/dashboardStore";
+import { projectsApi, translationJobsApi } from "../../services/api";
+import type { ProjectDetailResponse, TranslationJobListItem } from "../../services/api";
+import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
+import { getLanguageDisplayName } from "../../utils/language";
+
+const PROCESSING_STATUSES = new Set(["queued", "parsing", "translating", "translation_queued"]);
+
+function statusLabel(status: string): string {
+  if (PROCESSING_STATUSES.has(status)) return "Translating…";
+  if (status === "in_review" || status === "review") return "In Review";
+  if (status === "completed" || status === "exported") return "Completed";
+  if (status === "ready_for_export") return "Ready for Export";
+  if (status === "translation_failed") return "Failed";
+  return "Pending";
+}
+
+function statusBadgeClasses(label: string): string {
+  switch (label) {
+    case "In Review":
+      return "bg-brand-accent/[0.12] text-brand-accent";
+    case "Completed":
+    case "Ready for Export":
+      return "bg-green-50 text-green-700";
+    case "Failed":
+      return "bg-status-errorBg text-status-error";
+    case "Translating…":
+      return "bg-brand-bg text-brand-muted animate-pulse";
+    default:
+      return "bg-brand-bg text-brand-muted";
+  }
+}
 
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
   const projectId = Number(params.id);
 
   const [project, setProject] = useState<ProjectDetailResponse | null>(null);
+  const [jobs, setJobs] = useState<TranslationJobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -24,9 +56,14 @@ export default function ProjectPage() {
 
   useEffect(() => {
     if (!token || Number.isNaN(projectId)) return;
-    projectsApi
-      .get(projectId)
-      .then(setProject)
+    Promise.all([
+      projectsApi.get(projectId),
+      translationJobsApi.listByProject(projectId),
+    ])
+      .then(([proj, jobList]) => {
+        setProject(proj);
+        setJobs(jobList);
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load project"))
       .finally(() => setLoading(false));
   }, [projectId, token]);
@@ -44,53 +81,64 @@ export default function ProjectPage() {
         </Link>
 
         {/* Header */}
-        <div className="mb-8">
-          <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
-            PROJECT
-          </p>
-          <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold leading-[1.1] tracking-tight text-brand-text">
-            {project.name}
-          </h1>
-          <div className="mt-3 flex items-center gap-4 text-sm text-brand-muted">
-            {project.target_languages.length > 0 && (
-              <span>Languages: {project.target_languages.join(", ")}</span>
-            )}
-            <span>Tone: {project.default_tone.charAt(0).toUpperCase() + project.default_tone.slice(1)}</span>
-            <span>{project.document_count} {project.document_count === 1 ? "document" : "documents"}</span>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
+              PROJECT
+            </p>
+            <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold leading-[1.1] tracking-tight text-brand-text">
+              {project.name}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {project.target_languages.map((lang) => (
+                <span key={lang} className="rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
+                  {getLanguageDisplayName(lang)}
+                </span>
+              ))}
+              <span className="rounded-full bg-brand-bg px-3 py-1 text-xs font-medium text-brand-muted">
+                {project.default_tone.charAt(0).toUpperCase() + project.default_tone.slice(1)} tone
+              </span>
+              <span className="text-xs text-brand-subtle">
+                {project.document_count} {project.document_count === 1 ? "document" : "documents"}
+              </span>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => openTranslationModal(projectId)}
+            className="shrink-0 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
+          >
+            + New Translation
+          </button>
         </div>
 
-        {/* Documents */}
+        {/* Translation Jobs */}
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-lg font-bold text-brand-text">Documents</h2>
-            <Link
-              href="/upload"
-              className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
-            >
-              + Upload document
-            </Link>
+          <div className="mb-4 flex items-center gap-3">
+            <h2 className="font-display text-lg font-bold text-brand-text">Translations</h2>
+            <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
           </div>
 
-          {project.documents.length === 0 ? (
+          {jobs.length === 0 ? (
             <div className="rounded-lg border border-brand-border bg-brand-surface px-8 py-16 text-center">
-              <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
+              <p className="font-display text-lg font-bold text-brand-text">No translations yet</p>
               <p className="mt-1 font-sans text-sm text-brand-muted">
-                Upload your first document to this project.
+                Upload a document to get started.
               </p>
-              <Link
-                href="/upload"
-                className="mt-4 inline-block rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white no-underline hover:bg-brand-accentHov"
+              <button
+                type="button"
+                onClick={() => openTranslationModal(projectId)}
+                className="mt-4 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
               >
-                Upload document
-              </Link>
+                Upload a document
+              </button>
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-brand-border">
-                    {["Document", "Status", "Language", "Created"].map((col) => (
+                    {["Document", "Language", "Status", "Created"].map((col) => (
                       <th
                         key={col}
                         className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
@@ -101,35 +149,52 @@ export default function ProjectPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {project.documents.map((doc) => (
-                    <tr key={doc.id} className="transition-colors hover:bg-brand-bg">
-                      <td className="px-5 py-3.5 font-sans text-sm font-medium text-brand-text">
-                        <Link
-                          href={`/documents/${doc.id}`}
-                          className="text-brand-text no-underline hover:underline"
-                        >
-                          {doc.filename}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="rounded-full bg-brand-bg px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium text-brand-muted">
-                          {doc.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 font-sans text-sm text-brand-muted">
-                        {doc.target_language}
-                      </td>
-                      <td className="px-5 py-3.5 font-sans text-xs text-brand-subtle">
-                        {new Date(doc.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
+                  {jobs.map((job) => {
+                    const label = statusLabel(job.status);
+                    const isProcessing = PROCESSING_STATUSES.has(job.status);
+                    return (
+                      <tr
+                        key={job.id}
+                        className={isProcessing
+                          ? "cursor-not-allowed opacity-60"
+                          : "cursor-pointer transition-colors hover:bg-brand-bg"
+                        }
+                      >
+                        <td className="px-5 py-3.5 font-sans text-sm font-medium text-brand-text">
+                          {isProcessing ? (
+                            job.document_name ?? `Job #${job.id}`
+                          ) : (
+                            <Link
+                              href={`/translation-jobs/${job.id}/overview`}
+                              className="text-brand-text no-underline hover:underline"
+                            >
+                              {job.document_name ?? `Job #${job.id}`}
+                            </Link>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 font-sans text-[0.8125rem] text-brand-muted">
+                          {(job.source_language ?? "EN").substring(0, 2).toUpperCase()} → {job.target_language.substring(0, 2).toUpperCase()}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium ${statusBadgeClasses(label)}`}>
+                            {label}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 font-sans text-xs text-brand-subtle">
+                          {new Date(job.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
       </div>
+
+      {/* Modal — needs projects list for selector */}
+      <NewTranslationModal projects={project ? [project] : []} />
     </div>
   );
 }

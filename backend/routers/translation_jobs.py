@@ -2433,6 +2433,7 @@ def list_document_translation_jobs(
 def list_translation_jobs(
     limit: int = Query(default=10, ge=1, le=50),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    project_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
@@ -2440,15 +2441,23 @@ def list_translation_jobs(
 
     Returns jobs ordered by created_at in the requested direction, capped at
     `limit` (max 50). Scoped to the authenticated user's organisation.
+    Optionally filter by project_id (matches via document.project_id).
     """
     order_col = TranslationJob.created_at.desc() if order == "desc" else TranslationJob.created_at.asc()
-    jobs = (
-        db.query(TranslationJob)
-        .filter(TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None))
-        .order_by(order_col)
-        .limit(limit)
-        .all()
+    query = db.query(TranslationJob).filter(
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
     )
+    if project_id is not None:
+        project_doc_ids = [
+            d.id for d in db.query(Document.id).filter(
+                Document.project_id == project_id,
+                Document.org_id == current_org.id,
+                Document.deleted_at.is_(None),
+            ).all()
+        ]
+        query = query.filter(TranslationJob.document_id.in_(project_doc_ids))
+    jobs = query.order_by(order_col).limit(limit).all()
     doc_ids = [j.document_id for j in jobs]
     docs = (
         {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
