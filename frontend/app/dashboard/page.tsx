@@ -357,7 +357,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Modals ── */}
-      <NewTranslationModal projects={[]} />
+      <NewTranslationModal projects={projectList ?? []} />
       <NewProjectModal />
     </div>
   );

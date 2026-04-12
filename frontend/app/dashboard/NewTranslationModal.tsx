@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, queryKeys } from "../services/api";
-import type { ProjectListItem } from "../services/api";
+import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 import { trackEvent } from "../utils/analytics";
 
@@ -22,7 +22,7 @@ const LANGUAGE_OPTIONS = [
 const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-export function NewTranslationModal({ projects }: { projects: ProjectListItem[] }) {
+export function NewTranslationModal({ projects }: { projects: ProjectResponse[] }) {
   const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.translationModalOpen);
   const closeModal = useDashboardStore((s) => s.closeTranslationModal);
