@@ -30,12 +30,15 @@ from models import (
     TranslationResult,
 )
 from schemas import (
+    DocumentBlockResponse,
     ExportResponse,
     PreviewResponse,
     ExportFileResponse,
     ProcessingStageJobResponse,
     ReviewBlocksPageResponse,
     ReviewSummaryResponse,
+    SourceEditRequest,
+    SourceEditResponse,
     TranslationJobCreateRequest,
     TranslationProgressResponse,
     ReviewBlockResponse,
@@ -106,6 +109,8 @@ _RTF_METADATA_FRAGMENT_PATTERN = re.compile(
 _FONT_NAME_FRAGMENT_PATTERN = re.compile(r"^[A-Za-z0-9 _-]{2,80};$")
 SUPPORTED_EXPORT_MODES = {"clean_text", "preserve_formatting"}
 SUPPORTED_EXPORT_FORMATS = {"txt", "rtf", "docx"}
+SOURCE_EDIT_WARNING = 0.25
+SOURCE_EDIT_THRESHOLD = 0.33
 
 
 def _normalize_translation_style(value: str | None) -> str:
@@ -1709,6 +1714,7 @@ def list_review_blocks(
                 text_original=block.text_original,
                 text_translated=translated_text_final,
                 formatting_json=block.formatting_json,
+                source_edited=block.source_edited,
                 segments=block_segments,
             )
         )
@@ -2455,3 +2461,128 @@ def list_translation_jobs(
         )
         for job in jobs
     ]
+
+
+# ---------------------------------------------------------------------------
+# Source block editing
+# ---------------------------------------------------------------------------
+
+
+def _count_words(text: str) -> int:
+    """Count words in a text string."""
+    return len(text.split())
+
+
+@router.patch("/{job_id}/blocks/{block_id}/source", response_model=SourceEditResponse)
+def edit_block_source(
+    job_id: int,
+    block_id: int,
+    body: SourceEditRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Edit the source text of a block and trigger re-translation.
+
+    Stores the original source text on first edit, updates the block,
+    voids all translation results for the block's segments, and queues
+    re-translation. Returns threshold warnings when cumulative edits
+    approach or exceed the configured limit.
+    """
+    job = (
+        db.query(TranslationJob)
+        .filter(
+            TranslationJob.id == job_id,
+            TranslationJob.org_id == current_org.id,
+            TranslationJob.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    block = (
+        db.query(DocumentBlock)
+        .filter(
+            DocumentBlock.id == block_id,
+            DocumentBlock.document_id == job.document_id,
+        )
+        .first()
+    )
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found in this job's document")
+
+    new_source = body.source_text.strip()
+    if new_source == block.text_original:
+        raise HTTPException(status_code=400, detail="Source text is unchanged")
+
+    # Store original on first edit
+    if not block.source_edited:
+        block.original_source_text = block.text_original
+
+    # Calculate word delta
+    old_word_count = _count_words(block.text_original)
+    new_word_count = _count_words(new_source)
+    word_delta = abs(new_word_count - old_word_count)
+    job.source_edit_word_delta = (job.source_edit_word_delta or 0) + word_delta
+
+    # Update block source
+    block.text_original = new_source
+    block.source_edited = True
+
+    # Update all segments in this block with new source text
+    segments = (
+        db.query(DocumentSegment)
+        .filter(DocumentSegment.block_id == block_id)
+        .order_by(DocumentSegment.segment_index)
+        .all()
+    )
+
+    # For single-segment blocks, update the segment source text directly
+    if len(segments) == 1:
+        segments[0].source_text = new_source
+
+    # Void translation results for all segments in this block
+    segment_ids = [s.id for s in segments]
+    if segment_ids:
+        db.query(TranslationResult).filter(
+            TranslationResult.job_id == job_id,
+            TranslationResult.segment_id.in_(segment_ids),
+        ).update(
+            {"review_status": "source_changed", "final_translation": ""},
+            synchronize_session="fetch",
+        )
+
+    # Clear block translated text
+    block.text_translated = None
+
+    # Calculate threshold
+    total_source_words = sum(
+        _count_words(b.text_original)
+        for b in db.query(DocumentBlock)
+        .filter(DocumentBlock.document_id == job.document_id)
+        .all()
+    )
+    edit_ratio = job.source_edit_word_delta / max(total_source_words, 1)
+    threshold_warning = edit_ratio >= SOURCE_EDIT_WARNING
+    threshold_exceeded = edit_ratio >= SOURCE_EDIT_THRESHOLD
+
+    db.commit()
+    db.refresh(block)
+    db.refresh(job)
+
+    # Queue re-translation in background
+    background_tasks.add_task(_run_translation_pipeline, job.id)
+
+    logger.info(
+        "Source edited block_id=%d job_id=%d word_delta=%d edit_ratio=%.2f",
+        block_id, job_id, word_delta, edit_ratio,
+    )
+
+    return SourceEditResponse(
+        block=DocumentBlockResponse.model_validate(block),
+        source_edit_word_delta=job.source_edit_word_delta,
+        total_source_words=total_source_words,
+        threshold_warning=threshold_warning,
+        threshold_exceeded=threshold_exceeded,
+    )

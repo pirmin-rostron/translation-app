@@ -99,6 +99,7 @@ export type ReviewBlock = {
   text_original: string | null;
   text_translated: string | null;
   formatting_json: Record<string, unknown> | null;
+  source_edited: boolean;
   segments: ReviewSegment[];
 };
 

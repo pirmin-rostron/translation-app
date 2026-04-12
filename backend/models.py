@@ -75,6 +75,7 @@ class TranslationJob(Base):
     translation_batch_size = Column(Integer, nullable=True)  # batch size used
     created_at = Column(DateTime, default=datetime.utcnow)
     org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
+    source_edit_word_delta = Column(Integer, nullable=False, default=0)
     deleted_at = Column(DateTime, nullable=True, default=None)
 
     document = relationship("Document", backref="translation_jobs")
@@ -218,6 +219,8 @@ class DocumentBlock(Base):
     text_original = Column(Text, nullable=False)
     text_translated = Column(Text, nullable=True)
     formatting_json = Column(JSONB, nullable=True)
+    source_edited = Column(Boolean, nullable=False, default=False)
+    original_source_text = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", back_populates="blocks")

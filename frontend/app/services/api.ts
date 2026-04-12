@@ -217,6 +217,32 @@ export const translationJobsApi = {
 
   saveDraft: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/save-draft`, { method: "POST" }),
+
+  editBlockSource: (jobId: number, blockId: number, sourceText: string) =>
+    apiFetch<SourceEditResponse>(`${API_URL}/translation-jobs/${jobId}/blocks/${blockId}/source`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_text: sourceText }),
+    }),
+};
+
+export type SourceEditResponse = {
+  block: {
+    id: number;
+    document_id: number;
+    block_index: number;
+    block_type: string;
+    text_original: string;
+    text_translated: string | null;
+    formatting_json: Record<string, unknown> | null;
+    source_edited: boolean;
+    original_source_text: string | null;
+    created_at: string;
+  };
+  source_edit_word_delta: number;
+  total_source_words: number;
+  threshold_warning: boolean;
+  threshold_exceeded: boolean;
 };
 
 // --- translation_results (part of translation_jobs router boundary) ---

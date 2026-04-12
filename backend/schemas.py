@@ -59,10 +59,24 @@ class DocumentBlockResponse(BaseModel):
     text_original: str
     text_translated: str | None
     formatting_json: dict | None
+    source_edited: bool = False
+    original_source_text: str | None = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class SourceEditRequest(BaseModel):
+    source_text: str = Field(..., min_length=1)
+
+
+class SourceEditResponse(BaseModel):
+    block: DocumentBlockResponse
+    source_edit_word_delta: int
+    total_source_words: int
+    threshold_warning: bool = False
+    threshold_exceeded: bool = False
 
 
 class TranslationJobCreateRequest(BaseModel):
@@ -248,6 +262,7 @@ class ReviewBlockResponse(BaseModel):
     text_original: str
     text_translated: str | None
     formatting_json: dict | None
+    source_edited: bool = False
     segments: list[ReviewSegmentResponse]
 
 

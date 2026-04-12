@@ -114,6 +114,7 @@ type DocumentBlock = {
   translated_text_display: string | null;
   text_original: string;
   text_translated: string | null;
+  source_edited: boolean;
   segments: ReviewSegment[];
 };
 
@@ -479,6 +480,11 @@ function TranslationReviewPageInner() {
   const liveRegionRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [editingSourceBlockId, setEditingSourceBlockId] = useState<number | null>(null);
+  const [sourceEditDraft, setSourceEditDraft] = useState("");
+  const [sourceEditLoading, setSourceEditLoading] = useState(false);
+  const [sourceThresholdWarning, setSourceThresholdWarning] = useState(false);
+  const [sourceThresholdExceeded, setSourceThresholdExceeded] = useState(false);
   const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
   const allSegments = useMemo(
@@ -896,6 +902,80 @@ function TranslationReviewPageInner() {
     );
   }
 
+  function renderSourceEditControls(block: DocumentBlock) {
+    if (editingSourceBlockId === block.id) {
+      return (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={sourceEditDraft}
+            onChange={(e) => setSourceEditDraft(e.target.value)}
+            className="w-full rounded border border-brand-border bg-brand-surface px-3 py-2 font-sans text-sm text-brand-text outline-none focus:border-brand-accent"
+            rows={4}
+            disabled={sourceEditLoading}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleSaveSourceEdit(block.id)}
+              disabled={sourceEditLoading || sourceEditDraft.trim() === block.text_original}
+              className="rounded-full bg-brand-accent px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            >
+              {sourceEditLoading ? "Saving…" : "Save & Re-translate"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelSourceEdit}
+              disabled={sourceEditLoading}
+              className="rounded-full border border-brand-border px-4 py-1.5 text-xs font-medium text-brand-muted"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  function renderSourceChangedLabel(block: DocumentBlock) {
+    const hasSourceChanged = block.segments.some((s) => s.review_status === "source_changed");
+    if (block.source_edited && hasSourceChanged) {
+      return (
+        <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-700">
+          <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Source updated — re-translating
+        </span>
+      );
+    }
+    if (block.source_edited) {
+      return (
+        <span className="mb-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-600">
+          Source edited
+        </span>
+      );
+    }
+    return null;
+  }
+
+  function renderPencilIcon(block: DocumentBlock) {
+    if (editingSourceBlockId != null) return null;
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); startSourceEdit(block); }}
+        className="ml-1 inline-flex opacity-0 transition-opacity group-hover/source:opacity-100"
+        title="Edit source text"
+      >
+        <svg className="h-3.5 w-3.5 text-brand-muted hover:text-brand-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
+    );
+  }
+
   function renderNode(node: DocumentNode, side: "source" | "target") {
     if (node.type === "bullet_list") {
       return (
@@ -909,9 +989,14 @@ function TranslationReviewPageInner() {
                   blockRefs.current[block.id] = el;
                 }}
               >
-                <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
-                  {renderInlineSegments(block, side)}
-                </p>
+                <div className="group/source">
+                  {side === "source" && renderSourceChangedLabel(block)}
+                  <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+                    {renderInlineSegments(block, side)}
+                    {side === "source" && renderPencilIcon(block)}
+                  </p>
+                  {side === "source" && renderSourceEditControls(block)}
+                </div>
               </li>
             );
           })}
@@ -928,9 +1013,14 @@ function TranslationReviewPageInner() {
           ref={(el) => {
             blockRefs.current[block.id] = el;
           }}
-          className="p-1"
+          className="group/source p-1"
         >
-          <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>{body}</H>
+          {side === "source" && renderSourceChangedLabel(block)}
+          <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>
+            {body}
+            {side === "source" && renderPencilIcon(block)}
+          </H>
+          {side === "source" && renderSourceEditControls(block)}
         </div>
       );
     }
@@ -939,9 +1029,14 @@ function TranslationReviewPageInner() {
         ref={(el) => {
           blockRefs.current[block.id] = el;
         }}
-        className="p-1"
+        className="group/source p-1"
       >
-        <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>{body}</p>
+        {side === "source" && renderSourceChangedLabel(block)}
+        <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+          {body}
+          {side === "source" && renderPencilIcon(block)}
+        </p>
+        {side === "source" && renderSourceEditControls(block)}
       </div>
     );
   }
@@ -1026,6 +1121,37 @@ function TranslationReviewPageInner() {
     } finally {
       setActionLoading(false);
 
+    }
+  }
+
+  function startSourceEdit(block: DocumentBlock) {
+    setEditingSourceBlockId(block.id);
+    setSourceEditDraft(block.text_original);
+  }
+
+  function cancelSourceEdit() {
+    setEditingSourceBlockId(null);
+    setSourceEditDraft("");
+  }
+
+  async function handleSaveSourceEdit(blockId: number) {
+    if (!job) return;
+    setSourceEditLoading(true);
+    setError("");
+    try {
+      const result = await translationJobsApi.editBlockSource(job.id, blockId, sourceEditDraft);
+      setEditingSourceBlockId(null);
+      setSourceEditDraft("");
+      if (result.threshold_exceeded) {
+        setSourceThresholdExceeded(true);
+      } else if (result.threshold_warning) {
+        setSourceThresholdWarning(true);
+      }
+      await Promise.all([loadReviewBlocks(page), loadReviewSummary()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save source edit");
+    } finally {
+      setSourceEditLoading(false);
     }
   }
 
@@ -1582,6 +1708,51 @@ function TranslationReviewPageInner() {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {sourceThresholdWarning && !sourceThresholdExceeded && (
+        <div className="flex items-center justify-between gap-3 border-b border-amber-300/30 bg-amber-50 px-6 py-2">
+          <p className="text-sm text-amber-700">
+            You&apos;re editing a significant portion of this document. Consider starting a new translation job for best results.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSourceThresholdWarning(false)}
+            className="shrink-0 text-amber-700 hover:opacity-70"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {sourceThresholdExceeded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-lg bg-brand-surface p-6 shadow-xl">
+            <h3 className="mb-2 font-display text-lg font-bold text-brand-text">
+              Significant source changes detected
+            </h3>
+            <p className="mb-4 text-sm text-brand-muted">
+              You&apos;ve changed more than 33% of the source content. We recommend creating a new translation job for best results.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSourceThresholdExceeded(false)}
+                className="rounded-full border border-brand-border px-4 py-2 text-sm font-medium text-brand-muted"
+              >
+                Continue editing
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-full bg-brand-accent px-4 py-2 text-sm font-medium text-white"
+              >
+                Start new job
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
