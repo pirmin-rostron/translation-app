@@ -36,7 +36,7 @@ function statusBadgeClasses(status: string): string {
       return "bg-brand-accent/[0.12] text-brand-accent";
     case "Completed":
     case "Ready for Export":
-      return "bg-green-50 text-green-700";
+      return "bg-status-successBg text-status-success";
     case "Failed":
       return "bg-status-errorBg text-status-error";
     case "Translating…":

@@ -30,7 +30,7 @@ export function Input({
       <input
         id={inputId}
         {...props}
-        className={`rounded border px-3 py-2 text-sm text-brand-text placeholder-brand-subtle outline-none transition-colors focus:border-brand-accent focus:ring-2 focus:ring-brand-accentMid disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`rounded-lg border px-3 py-2 text-sm text-brand-text placeholder-brand-subtle outline-none transition-colors focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 disabled:cursor-not-allowed disabled:opacity-50 ${
           error ? "border-status-error" : "border-brand-border"
         } ${className}`}
       />

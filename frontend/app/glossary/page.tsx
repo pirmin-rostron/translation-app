@@ -181,7 +181,7 @@ export default function GlossaryPage() {
     width: "100%",
     fontFamily: "Inter, sans-serif",
   };
-  const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400";
+  const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-brand-subtle";
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC", paddingTop: "5.5rem" }}>
@@ -194,11 +194,11 @@ export default function GlossaryPage() {
         </h1>
 
         {/* ── CSV Import ── */}
-        <div className="mb-6 border border-stone-200 bg-white p-6">
+        <div className="mb-6 border border-brand-border bg-white p-6">
           <h2 className="mb-1 text-base font-semibold" style={{ color: "#1A110A" }}>
             Bulk CSV import
           </h2>
-          <p className="mb-4 text-sm text-stone-500">
+          <p className="mb-4 text-sm text-brand-subtle">
             Use bulk import to seed terminology quickly, then manage terms here with create/edit/delete actions.
           </p>
           <form
@@ -206,36 +206,36 @@ export default function GlossaryPage() {
             className="flex flex-wrap items-end gap-3"
           >
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-stone-500">CSV file</label>
+              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">CSV file</label>
               <input
                 type="file"
                 accept=".csv"
                 required
                 disabled={csvImporting}
                 onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-                className="text-sm text-stone-700 file:mr-3 file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-stone-600 hover:file:bg-stone-200"
+                className="text-sm text-brand-text file:mr-3 file:border-0 file:bg-brand-bg file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-muted hover:file:bg-brand-bg"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-stone-500">Source language</label>
+              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Source language</label>
               <input
                 value={csvSourceLang}
                 onChange={(e) => setCsvSourceLang(e.target.value)}
                 placeholder="en"
                 required
                 disabled={csvImporting}
-                className="w-24 border border-stone-300 bg-white px-3 py-2 text-sm focus:border-[#0D7B6E] focus:outline-none"
+                className="w-24 border border-brand-border bg-white px-3 py-2 text-sm focus:border-[#0D7B6E] focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-stone-500">Target language</label>
+              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Target language</label>
               <input
                 value={csvTargetLang}
                 onChange={(e) => setCsvTargetLang(e.target.value)}
                 placeholder="de"
                 required
                 disabled={csvImporting}
-                className="w-24 border border-stone-300 bg-white px-3 py-2 text-sm focus:border-[#0D7B6E] focus:outline-none"
+                className="w-24 border border-brand-border bg-white px-3 py-2 text-sm focus:border-[#0D7B6E] focus:outline-none"
               />
             </div>
             <button
@@ -251,7 +251,7 @@ export default function GlossaryPage() {
             <div className="mt-3 text-sm" style={{ color: "#0D7B6E" }}>
               Imported {csvResult.imported} terms, skipped {csvResult.skipped}.
               {csvResult.errors.length > 0 && (
-                <ul className="mt-1 list-inside list-disc text-red-600">
+                <ul className="mt-1 list-inside list-disc text-status-error">
                   {csvResult.errors.map((e, i) => (
                     <li key={i}>{e}</li>
                   ))}
@@ -259,11 +259,11 @@ export default function GlossaryPage() {
               )}
             </div>
           )}
-          {csvError && <p className="mt-2 text-sm text-red-600">{csvError}</p>}
+          {csvError && <p className="mt-2 text-sm text-status-error">{csvError}</p>}
         </div>
 
         {/* ── Add term ── */}
-        <div className="mb-6 border border-stone-200 bg-white p-6">
+        <div className="mb-6 border border-brand-border bg-white p-6">
           <h2 className="mb-4 text-base font-semibold" style={{ color: "#1A110A" }}>
             Add term
           </h2>
@@ -318,14 +318,14 @@ export default function GlossaryPage() {
                 {saving ? "Saving…" : "Save glossary term"}
               </button>
               {message && <span className="text-sm" style={{ color: "#0D7B6E" }}>{message}</span>}
-              {error && <span className="text-sm text-red-600">{error}</span>}
+              {error && <span className="text-sm text-status-error">{error}</span>}
             </div>
           </form>
         </div>
 
         {/* ── Terms list ── */}
-        <div className="border border-stone-200 bg-white">
-          <div className="border-b border-stone-100 px-6 py-4">
+        <div className="border border-brand-border bg-white">
+          <div className="border-b border-brand-border px-6 py-4">
             <h2 className="mb-3 text-base font-semibold" style={{ color: "#1A110A" }}>
               Glossary terms
             </h2>
@@ -355,7 +355,7 @@ export default function GlossaryPage() {
                     className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                       langFilter === pair
                         ? "text-white"
-                        : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                        : "border border-brand-border bg-white text-brand-muted hover:bg-brand-bg"
                     }`}
                     style={langFilter === pair ? { backgroundColor: "#0D7B6E" } : undefined}
                   >
@@ -367,9 +367,9 @@ export default function GlossaryPage() {
           </div>
 
           {loading ? (
-            <p className="px-6 py-8 text-sm text-stone-400">Loading…</p>
+            <p className="px-6 py-8 text-sm text-brand-subtle">Loading…</p>
           ) : displayedTerms.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-stone-400">
+            <p className="px-6 py-8 text-sm text-brand-subtle">
               {terms.length === 0
                 ? "No glossary terms yet. Add your first term above or import from a CSV file."
                 : "No terms match your search or filter."}
@@ -377,7 +377,7 @@ export default function GlossaryPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-stone-100 text-sm">
-                <thead className="bg-stone-50">
+                <thead className="bg-brand-bg">
                   <tr>
                     {["Source", "Target", "Languages", "Industry", "Domain", "Action"].map((col) => (
                       <th key={col} className={TH}>
@@ -391,19 +391,19 @@ export default function GlossaryPage() {
                     const isEditing = editingId === term.id;
                     const isPhrase = term.source_term.includes(" ");
                     return (
-                      <tr key={term.id} className="hover:bg-stone-50">
+                      <tr key={term.id} className="hover:bg-brand-bg">
                         {/* Source */}
                         <td className="px-4 py-3 font-medium" style={{ color: "#1A110A" }}>
                           {isEditing ? (
                             <input
                               value={editSource}
                               onChange={(e) => setEditSource(e.target.value)}
-                              className="w-full border border-stone-300 px-2 py-1 text-sm focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border px-2 py-1 text-sm focus:border-[#0D7B6E] focus:outline-none"
                             />
                           ) : (
                             <span className="flex items-center gap-2">
                               {term.source_term}
-                              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-400">
+                              <span className="rounded bg-brand-bg px-1.5 py-0.5 text-xs text-brand-subtle">
                                 {isPhrase ? "Phrase" : "Term"}
                               </span>
                             </span>
@@ -415,20 +415,20 @@ export default function GlossaryPage() {
                             <input
                               value={editTarget}
                               onChange={(e) => setEditTarget(e.target.value)}
-                              className="w-full border border-stone-300 px-2 py-1 text-sm focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border px-2 py-1 text-sm focus:border-[#0D7B6E] focus:outline-none"
                             />
                           ) : (
                             term.target_term
                           )}
                         </td>
-                        <td className="px-4 py-3 text-stone-500">
+                        <td className="px-4 py-3 text-brand-subtle">
                           {term.source_language} → {term.target_language}
                         </td>
-                        <td className="px-4 py-3 text-stone-500">
-                          {term.industry ?? <span className="text-stone-300">—</span>}
+                        <td className="px-4 py-3 text-brand-subtle">
+                          {term.industry ?? <span className="text-brand-subtle">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-stone-500">
-                          {term.domain ?? <span className="text-stone-300">—</span>}
+                        <td className="px-4 py-3 text-brand-subtle">
+                          {term.domain ?? <span className="text-brand-subtle">—</span>}
                         </td>
                         {/* Action */}
                         <td className="px-4 py-3">
@@ -448,13 +448,13 @@ export default function GlossaryPage() {
                                   type="button"
                                   onClick={cancelEdit}
                                   disabled={editSaving}
-                                  className="text-sm text-stone-400 hover:text-stone-600 disabled:opacity-50"
+                                  className="text-sm text-brand-subtle hover:text-brand-muted disabled:opacity-50"
                                 >
                                   Cancel
                                 </button>
                               </div>
                               {editError && (
-                                <span className="text-xs text-red-600">{editError}</span>
+                                <span className="text-xs text-status-error">{editError}</span>
                               )}
                             </div>
                           ) : (
@@ -462,7 +462,7 @@ export default function GlossaryPage() {
                               <button
                                 type="button"
                                 onClick={() => startEdit(term)}
-                                className="text-sm text-stone-500 hover:text-stone-700"
+                                className="text-sm text-brand-subtle hover:text-brand-text"
                               >
                                 Edit
                               </button>

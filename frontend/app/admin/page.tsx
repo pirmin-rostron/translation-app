@@ -54,14 +54,14 @@ function exportCsv(rows: WaitlistEntry[]): void {
 
 // ── Shared table class constants ───────────────────────────────────────────
 
-const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-stone-400";
-const TD = "px-4 py-3 text-sm text-stone-600";
+const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-brand-subtle";
+const TD = "px-4 py-3 text-sm text-brand-muted";
 
 // ── Stat card ──────────────────────────────────────────────────────────────
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="border border-stone-200 bg-white px-5 py-4">
+    <div className="border border-brand-border bg-white px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
         {label}
       </p>
@@ -79,9 +79,9 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 function ComingSoon({ note }: { note: string }) {
   return (
-    <div className="border border-stone-200 bg-stone-50 px-5 py-6">
-      <p className="text-xs font-medium uppercase tracking-widest text-stone-400">Coming Soon</p>
-      <p className="mt-2 text-sm text-stone-500">{note}</p>
+    <div className="border border-brand-border bg-brand-bg px-5 py-6">
+      <p className="text-xs font-medium uppercase tracking-widest text-brand-subtle">Coming Soon</p>
+      <p className="mt-2 text-sm text-brand-subtle">{note}</p>
     </div>
   );
 }
@@ -246,7 +246,7 @@ export default function AdminPage() {
         >
           Admin Dashboard
         </h1>
-        <p className="mb-8 text-sm text-stone-500">Internal tooling — admin access only.</p>
+        <p className="mb-8 text-sm text-brand-subtle">Internal tooling — admin access only.</p>
 
         {/* ── Tab pills ── */}
         <div className="mb-8 flex flex-wrap gap-2">
@@ -258,7 +258,7 @@ export default function AdminPage() {
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-[#1A110A] text-white"
-                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                  : "border border-brand-border bg-white text-brand-muted hover:bg-brand-bg"
               }`}
             >
               {tab.label}
@@ -280,7 +280,7 @@ export default function AdminPage() {
                   Waitlist
                 </h2>
                 {!waitlistLoading && (
-                  <p className="mt-0.5 text-sm text-stone-500">
+                  <p className="mt-0.5 text-sm text-brand-subtle">
                     {waitlist.length} {waitlist.length === 1 ? "entry" : "entries"}
                   </p>
                 )}
@@ -289,19 +289,19 @@ export default function AdminPage() {
                 type="button"
                 onClick={() => exportCsv(waitlist)}
                 disabled={waitlist.length === 0}
-                className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+                className="rounded-full border border-brand-border bg-white px-4 py-1.5 text-sm font-medium text-brand-text hover:bg-brand-bg disabled:opacity-40"
               >
                 Export CSV
               </button>
             </div>
 
-            {waitlistLoading && <p className="text-stone-500">Loading…</p>}
-            {waitlistError && <p className="text-red-600">{waitlistError}</p>}
+            {waitlistLoading && <p className="text-brand-subtle">Loading…</p>}
+            {waitlistError && <p className="text-status-error">{waitlistError}</p>}
 
             {!waitlistLoading && !waitlistError && (
-              <div className="overflow-x-auto border border-stone-200 bg-white">
+              <div className="overflow-x-auto border border-brand-border bg-white">
                 <table className="min-w-full divide-y divide-stone-100 text-sm">
-                  <thead className="bg-stone-50">
+                  <thead className="bg-brand-bg">
                     <tr>
                       {["Name", "Email", "Joined"].map((col) => (
                         <th key={col} className={TH}>
@@ -312,7 +312,7 @@ export default function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {waitlist.map((entry) => (
-                      <tr key={entry.email} className="hover:bg-stone-50">
+                      <tr key={entry.email} className="hover:bg-brand-bg">
                         <td className={TD} style={{ color: "#1A110A" }}>
                           {entry.name}
                         </td>
@@ -322,7 +322,7 @@ export default function AdminPage() {
                     ))}
                     {waitlist.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-stone-400">
+                        <td colSpan={3} className="px-4 py-8 text-center text-brand-subtle">
                           No waitlist entries yet.
                         </td>
                       </tr>
@@ -346,14 +346,14 @@ export default function AdminPage() {
               Users & Orgs
             </h2>
 
-            {usersLoading && <p className="text-stone-500">Loading…</p>}
-            {usersError && <p className="text-red-600">{usersError}</p>}
+            {usersLoading && <p className="text-brand-subtle">Loading…</p>}
+            {usersError && <p className="text-status-error">{usersError}</p>}
 
             {!usersLoading && !usersError && (
               <>
                 {/* Org card */}
                 {org && (
-                  <div className="mb-6 border border-stone-200 bg-white px-5 py-4">
+                  <div className="mb-6 border border-brand-border bg-white px-5 py-4">
                     <p
                       className="text-xs font-medium uppercase tracking-widest"
                       style={{ color: "#0D7B6E" }}
@@ -366,7 +366,7 @@ export default function AdminPage() {
                     >
                       {org.org.name}
                     </p>
-                    <p className="mt-0.5 text-xs text-stone-400">
+                    <p className="mt-0.5 text-xs text-brand-subtle">
                       {members.length} member{members.length !== 1 ? "s" : ""} · Created{" "}
                       {fmt(org.org.created_at)}
                     </p>
@@ -374,12 +374,12 @@ export default function AdminPage() {
                 )}
 
                 {/* Members table */}
-                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-stone-400">
+                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-subtle">
                   Members
                 </p>
-                <div className="mb-6 overflow-x-auto border border-stone-200 bg-white">
+                <div className="mb-6 overflow-x-auto border border-brand-border bg-white">
                   <table className="min-w-full divide-y divide-stone-100 text-sm">
-                    <thead className="bg-stone-50">
+                    <thead className="bg-brand-bg">
                       <tr>
                         {["Name", "Email", "Role"].map((col) => (
                           <th key={col} className={TH}>
@@ -390,13 +390,13 @@ export default function AdminPage() {
                     </thead>
                     <tbody className="divide-y divide-stone-100">
                       {members.map((m) => (
-                        <tr key={m.user_id} className="hover:bg-stone-50">
+                        <tr key={m.user_id} className="hover:bg-brand-bg">
                           <td className={TD} style={{ color: "#1A110A" }}>
-                            {m.full_name ?? <span className="text-stone-300">—</span>}
+                            {m.full_name ?? <span className="text-brand-subtle">—</span>}
                           </td>
                           <td className={TD}>{m.email}</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-stone-100 text-stone-600">
+                            <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-brand-bg text-brand-muted">
                               {toTitle(m.role)}
                             </span>
                           </td>
@@ -404,7 +404,7 @@ export default function AdminPage() {
                       ))}
                       {members.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-stone-400">
+                          <td colSpan={3} className="px-4 py-8 text-center text-brand-subtle">
                             No members found.
                           </td>
                         </tr>
@@ -414,7 +414,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* ── Invite User ── */}
-                <div className="border border-stone-200 bg-white px-5 py-5">
+                <div className="border border-brand-border bg-white px-5 py-5">
                   <p className="mb-4 text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
                     Invite User
                   </p>
@@ -427,10 +427,10 @@ export default function AdminPage() {
                             Account created. Share these credentials with the user:
                           </p>
                           <div className="space-y-1 rounded border border-[#0D7B6E]/20 bg-white px-4 py-3 font-mono text-sm" style={{ color: "#1A110A" }}>
-                            <p><span className="text-stone-400">Email:</span> {inviteResult.email}</p>
-                            <p><span className="text-stone-400">Temporary password:</span> <span className="font-bold select-all">{inviteResult.temporaryPassword}</span></p>
+                            <p><span className="text-brand-subtle">Email:</span> {inviteResult.email}</p>
+                            <p><span className="text-brand-subtle">Temporary password:</span> <span className="font-bold select-all">{inviteResult.temporaryPassword}</span></p>
                           </div>
-                          <p className="mt-2 text-xs text-stone-500">They should change this on first login.</p>
+                          <p className="mt-2 text-xs text-brand-subtle">They should change this on first login.</p>
                         </>
                       ) : (
                         <p className="text-sm font-medium" style={{ color: "#0D7B6E" }}>
@@ -441,12 +441,12 @@ export default function AdminPage() {
                   )}
 
                   {inviteError && (
-                    <p className="mb-4 text-sm text-red-600">{inviteError}</p>
+                    <p className="mb-4 text-sm text-status-error">{inviteError}</p>
                   )}
 
                   <form onSubmit={(e) => { void handleInvite(e); }} className="flex flex-col gap-4 sm:flex-row sm:items-end">
                     <div className="flex-1">
-                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Email</label>
+                      <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Email</label>
                       <input
                         type="email"
                         required
@@ -454,11 +454,11 @@ export default function AdminPage() {
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="user@company.com"
                         disabled={inviteLoading}
-                        className="w-full border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                        className="w-full border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-text placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Full name</label>
+                      <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Full name</label>
                       <input
                         type="text"
                         required
@@ -466,16 +466,16 @@ export default function AdminPage() {
                         onChange={(e) => setInviteFullName(e.target.value)}
                         placeholder="Ada Lovelace"
                         disabled={inviteLoading}
-                        className="w-full border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                        className="w-full border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-text placeholder-stone-300 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-stone-500">Role</label>
+                      <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Role</label>
                       <select
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value as "member" | "admin")}
                         disabled={inviteLoading}
-                        className="border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
+                        className="border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-text focus:border-[#0D7B6E] focus:outline-none disabled:opacity-50"
                       >
                         <option value="member">Member</option>
                         <option value="admin">Admin</option>
@@ -511,8 +511,8 @@ export default function AdminPage() {
               Usage
             </h2>
 
-            {usageLoading && <p className="text-stone-500">Loading…</p>}
-            {usageError && <p className="text-red-600">{usageError}</p>}
+            {usageLoading && <p className="text-brand-subtle">Loading…</p>}
+            {usageError && <p className="text-status-error">{usageError}</p>}
 
             {usageData && (
               <>
@@ -527,15 +527,15 @@ export default function AdminPage() {
                 </div>
 
                 {/* Org audit log — GET /auth/org/audit */}
-                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-stone-400">
+                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-subtle">
                   Org Audit Log
                 </p>
-                {auditLoading && <p className="text-stone-500">Loading audit log…</p>}
-                {auditError && <p className="mb-2 text-red-600">{auditError}</p>}
+                {auditLoading && <p className="text-brand-subtle">Loading audit log…</p>}
+                {auditError && <p className="mb-2 text-status-error">{auditError}</p>}
                 {!auditLoading && !auditError && (
-                  <div className="overflow-x-auto border border-stone-200 bg-white">
+                  <div className="overflow-x-auto border border-brand-border bg-white">
                     <table className="min-w-full divide-y divide-stone-100 text-sm">
-                      <thead className="bg-stone-50">
+                      <thead className="bg-brand-bg">
                         <tr>
                           {["Time", "Event", "Meta"].map((col) => (
                             <th key={col} className={TH}>
@@ -546,8 +546,8 @@ export default function AdminPage() {
                       </thead>
                       <tbody className="divide-y divide-stone-100">
                         {auditLog.map((event) => (
-                          <tr key={event.id} className="hover:bg-stone-50">
-                            <td className="whitespace-nowrap px-4 py-3 text-sm text-stone-500">
+                          <tr key={event.id} className="hover:bg-brand-bg">
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-brand-subtle">
                               {fmt(event.created_at)}
                             </td>
                             <td
@@ -563,7 +563,7 @@ export default function AdminPage() {
                         ))}
                         {auditLog.length === 0 && !auditError && (
                           <tr>
-                            <td colSpan={3} className="px-4 py-8 text-center text-stone-400">
+                            <td colSpan={3} className="px-4 py-8 text-center text-brand-subtle">
                               No audit events recorded yet.
                             </td>
                           </tr>

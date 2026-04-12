@@ -843,14 +843,14 @@ function TranslationReviewPageInner() {
     if (!block.segments.length) {
       const fallbackText = side === "source" ? (block.source_text_display || "") : (block.translated_text_display || "");
       return (
-        <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md transition-colors hover:bg-stone-100/60">
+        <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md transition-colors hover:bg-brand-bg">
           {fallbackText}
         </span>
       );
     }
 
     return (
-      <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-stone-100/60">
+      <span onClick={handleClick} className="cursor-pointer rounded-md transition-colors hover:bg-brand-bg">
         {block.segments.map((segment) => {
           const isResolvedAmbiguity = segment.ambiguity_detected && isAcceptableFinalStatus(segment.review_status);
           const isUnresolvedAmbiguity = segment.ambiguity_detected && !isAcceptableFinalStatus(segment.review_status);
@@ -981,7 +981,7 @@ function TranslationReviewPageInner() {
   function renderNode(node: DocumentNode, side: "source" | "target") {
     if (node.type === "bullet_list") {
       return (
-        <ul className="list-disc space-y-3 pl-6 marker:text-stone-400">
+        <ul className="list-disc space-y-3 pl-6 marker:text-brand-subtle">
           {node.blocks.map((block) => {
             return (
               <li
@@ -1492,8 +1492,8 @@ function TranslationReviewPageInner() {
   }
 
   if (loading) return <div className="min-h-screen p-6" style={{ backgroundColor: "#F5F2EC" }}>Loading…</div>;
-  if (error && !job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>{error}</div>;
-  if (!job) return <div className="min-h-screen p-6 text-red-600" style={{ backgroundColor: "#F5F2EC" }}>Job not found</div>;
+  if (error && !job) return <div className="min-h-screen p-6 text-status-error" style={{ backgroundColor: "#F5F2EC" }}>{error}</div>;
+  if (!job) return <div className="min-h-screen p-6 text-status-error" style={{ backgroundColor: "#F5F2EC" }}>Job not found</div>;
 
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
   const reviewComplete = Boolean(reviewSummary?.review_complete);
@@ -1983,16 +1983,16 @@ function TranslationReviewPageInner() {
 
       {/* ── Modals ── */}
         {showExportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4">
-            <div className="w-full max-w-lg border border-stone-200 bg-white p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-lg border border-brand-border bg-brand-surface p-6">
               <h3 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Export settings</h3>
-              <p className="mt-1 text-sm text-stone-600">
+              <p className="mt-1 text-sm text-brand-muted">
                 Choose export options for this download.
               </p>
               <div className="mt-4 space-y-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Export format</p>
-                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-subtle">Export format</p>
+                  <label className="mt-2 block border border-brand-border bg-brand-surface px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -2004,11 +2004,11 @@ function TranslationReviewPageInner() {
                       />
                       <div>
                         <p className="text-sm font-medium" style={{ color: "#1A110A" }}>DOCX</p>
-                        <p className="mt-1 text-xs text-stone-600">Best for sharing editable documents.</p>
+                        <p className="mt-1 text-xs text-brand-muted">Best for sharing editable documents.</p>
                       </div>
                     </div>
                   </label>
-                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
+                  <label className="mt-2 block border border-brand-border bg-brand-surface px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -2020,11 +2020,11 @@ function TranslationReviewPageInner() {
                       />
                       <div>
                         <p className="text-sm font-medium" style={{ color: "#1A110A" }}>RTF</p>
-                        <p className="mt-1 text-xs text-stone-600">Rich text output compatible with many editors.</p>
+                        <p className="mt-1 text-xs text-brand-muted">Rich text output compatible with many editors.</p>
                       </div>
                     </div>
                   </label>
-                  <label className="mt-2 block border border-stone-200 bg-white px-3 py-3">
+                  <label className="mt-2 block border border-brand-border bg-brand-surface px-3 py-3">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
@@ -2036,15 +2036,15 @@ function TranslationReviewPageInner() {
                       />
                       <div>
                         <p className="text-sm font-medium" style={{ color: "#1A110A" }}>TXT</p>
-                        <p className="mt-1 text-xs text-stone-600">Plain text export for simple delivery.</p>
+                        <p className="mt-1 text-xs text-brand-muted">Plain text export for simple delivery.</p>
                       </div>
                     </div>
                   </label>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Formatting</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-subtle">Formatting</p>
                 </div>
-                <label className="block cursor-pointer border border-stone-200 bg-white px-3 py-3">
+                <label className="block cursor-pointer border border-brand-border bg-brand-surface px-3 py-3">
                   <div className="flex items-start gap-2">
                     <input
                       type="radio"
@@ -2056,13 +2056,13 @@ function TranslationReviewPageInner() {
                     />
                     <div>
                       <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Preserve original formatting</p>
-                      <p className="mt-1 text-xs text-stone-600">
+                      <p className="mt-1 text-xs text-brand-muted">
                         Preserve original formatting: keeps headings, spacing, and structure where possible.
                       </p>
                     </div>
                   </div>
                 </label>
-                <label className="block cursor-pointer border border-stone-200 bg-white px-3 py-3">
+                <label className="block cursor-pointer border border-brand-border bg-brand-surface px-3 py-3">
                   <div className="flex items-start gap-2">
                     <input
                       type="radio"
@@ -2074,14 +2074,14 @@ function TranslationReviewPageInner() {
                     />
                     <div>
                       <p className="text-sm font-medium" style={{ color: "#1A110A" }}>Clean text only</p>
-                      <p className="mt-1 text-xs text-stone-600">
+                      <p className="mt-1 text-xs text-brand-muted">
                         Clean text only: removes formatting and exports plain reviewed text.
                       </p>
                     </div>
                   </div>
                 </label>
                 {lastExportTimestamp && (
-                  <p className="border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                  <p className="border border-brand-border bg-brand-bg px-3 py-2 text-xs text-brand-muted">
                     Last export: {new Date(lastExportTimestamp).toLocaleString()} • Format:{" "}
                     {lastExportFormat.toUpperCase()} • Last mode:{" "}
                     {lastExportMode === "preserve_formatting"
@@ -2096,7 +2096,7 @@ function TranslationReviewPageInner() {
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                  className="rounded-full border border-brand-border px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-bg"
                 >
                   Cancel
                 </button>
@@ -2114,26 +2114,26 @@ function TranslationReviewPageInner() {
           </div>
         )}
         {showPreviewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4">
-            <div className="w-full max-w-4xl border border-stone-200 bg-white">
-              <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-4xl border border-brand-border bg-white">
+              <div className="flex items-center justify-between gap-4 border-b border-brand-border px-6 py-4">
                 <div>
                   <h3 className="text-lg font-semibold" style={{ color: "#1A110A" }}>Preview</h3>
-                  <p className="mt-0.5 text-xs text-stone-500">{previewDocumentName || doc?.filename || "Document"}</p>
+                  <p className="mt-0.5 text-xs text-brand-subtle">{previewDocumentName || doc?.filename || "Document"}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => { void navigator.clipboard.writeText(previewContentDisplay); }}
                     disabled={previewLoading || Boolean(previewError) || !previewContentDisplay}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+                    className="rounded-full border border-brand-border px-3 py-1.5 text-sm font-medium text-brand-text hover:bg-brand-bg disabled:opacity-40"
                   >
                     Copy to clipboard
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowPreviewModal(false)}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                    className="rounded-full border border-brand-border px-3 py-1.5 text-sm font-medium text-brand-text hover:bg-brand-bg"
                   >
                     Close
                   </button>
@@ -2141,9 +2141,9 @@ function TranslationReviewPageInner() {
               </div>
               <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
                 {previewLoading ? (
-                  <p className="text-sm text-stone-600">Loading preview…</p>
+                  <p className="text-sm text-brand-muted">Loading preview…</p>
                 ) : previewError ? (
-                  <p className="text-sm text-red-600">{previewError}</p>
+                  <p className="text-sm text-status-error">{previewError}</p>
                 ) : (
                   <article className="whitespace-pre-wrap text-[15px] leading-7" style={{ color: "#1A110A" }}>{previewContentDisplay}</article>
                 )}

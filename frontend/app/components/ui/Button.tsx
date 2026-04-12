@@ -17,7 +17,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost:
     "bg-transparent text-brand-accent hover:bg-brand-accentMid disabled:opacity-50",
   destructive:
-    "bg-status-error text-white hover:bg-red-700 disabled:opacity-50",
+    "bg-status-error text-white hover:opacity-90 disabled:opacity-50",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

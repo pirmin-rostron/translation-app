@@ -36,7 +36,7 @@ function Toggle({
         <p className="text-sm font-medium" style={{ color: "#1A110A" }}>
           {label}
         </p>
-        {description && <p className="mt-0.5 text-xs text-stone-400">{description}</p>}
+        {description && <p className="mt-0.5 text-xs text-brand-subtle">{description}</p>}
       </div>
       <button
         type="button"
@@ -45,7 +45,7 @@ function Toggle({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
-          checked ? "bg-[#0D7B6E]" : "bg-stone-200"
+          checked ? "bg-[#0D7B6E]" : "bg-brand-border"
         }`}
       >
         <span
@@ -70,7 +70,7 @@ function Section({
   className?: string;
 }) {
   return (
-    <section className={`border border-stone-200 bg-white px-6 py-6 ${className ?? ""}`}>
+    <section className={`border border-brand-border bg-white px-6 py-6 ${className ?? ""}`}>
       <h2
         className="mb-5 text-base font-semibold"
         style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
@@ -181,7 +181,7 @@ export default function SettingsPage() {
         >
           Settings
         </h1>
-        <p className="mb-8 text-sm text-stone-500">Manage your account and preferences.</p>
+        <p className="mb-8 text-sm text-brand-subtle">Manage your account and preferences.</p>
 
         <div className="space-y-6">
           {/* ════════════════════════════════════════════════════════════
@@ -193,7 +193,7 @@ export default function SettingsPage() {
               <div>
                 <label
                   htmlFor="full-name"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-brand-subtle"
                 >
                   Full name
                 </label>
@@ -203,24 +203,24 @@ export default function SettingsPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-300 focus:border-[#0D7B6E] focus:outline-none"
+                  className="w-full border border-brand-border bg-white px-3 py-2 text-sm text-brand-text placeholder:text-brand-subtle focus:border-[#0D7B6E] focus:outline-none"
                 />
               </div>
 
               {/* Email — read-only */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-brand-subtle">
                   Email
                 </label>
-                <div className="flex items-center gap-2 border border-stone-200 bg-stone-50 px-3 py-2">
-                  <span className="flex-1 text-sm text-stone-500">{profile?.email}</span>
-                  <span className="text-xs text-stone-400">read-only</span>
+                <div className="flex items-center gap-2 border border-brand-border bg-brand-bg px-3 py-2">
+                  <span className="flex-1 text-sm text-brand-subtle">{profile?.email}</span>
+                  <span className="text-xs text-brand-subtle">read-only</span>
                 </div>
               </div>
 
               {/* Member since */}
               {profile?.created_at && (
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-brand-subtle">
                   Member since {new Date(profile.created_at).toLocaleDateString("en-AU", {
                     day: "numeric",
                     month: "long",
@@ -244,7 +244,7 @@ export default function SettingsPage() {
                 <p className="mt-2 text-sm text-[#0D7B6E]">{profileMessage}</p>
               )}
               {profileError && (
-                <p className="mt-2 text-sm text-red-600">{profileError}</p>
+                <p className="mt-2 text-sm text-status-error">{profileError}</p>
               )}
             </div>
           </Section>
@@ -288,7 +288,7 @@ export default function SettingsPage() {
               >
                 Save preferences
               </button>
-              <p className="mt-1.5 text-xs text-stone-400">
+              <p className="mt-1.5 text-xs text-brand-subtle">
                 Email preferences coming soon.
               </p>
             </div>
@@ -298,8 +298,8 @@ export default function SettingsPage() {
               Section 3 — Danger zone
           ════════════════════════════════════════════════════════════ */}
           <section className="border border-red-200 bg-white px-6 py-6">
-            <h2 className="mb-1 text-base font-semibold text-red-600">Delete account</h2>
-            <p className="mb-5 text-sm text-stone-500">
+            <h2 className="mb-1 text-base font-semibold text-status-error">Delete account</h2>
+            <p className="mb-5 text-sm text-brand-subtle">
               Permanently anonymises your account and removes you from your organisation. This
               action cannot be undone.
             </p>
@@ -310,7 +310,7 @@ export default function SettingsPage() {
                 setDeleteError("");
                 setShowDeleteModal(true);
               }}
-              className="border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              className="border border-status-error/30 px-4 py-2 text-sm font-medium text-status-error hover:bg-status-errorBg"
             >
               Delete account
             </button>
@@ -320,15 +320,15 @@ export default function SettingsPage() {
 
       {/* ── Delete confirmation modal ── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 px-4">
-          <div className="w-full max-w-md border border-stone-200 bg-white px-6 py-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md border border-brand-border bg-white px-6 py-6">
             <h3
               className="mb-1 text-lg font-semibold"
               style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
             >
               Delete your account?
             </h3>
-            <p className="mb-5 text-sm text-stone-500">
+            <p className="mb-5 text-sm text-brand-subtle">
               This will anonymise your account and remove you from your organisation. All your
               data remains on record for compliance purposes but will no longer be linked to
               your identity.
@@ -336,9 +336,9 @@ export default function SettingsPage() {
 
             <label
               htmlFor="delete-confirm"
-              className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-stone-400"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-brand-subtle"
             >
-              Type <span className="font-semibold text-stone-700">DELETE</span> to confirm
+              Type <span className="font-semibold text-brand-text">DELETE</span> to confirm
             </label>
             <input
               id="delete-confirm"
@@ -346,11 +346,11 @@ export default function SettingsPage() {
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder="DELETE"
-              className="mb-5 w-full border border-stone-300 bg-white px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
+              className="mb-5 w-full border border-brand-border bg-white px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
             />
 
             {deleteError && (
-              <p className="mb-3 text-sm text-red-600">{deleteError}</p>
+              <p className="mb-3 text-sm text-status-error">{deleteError}</p>
             )}
 
             <div className="flex items-center justify-end gap-3">
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleteLoading}
-                className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+                className="rounded-full border border-brand-border px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-bg disabled:opacity-40"
               >
                 Cancel
               </button>
@@ -366,7 +366,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void handleDeleteAccount()}
                 disabled={!deleteConfirmValid || deleteLoading}
-                className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-40"
+                className="rounded-full bg-status-error px-4 py-2 text-sm font-medium text-white hover:bg-status-errorBg0 disabled:opacity-40"
               >
                 {deleteLoading ? "Deleting…" : "Delete account"}
               </button>

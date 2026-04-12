@@ -38,7 +38,7 @@ export default function UsageDashboardPage() {
 
         {isLoading && <p className="text-slate-600">Loading…</p>}
         {error && (
-          <p className="text-red-600">
+          <p className="text-status-error">
             {error instanceof Error ? error.message : "Failed to load usage data"}
           </p>
         )}

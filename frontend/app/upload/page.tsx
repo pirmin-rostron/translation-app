@@ -387,7 +387,7 @@ export default function UploadPage() {
           >
             Translate Documents
           </h1>
-          <p className="mt-2 text-sm text-stone-500">
+          <p className="mt-2 text-sm text-brand-subtle">
             DOCX, TXT, RTF, or ZIP · max 10 MB per file · max {MAX_FILES} files
           </p>
         </div>
@@ -411,8 +411,8 @@ export default function UploadPage() {
               className={[
                 "cursor-pointer border-2 border-dashed px-8 py-16 text-center transition-colors",
                 isDragging
-                  ? "border-[#0D7B6E] bg-teal-50"
-                  : "border-stone-300 bg-white hover:border-stone-400 hover:bg-stone-50",
+                  ? "border-[#0D7B6E] bg-brand-accentMid"
+                  : "border-brand-border bg-white hover:border-brand-muted hover:bg-brand-bg",
               ].join(" ")}
             >
               <div className="flex justify-center">
@@ -435,12 +435,12 @@ export default function UploadPage() {
               <p
                 className={[
                   "mt-3 text-sm font-medium",
-                  isDragging ? "text-[#0D7B6E]" : "text-stone-700",
+                  isDragging ? "text-[#0D7B6E]" : "text-brand-text",
                 ].join(" ")}
               >
                 Drop documents here
               </p>
-              <p className="mt-1 text-xs text-stone-400">or click to browse</p>
+              <p className="mt-1 text-xs text-brand-subtle">or click to browse</p>
             </div>
           )}
 
@@ -456,7 +456,7 @@ export default function UploadPage() {
 
           {/* ── Apply to all (multi-file, pre-processing) ── */}
           {fileList.length > 1 && !isProcessing && (
-            <div className="border border-stone-200 bg-white px-5 py-5">
+            <div className="border border-brand-border bg-white px-5 py-5">
               <p
                 className="mb-3 text-sm font-semibold"
                 style={{ color: "#1A110A" }}
@@ -465,13 +465,13 @@ export default function UploadPage() {
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                  <label className="mb-1 block text-xs font-medium text-brand-subtle">
                     Target language
                   </label>
                   <select
                     value={sharedTargetLanguage}
                     onChange={(e) => setSharedTargetLanguage(e.target.value)}
-                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                    className="w-full border border-brand-border bg-white px-2 py-1.5 text-sm text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {TARGET_LANGUAGE_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -481,7 +481,7 @@ export default function UploadPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                  <label className="mb-1 block text-xs font-medium text-brand-subtle">
                     Style
                   </label>
                   <select
@@ -489,7 +489,7 @@ export default function UploadPage() {
                     onChange={(e) =>
                       setSharedTranslationStyle(e.target.value as TranslationStyle)
                     }
-                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                    className="w-full border border-brand-border bg-white px-2 py-1.5 text-sm text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                   >
                     <option value="natural">Natural</option>
                     <option value="formal">Formal</option>
@@ -497,13 +497,13 @@ export default function UploadPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                  <label className="mb-1 block text-xs font-medium text-brand-subtle">
                     Industry
                   </label>
                   <select
                     value={sharedIndustry}
                     onChange={(e) => setSharedIndustry(e.target.value)}
-                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                    className="w-full border border-brand-border bg-white px-2 py-1.5 text-sm text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {INDUSTRY_OPTIONS.map((o) => (
                       <option key={o.value || "none"} value={o.value}>
@@ -513,13 +513,13 @@ export default function UploadPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-500">
+                  <label className="mb-1 block text-xs font-medium text-brand-subtle">
                     Domain
                   </label>
                   <select
                     value={sharedDomain}
                     onChange={(e) => setSharedDomain(e.target.value)}
-                    className="w-full border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                    className="w-full border border-brand-border bg-white px-2 py-1.5 text-sm text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                   >
                     {DOMAIN_OPTIONS.map((o) => (
                       <option key={o.value || "none"} value={o.value}>
@@ -532,7 +532,7 @@ export default function UploadPage() {
               <button
                 type="button"
                 onClick={handleApplyToAll}
-                className="mt-3 border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                className="mt-3 border border-brand-border px-3 py-1.5 text-xs font-medium text-brand-text hover:bg-brand-bg"
               >
                 Apply to all files
               </button>
@@ -541,8 +541,8 @@ export default function UploadPage() {
 
           {/* ── File list ── */}
           {fileList.length > 0 && (
-            <div className="border border-stone-200 bg-white">
-              <div className="border-b border-stone-100 px-5 py-3">
+            <div className="border border-brand-border bg-white">
+              <div className="border-b border-brand-border px-5 py-3">
                 <p className="text-sm font-semibold" style={{ color: "#1A110A" }}>
                   {fileList.length} {fileList.length === 1 ? "file" : "files"} selected
                 </p>
@@ -570,7 +570,7 @@ export default function UploadPage() {
                             {entry.file.name}
                           </p>
                           {entry.kind === "zip" && entry.status === "queued" && (
-                            <p className="mt-0.5 text-xs text-stone-400">
+                            <p className="mt-0.5 text-xs text-brand-subtle">
                               ZIP — contents will be extracted
                             </p>
                           )}
@@ -589,7 +589,7 @@ export default function UploadPage() {
                               {entry.file.name}
                             </p>
                             {entry.kind === "zip" && (
-                              <p className="mt-0.5 text-xs text-stone-400">
+                              <p className="mt-0.5 text-xs text-brand-subtle">
                                 ZIP — contents will be extracted
                               </p>
                             )}
@@ -597,7 +597,7 @@ export default function UploadPage() {
                           <button
                             type="button"
                             onClick={() => handleRemoveFile(entry.id)}
-                            className="shrink-0 px-1.5 py-0.5 text-xs text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                            className="shrink-0 px-1.5 py-0.5 text-xs text-brand-subtle hover:bg-brand-bg hover:text-brand-muted"
                             aria-label={`Remove ${entry.file.name}`}
                           >
                             ×
@@ -606,7 +606,7 @@ export default function UploadPage() {
 
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div>
-                            <label className="mb-0.5 block text-xs text-stone-500">
+                            <label className="mb-0.5 block text-xs text-brand-subtle">
                               Language
                             </label>
                             <select
@@ -614,7 +614,7 @@ export default function UploadPage() {
                               onChange={(e) =>
                                 updateEntry(entry.id, { targetLanguage: e.target.value })
                               }
-                              className="w-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border bg-white px-2 py-1 text-xs text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                             >
                               {TARGET_LANGUAGE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>
@@ -624,7 +624,7 @@ export default function UploadPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-stone-500">
+                            <label className="mb-0.5 block text-xs text-brand-subtle">
                               Style
                             </label>
                             <select
@@ -634,7 +634,7 @@ export default function UploadPage() {
                                   translationStyle: e.target.value as TranslationStyle,
                                 })
                               }
-                              className="w-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border bg-white px-2 py-1 text-xs text-brand-text focus:border-[#0D7B6E] focus:outline-none"
                             >
                               <option value="natural">Natural</option>
                               <option value="formal">Formal</option>
@@ -642,7 +642,7 @@ export default function UploadPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-stone-500">
+                            <label className="mb-0.5 block text-xs text-brand-subtle">
                               Industry
                             </label>
                             <input
@@ -652,11 +652,11 @@ export default function UploadPage() {
                                 updateEntry(entry.id, { industry: e.target.value })
                               }
                               placeholder="Optional"
-                              className="w-full border border-stone-300 px-2 py-1 text-xs text-stone-900 placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border px-2 py-1 text-xs text-brand-text placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="mb-0.5 block text-xs text-stone-500">
+                            <label className="mb-0.5 block text-xs text-brand-subtle">
                               Domain
                             </label>
                             <input
@@ -666,7 +666,7 @@ export default function UploadPage() {
                                 updateEntry(entry.id, { domain: e.target.value })
                               }
                               placeholder="Optional"
-                              className="w-full border border-stone-300 px-2 py-1 text-xs text-stone-900 placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
+                              className="w-full border border-brand-border px-2 py-1 text-xs text-brand-text placeholder-stone-400 focus:border-[#0D7B6E] focus:outline-none"
                             />
                           </div>
                         </div>
@@ -678,12 +678,12 @@ export default function UploadPage() {
 
               {/* Summary row when all done */}
               {allDone && (
-                <div className="border-t border-stone-100 px-5 py-4">
+                <div className="border-t border-brand-border px-5 py-4">
                   <p className="text-sm font-medium" style={{ color: "#1A110A" }}>
                     All done —{" "}
                     <span style={{ color: "#0D7B6E" }}>{readyCount} ready</span>
                     {errorCount > 0 && (
-                      <span className="text-red-600"> · {errorCount} failed</span>
+                      <span className="text-status-error"> · {errorCount} failed</span>
                     )}
                   </p>
                 </div>
@@ -723,7 +723,7 @@ export default function UploadPage() {
               <button
                 type="button"
                 onClick={() => router.push("/documents")}
-                className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                className="text-sm text-brand-subtle transition-colors hover:text-brand-text"
               >
                 Cancel
               </button>
@@ -747,7 +747,7 @@ export default function UploadPage() {
                   setIsProcessing(false);
                   setGlobalError("");
                 }}
-                className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                className="text-sm text-brand-subtle transition-colors hover:text-brand-text"
               >
                 Upload more
               </button>
@@ -770,13 +770,13 @@ function StatusIcon({ status }: { status: FileStatus }) {
     );
   if (status === "error")
     return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-bold text-red-600">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-bold text-status-error">
         ✗
       </span>
     );
   if (status === "uploading" || status === "translating")
     return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs"
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-accentMid text-xs"
         style={{ color: "#0D7B6E" }}
       >
         ⟳
@@ -784,7 +784,7 @@ function StatusIcon({ status }: { status: FileStatus }) {
     );
   // queued
   return (
-    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs text-stone-400">
+    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-bg text-xs text-brand-subtle">
       ·
     </span>
   );
@@ -792,7 +792,7 @@ function StatusIcon({ status }: { status: FileStatus }) {
 
 function StatusLabel({ entry }: { entry: FileEntry }) {
   if (entry.status === "queued")
-    return <p className="mt-0.5 text-xs text-stone-400">Queued</p>;
+    return <p className="mt-0.5 text-xs text-brand-subtle">Queued</p>;
   if (entry.status === "uploading")
     return (
       <p className="mt-0.5 text-xs" style={{ color: "#0D7B6E" }}>
@@ -807,7 +807,7 @@ function StatusLabel({ entry }: { entry: FileEntry }) {
     );
   if (entry.status === "error")
     return (
-      <p className="mt-0.5 text-xs text-red-600">{entry.error || "Failed"}</p>
+      <p className="mt-0.5 text-xs text-status-error">{entry.error || "Failed"}</p>
     );
   // ready
   if (entry.kind === "zip") {

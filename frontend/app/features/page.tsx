@@ -138,7 +138,7 @@ export default function FeaturesPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
       {/* ── Header ── */}
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm">
+      <header className="border-b border-brand-border bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link
             href="/"
@@ -150,7 +150,7 @@ export default function FeaturesPage() {
           <nav className="flex items-center gap-4">
             <Link
               href="/"
-              className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+              className="text-sm text-brand-subtle hover:text-brand-text transition-colors"
             >
               Log in
             </Link>
@@ -180,7 +180,7 @@ export default function FeaturesPage() {
           >
             Features
           </h1>
-          <p className="mt-3 text-base text-stone-500">
+          <p className="mt-3 text-base text-brand-subtle">
             A complete AI-powered translation workflow
           </p>
         </div>
@@ -195,7 +195,7 @@ export default function FeaturesPage() {
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeCategory === cat
                   ? "bg-[#1A110A] text-white"
-                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                  : "border border-brand-border bg-white text-brand-muted hover:bg-brand-bg"
               }`}
             >
               {cat}
@@ -208,7 +208,7 @@ export default function FeaturesPage() {
           {displayed.map((feature) => (
             <div
               key={feature.name}
-              className="border border-stone-200 bg-white px-6 py-5"
+              className="border border-brand-border bg-white px-6 py-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <p
@@ -218,7 +218,7 @@ export default function FeaturesPage() {
                   {feature.category}
                 </p>
                 {feature.isNew && (
-                  <span className="shrink-0 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-[#0D7B6E]">
+                  <span className="shrink-0 rounded-full bg-brand-accentMid px-2 py-0.5 text-xs font-medium text-[#0D7B6E]">
                     New
                   </span>
                 )}
@@ -229,9 +229,9 @@ export default function FeaturesPage() {
               >
                 {feature.name}
               </p>
-              <p className="mt-1 text-sm text-stone-500">{feature.description}</p>
+              <p className="mt-1 text-sm text-brand-subtle">{feature.description}</p>
               {feature.shippedDate && (
-                <p className="mt-2 text-xs text-stone-400">Shipped {feature.shippedDate}</p>
+                <p className="mt-2 text-xs text-brand-subtle">Shipped {feature.shippedDate}</p>
               )}
             </div>
           ))}
@@ -239,12 +239,12 @@ export default function FeaturesPage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-stone-200 px-6 py-8">
+      <footer className="border-t border-brand-border px-6 py-8">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-stone-400">© 2026 Helvara</p>
+          <p className="text-sm text-brand-subtle">© 2026 Helvara</p>
           <Link
             href="/"
-            className="text-sm text-stone-400 hover:text-stone-700 transition-colors"
+            className="text-sm text-brand-subtle hover:text-brand-text transition-colors"
           >
             Back to helvara.io
           </Link>
