@@ -7,6 +7,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
+import { AppShell } from "../components/AppShell";
 import { TierGate } from "../components/TierGate";
 import { SplitButton } from "./SplitButton";
 import { NewTranslationModal } from "./NewTranslationModal";
@@ -179,8 +180,8 @@ export default function DashboardPage() {
   const hasTranslations = displayTranslations.length > 0;
 
   return (
-    <div className="min-h-screen bg-brand-bg pt-20">
-      <div className="mx-auto max-w-[1200px] px-10 py-12">
+    <AppShell>
+      <div className="mx-auto max-w-[1200px] px-10 py-8">
 
         {/* ── Hero + Split Button ── */}
         <div className="mb-10 flex items-start justify-between">
@@ -413,6 +414,6 @@ export default function DashboardPage() {
       {/* ── Modals ── */}
       <NewTranslationModal projects={projectList ?? []} />
       <NewProjectModal />
-    </div>
+    </AppShell>
   );
 }
