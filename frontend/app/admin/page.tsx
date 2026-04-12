@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../components/AppShell";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -238,8 +240,9 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F2EC" }}>
-      <main className="mx-auto max-w-6xl px-6 py-12">
+    <AppShell>
+      <div className="px-8 py-8">
+      <main className="mx-auto max-w-6xl">
         <h1
           className="mb-1 text-2xl font-semibold"
           style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
@@ -594,5 +597,6 @@ export default function AdminPage() {
         )}
       </main>
     </div>
+    </AppShell>
   );
 }

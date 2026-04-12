@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../../components/AppShell";
+
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -268,7 +270,8 @@ export default function DocumentDetailPage() {
   const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <AppShell>
+      <div className="px-8 py-8">
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
           href="/dashboard"
@@ -511,5 +514,6 @@ export default function DocumentDetailPage() {
         </div>
       </main>
     </div>
+    </AppShell>
   );
 }

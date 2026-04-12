@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../../components/AppShell";
+
 import { useUsage } from "../../hooks/queries";
 import type { UsageEvent } from "../../services/api";
 
@@ -32,7 +34,8 @@ export default function UsageDashboardPage() {
   const { data, isLoading, error } = useUsage();
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <AppShell>
+      <div className="px-8 py-8">
       <main className="mx-auto max-w-5xl px-6 py-12">
         <h1 className="mb-8 text-2xl font-bold text-brand-text">Usage Dashboard</h1>
 
@@ -113,5 +116,6 @@ export default function UsageDashboardPage() {
         )}
       </main>
     </div>
+    </AppShell>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../../components/AppShell";
+
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -69,12 +71,13 @@ export default function ProjectPage() {
   }, [projectId, token]);
 
   if (!hasHydrated || !token) return null;
-  if (loading) return <div className="min-h-screen bg-brand-bg pt-20 px-6">Loading…</div>;
-  if (error) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">{error}</div>;
-  if (!project) return <div className="min-h-screen bg-brand-bg pt-20 px-6 text-status-error">Project not found</div>;
+  if (loading) return <div className="min-h-screen bg-brand-bg  px-6">Loading…</div>;
+  if (error) return <div className="min-h-screen bg-brand-bg  px-6 text-status-error">{error}</div>;
+  if (!project) return <div className="min-h-screen bg-brand-bg  px-6 text-status-error">Project not found</div>;
 
   return (
-    <div className="min-h-screen bg-brand-bg pt-20">
+    <AppShell>
+      <div className="px-8 py-8">
       <div className="mx-auto max-w-[1100px] px-10 py-12">
         <Link href="/dashboard" className="mb-6 inline-block text-sm text-brand-subtle hover:text-brand-text no-underline">
           ← Back to dashboard
@@ -196,5 +199,6 @@ export default function ProjectPage() {
       {/* Modal — needs projects list for selector */}
       <NewTranslationModal projects={project ? [project] : []} />
     </div>
+    </AppShell>
   );
 }

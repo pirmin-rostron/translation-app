@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../components/AppShell";
+
 import { useEffect, useMemo, useState } from "react";
 
 import { glossaryTermsApi, type GlossaryTerm, type GlossaryTermCreate } from "../services/api";
@@ -184,7 +186,8 @@ export default function GlossaryPage() {
   const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-brand-subtle";
 
   return (
-    <div className="min-h-screen bg-brand-bg pt-20">
+    <AppShell>
+      <div className="px-8 py-8">
       <main className="mx-auto max-w-5xl px-8 pb-12">
         <h1 className="mb-10 font-display text-2xl font-semibold text-brand-text">
           Glossary
@@ -474,5 +477,6 @@ export default function GlossaryPage() {
         </div>
       </main>
     </div>
+    </AppShell>
   );
 }

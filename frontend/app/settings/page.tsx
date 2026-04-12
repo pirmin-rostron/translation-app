@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "../components/AppShell";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, API_URL } from "../services/api";
@@ -173,7 +175,8 @@ export default function SettingsPage() {
   const deleteConfirmValid = deleteConfirmText === "DELETE";
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <AppShell>
+      <div className="px-8 py-8">
       <main className="mx-auto max-w-2xl px-8 py-12 pt-24">
         <h1
           className="mb-1 text-2xl font-semibold"
@@ -373,5 +376,6 @@ export default function SettingsPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }
