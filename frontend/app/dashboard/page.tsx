@@ -9,7 +9,6 @@ import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries
 import type { DashboardTranslation } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
 import { TierGate } from "../components/TierGate";
-import { SplitButton } from "./SplitButton";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
 
@@ -64,9 +63,9 @@ function isProcessing(rawStatus: string): boolean {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle: string }) {
+function StatCard({ label, value, subtitle, href }: { label: string; value: string; subtitle: string; href: string }) {
   return (
-    <div className="group rounded-xl border border-brand-border bg-brand-surface p-6 transition-colors hover:border-t-2 hover:border-t-brand-accent">
+    <Link href={href} className="group rounded-xl border border-brand-border bg-brand-surface p-6 no-underline transition-colors hover:border-t-2 hover:border-t-brand-accent">
       <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
         {label}
       </p>
@@ -76,7 +75,7 @@ function StatCard({ label, value, subtitle }: { label: string; value: string; su
       <p className="font-sans text-xs text-brand-accent">
         {subtitle}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -183,20 +182,14 @@ export default function DashboardPage() {
     <AppShell>
       <div className="mx-auto max-w-[1200px] px-10 py-8">
 
-        {/* ── Hero + Split Button ── */}
-        <div className="mb-10 flex items-start justify-between">
-          <div>
-            <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
-              OVERVIEW
-            </p>
-            <h1 className="mb-2 font-display text-[clamp(2rem,4vw,2.75rem)] font-bold leading-[1.1] tracking-tight text-brand-text">
-              Welcome back, <em>{firstName}</em>.
-            </h1>
-            <p className="font-sans text-[0.9375rem] text-brand-muted">
-              Here&apos;s what&apos;s happening across your translation workspace.
-            </p>
-          </div>
-          <SplitButton />
+        {/* ── Hero ── */}
+        <div className="mb-8">
+          <h1 className="mb-1 font-display text-2xl font-bold text-brand-text">
+            Welcome back, <em>{firstName}</em>.
+          </h1>
+          <p className="text-sm text-brand-muted">
+            Here&apos;s what&apos;s happening across your translation workspace.
+          </p>
         </div>
 
         {/* ── Stat Cards ── */}
@@ -205,16 +198,19 @@ export default function DashboardPage() {
             label="Total Documents"
             value={String(totalDocuments)}
             subtitle={totalDocuments === 1 ? "1 document" : `${totalDocuments} documents`}
+            href="/documents"
           />
           <StatCard
             label="Active Projects"
             value={String(activeProjectCount)}
             subtitle={activeProjectCount === 1 ? "1 project" : `${activeProjectCount} projects`}
+            href="/projects"
           />
           <StatCard
             label="Pending Review"
             value={String(pendingReviewCount)}
             subtitle="Awaiting approval"
+            href="/documents"
           />
         </div>
 
