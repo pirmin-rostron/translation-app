@@ -223,6 +223,14 @@ Use Tailwind classes consistently for these states:
 - In every response, state which files were edited and why.
 - Do not reorganise file structure unless explicitly asked.
 
+### Inline code comments
+New components and non-obvious logic must include inline comments explaining:
+- What the component does and when to use it (top of file)
+- Any non-obvious logic or workarounds (inline)
+- Props and their purpose if not self-evident from types
+
+Do NOT comment obvious things (what a for loop does). DO comment architectural decisions, workarounds, and component contracts.
+
 ---
 
 ## Data Integrity
@@ -242,6 +250,20 @@ Use Tailwind classes consistently for these states:
 - Keep responses focused — do not refactor unrelated code in the same pass.
 - After any backend parser change, always run the parser against all three test RTF files (`basic_test.rtf`, `legal_test.rtf`, `messy_test.rtf`) and verify block output before finishing.
 - The frontend runs as a production Next.js build (`next build` + `next start`). `NEXT_PUBLIC_*` environment variables are baked into the bundle at build time — they are not available at runtime. Any new `NEXT_PUBLIC_*` var must be added to: (1) `/app/.env` on the server, (2) `docker-compose.yml` build args, (3) `frontend/Dockerfile` ARG and ENV declarations.
+
+### Commit messages
+Every commit must include a descriptive body (not just a subject line) explaining:
+- What changed and why
+- Which files were modified and what each change does
+- How to test the change
+Format: subject line, blank line, then bullet points for each file changed.
+
+### Test before deploy
+Always follow this order:
+1. Claude Code builds and runs tsc --noEmit + pytest
+2. User smoke tests locally at localhost:3000
+3. Only then: git push origin main && ./deploy.sh
+Never prompt the user to deploy before confirming local tests pass visually.
 
 ---
 
