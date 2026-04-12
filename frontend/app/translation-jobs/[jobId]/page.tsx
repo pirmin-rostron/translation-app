@@ -1666,9 +1666,11 @@ function TranslationReviewPageInner() {
         </div>
         <div className="flex-1 text-center">
           {reviewCompleteState ? (
-            <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Review complete</span>
+            <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Review complete ✓</span>
           ) : (
-            <span className="font-display text-lg font-semibold text-brand-text">{progressPercent}%</span>
+            <span className="text-sm font-medium text-brand-text">
+              {reviewCounts.completed_blocks} of {reviewCounts.total_blocks} blocks reviewed
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1689,14 +1691,23 @@ function TranslationReviewPageInner() {
           >
             Preview
           </button>
-          <button
-            type="button"
-            onClick={handleOpenExportModal}
-            disabled={!reviewComplete && workflowStatus !== "ready_for_export" && workflowStatus !== "exported"}
-            className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
-          >
-            Export
-          </button>
+          <div className="relative">
+            {reviewCompleteState && (
+              <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.625rem] font-medium text-brand-accent">
+                Ready to export
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleOpenExportModal}
+              disabled={!reviewComplete && workflowStatus !== "ready_for_export" && workflowStatus !== "exported"}
+              className={`rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50 ${
+                reviewCompleteState ? "ring-2 ring-brand-accent ring-offset-1" : ""
+              }`}
+            >
+              Export
+            </button>
+          </div>
         </div>
       </header>
 
