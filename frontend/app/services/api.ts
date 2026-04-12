@@ -24,15 +24,21 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   if (res.status === 401 && typeof window !== "undefined") {
     const authPaths = ["/login", "/register", "/preview", "/"];
     if (!authPaths.some((p) => window.location.pathname.startsWith(p))) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { useAuthStore } = require("../stores/authStore") as typeof import("../stores/authStore");
-        useAuthStore.getState().clearAuth();
-      } catch {
-        // Store unavailable — clear cookie directly as fallback.
-        document.cookie = "auth_token=; path=/; max-age=0";
-      }
-      window.location.href = "/login?reason=session_expired";
+      // Debounce: wait 100ms then check if token is still present before clearing.
+      // This prevents a single transient 401 (race condition on page refresh,
+      // backend restart, or network hiccup) from wiping a valid session.
+      setTimeout(() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { useAuthStore } = require("../stores/authStore") as typeof import("../stores/authStore");
+          const tokenStillPresent = useAuthStore.getState().token;
+          if (!tokenStillPresent) return; // Already cleared by another handler
+          useAuthStore.getState().clearAuth();
+        } catch {
+          document.cookie = "auth_token=; path=/; max-age=0";
+        }
+        window.location.href = "/login?reason=session_expired";
+      }, 100);
       throw new Error("Session expired");
     }
   }

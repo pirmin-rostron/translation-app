@@ -24,7 +24,7 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 function setAuthCookie(token: string) {
   const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
   const secureFlag = isLocalhost ? "" : "; Secure";
-  document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Strict${secureFlag}`;
+  document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureFlag}`;
 }
 
 function clearAuthCookie() {
