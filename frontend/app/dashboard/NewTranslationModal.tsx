@@ -31,7 +31,6 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [sourceLang, setSourceLang] = useState("English");
   const [targetLang, setTargetLang] = useState("German");
   const [projectId, setProjectId] = useState("");
   const [error, setError] = useState("");
@@ -198,36 +197,21 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         }}
       />
 
-      {/* Language selectors */}
-      <div className="mb-4 grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
-            Source language
-          </label>
-          <select
-            value={sourceLang}
-            onChange={(e) => setSourceLang(e.target.value)}
-            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-          >
-            {LANGUAGE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
-            Target language
-          </label>
-          <select
-            value={targetLang}
-            onChange={(e) => setTargetLang(e.target.value)}
-            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-          >
-            {LANGUAGE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
+      {/* Target language */}
+      <div className="mb-4">
+        <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
+          Translate to
+        </label>
+        <select
+          value={targetLang}
+          onChange={(e) => setTargetLang(e.target.value)}
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+        >
+          {LANGUAGE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-brand-subtle">Source language is auto-detected from your document</p>
       </div>
 
       {/* Project selector */}
