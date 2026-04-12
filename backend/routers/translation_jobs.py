@@ -2597,6 +2597,15 @@ def edit_block_source(
     threshold_warning = edit_ratio >= SOURCE_EDIT_WARNING
     threshold_exceeded = edit_ratio >= SOURCE_EDIT_THRESHOLD
 
+    # Create stage jobs for re-translation pipeline
+    for stage_name in [TRANSLATION_STAGE, AMBIGUITY_STAGE, RECONSTRUCTION_STAGE]:
+        db.add(ProcessingStageJob(
+            document_id=job.document_id,
+            translation_job_id=job.id,
+            stage_name=stage_name,
+            status="queued",
+        ))
+
     db.commit()
     db.refresh(block)
     db.refresh(job)

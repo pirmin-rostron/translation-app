@@ -81,12 +81,16 @@ export default function OverviewPage() {
     setExporting(true);
     setError("");
     try {
-      if (approveAll) {
-        await translationJobsApi.approveAllSegments<unknown>(jobId);
-      } else {
-        await translationJobsApi.approveSafeSegments<unknown>(jobId);
+      // Skip approve+markReady if already exported — go straight to re-export
+      const isAlreadyExported = data?.status === "exported" || data?.status === "ready_for_export";
+      if (!isAlreadyExported) {
+        if (approveAll) {
+          await translationJobsApi.approveAllSegments<unknown>(jobId);
+        } else {
+          await translationJobsApi.approveSafeSegments<unknown>(jobId);
+        }
+        await translationJobsApi.markReady<unknown>(jobId);
       }
-      await translationJobsApi.markReady<unknown>(jobId);
       const result = await translationJobsApi.export<ExportResult>(jobId, "docx", "preserve_formatting");
       if (result.download_url) {
         const { useAuthStore } = await import("../../../stores/authStore");
@@ -118,6 +122,7 @@ export default function OverviewPage() {
 
   const { summary } = data;
   const hasIssues = summary.issue_count > 0;
+  const isExported = data.status === "exported";
   const reviewMode = data.review_mode ?? "autopilot";
   const toneLabel = (data.tone_applied ?? "natural").charAt(0).toUpperCase() + (data.tone_applied ?? "natural").slice(1);
   const memoryPercent = summary.total_blocks > 0
@@ -238,7 +243,7 @@ export default function OverviewPage() {
         {/* ── Right column ── */}
         <div className="w-full space-y-6 lg:w-80 lg:shrink-0">
           {/* Action hub / Post-download confirmation */}
-          {downloaded ? (
+          {(downloaded || isExported) ? (
             <div className="rounded-xl border border-status-success/30 bg-status-successBg p-6">
               <div className="mb-3 text-center text-3xl">✅</div>
               <h3 className="text-center font-display text-lg font-semibold text-brand-text">
