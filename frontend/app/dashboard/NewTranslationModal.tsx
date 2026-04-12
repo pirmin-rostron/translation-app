@@ -146,7 +146,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
         }}
-        className={`mb-5 cursor-pointer rounded p-8 text-center transition-colors ${
+        className={`mb-5 cursor-pointer rounded-xl p-8 text-center transition-colors ${
           isDragging
             ? "border-2 border-dashed border-brand-accent bg-brand-accentMid"
             : "border-2 border-dashed border-brand-border bg-brand-bg"
@@ -182,7 +182,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
               Drop file here or click to browse
             </p>
             <p className="mt-1 font-sans text-[0.6875rem] text-brand-subtle">
-              DOCX, PDF, TXT — max 10 MB
+              DOCX, RTF, TXT — max 10 MB
             </p>
           </div>
         )}
@@ -207,7 +207,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           <select
             value={sourceLang}
             onChange={(e) => setSourceLang(e.target.value)}
-            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -221,7 +221,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           <select
             value={targetLang}
             onChange={(e) => setTargetLang(e.target.value)}
-            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -238,7 +238,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
         >
           <option value="">No project (standalone)</option>
           {projects.map((p) => (
@@ -263,7 +263,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         <button
           onClick={handleSubmit}
           disabled={submitting || !file}
-          className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2 font-sans text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-full border-none bg-brand-accent px-5 py-2.5 font-sans text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Uploading…" : "Upload & Translate"}
         </button>

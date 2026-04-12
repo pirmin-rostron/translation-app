@@ -70,7 +70,7 @@ export function NewProjectModal() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Legal Docs Q2"
-          className="box-border w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+          className="box-border w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
         />
       </div>
 
@@ -84,7 +84,7 @@ export function NewProjectModal() {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional description"
           rows={3}
-          className="box-border w-full resize-y rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+          className="box-border w-full resize-y rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
         />
       </div>
 
@@ -96,7 +96,7 @@ export function NewProjectModal() {
         <select
           value={glossary}
           onChange={(e) => setGlossary(e.target.value)}
-          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
         >
           <option value="">None</option>
           <option value="legal">Legal &amp; Compliance Terms</option>
@@ -118,7 +118,7 @@ export function NewProjectModal() {
         <button
           onClick={handleSubmit}
           disabled={submitting || !name.trim()}
-          className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2 font-sans text-[0.8125rem] font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-full border-none bg-brand-accent px-5 py-2.5 font-sans text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Creating…" : "Create Project"}
         </button>
