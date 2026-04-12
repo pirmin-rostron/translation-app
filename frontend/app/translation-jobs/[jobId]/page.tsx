@@ -472,6 +472,7 @@ function TranslationReviewPageInner() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [translatingBannerDismissed, setTranslatingBannerDismissed] = useState(false);
+  const [bulkApproving, setBulkApproving] = useState(false);
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<number, HTMLElement | null>>({});
   const reviewGuidanceRef = useRef<HTMLElement>(null);
@@ -1106,6 +1107,26 @@ function TranslationReviewPageInner() {
     }
   }
 
+  async function handleBulkApproveSafe() {
+    setBulkApproving(true);
+    setMessage("");
+    setError("");
+    try {
+      const summary = await translationJobsApi.approveSafeSegments<ReviewSummary>(jobId);
+      await Promise.all([loadReviewBlocks(page), loadReviewSummary(), loadJobMeta()]);
+      const approved = reviewCounts.safe_unresolved_segments;
+      setMessage(`${approved} clean block${approved === 1 ? "" : "s"} approved.`);
+      announce(`${approved} clean blocks approved`);
+      if (summary.review_complete) {
+        transitionToReviewCompleteState(summary);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk approve failed");
+    } finally {
+      setBulkApproving(false);
+    }
+  }
+
   function handleSkipBlock() {
     const nextBlockId = getNextUnresolvedBlockIdFromCurrent();
     if (nextBlockId == null) {
@@ -1519,6 +1540,16 @@ function TranslationReviewPageInner() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {!reviewCompleteState && reviewCounts.safe_unresolved_segments > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkApproveSafe}
+              disabled={bulkApproving || actionLoading}
+              className="rounded-full border border-brand-accent bg-brand-accentMid px-4 py-1.5 text-sm font-medium text-brand-accent hover:bg-brand-accent hover:text-white disabled:opacity-50"
+            >
+              {bulkApproving ? "Approving…" : `Approve ${reviewCounts.safe_unresolved_segments} clean`}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => { void handleOpenPreviewDocument(); }}
