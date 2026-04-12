@@ -750,14 +750,31 @@ def _calculate_review_summary(db: Session, job: TranslationJob) -> ReviewSummary
         for result in results
         if bool(result.semantic_memory_used) and not _is_acceptable_final_status(result.review_status)
     )
-    safe_unresolved_segments = sum(
-        1
-        for result in results
-        if not _is_acceptable_final_status(result.review_status)
-        and not bool(result.ambiguity_detected)
-        and not bool(result.semantic_memory_used)
-        and bool((result.final_translation or "").strip())
-    )
+    # Count safe unresolved BLOCKS (not segments) — group results by block
+    seg_to_block: dict[int, int] = {}
+    for seg in db.query(DocumentSegment).filter(
+        DocumentSegment.id.in_([r.segment_id for r in results])
+    ).all():
+        if seg.block_id is not None:
+            seg_to_block[seg.id] = seg.block_id
+    block_results: dict[int, list] = {}
+    for result in results:
+        bid = seg_to_block.get(result.segment_id, result.segment_id)
+        block_results.setdefault(bid, []).append(result)
+    safe_unresolved_segments = 0
+    for block_segs in block_results.values():
+        has_unresolved = any(not _is_acceptable_final_status(r.review_status) for r in block_segs)
+        if not has_unresolved:
+            continue
+        all_safe = all(
+            not bool(r.ambiguity_detected)
+            and not bool(r.semantic_memory_used)
+            and bool((r.final_translation or "").strip())
+            for r in block_segs
+            if not _is_acceptable_final_status(r.review_status)
+        )
+        if all_safe:
+            safe_unresolved_segments += 1
     review_complete = (
         total_segments > 0
         and unresolved_count == 0
@@ -2521,7 +2538,11 @@ def edit_block_source(
     if not block:
         raise HTTPException(status_code=404, detail="Block not found in this job's document")
 
-    new_source = body.source_text.strip()
+    # Strip any RTF control codes that leaked into the source text
+    raw_source = body.source_text.strip()
+    new_source = re.sub(r'\\[a-z]+\d*\s?|\{|\}', '', raw_source).strip()
+    if not new_source:
+        raise HTTPException(status_code=400, detail="Source text cannot be empty after cleanup")
     if new_source == block.text_original:
         raise HTTPException(status_code=400, detail="Source text is unchanged")
 
@@ -2558,7 +2579,7 @@ def edit_block_source(
             TranslationResult.job_id == job_id,
             TranslationResult.segment_id.in_(segment_ids),
         ).update(
-            {"review_status": "source_changed", "final_translation": ""},
+            {"review_status": "pending", "final_translation": ""},
             synchronize_session="fetch",
         )
 
