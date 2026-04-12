@@ -61,6 +61,7 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -100,6 +101,7 @@ export default function OverviewPage() {
         a.click();
         URL.revokeObjectURL(url);
       }
+      setDownloaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {
@@ -147,119 +149,183 @@ export default function OverviewPage() {
             <ScoreRing score={summary.quality_score} />
             <div className="mt-4">
               <VerdictTag score={summary.quality_score} />
+              <p className="mt-1 text-xs italic text-brand-muted">
+                {summary.quality_score >= 90
+                  ? "Above average for this document type"
+                  : summary.quality_score >= 70
+                    ? "Good result — a few blocks need attention"
+                    : "Review recommended before exporting"}
+              </p>
             </div>
           </div>
 
-          {/* Translation Integrity Report */}
+          {/* Here's what Helvara did */}
           <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-brand-subtle">
-              Translation Integrity Report
+            <h3 className="font-display text-xl font-semibold text-brand-text">
+              Here&apos;s what Helvara did
             </h3>
-            <ul className="space-y-3">
-              <li className="flex items-start gap-2.5 text-sm">
-                <span className="mt-0.5 text-status-success">✓</span>
-                <span className="text-brand-text">
-                  <strong>{summary.total_blocks}</strong> blocks translated
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5 text-sm">
-                <span className="mt-0.5 text-status-success">✓</span>
-                <span className="text-brand-text">
-                  <strong>{toneLabel}</strong> register applied
-                </span>
-              </li>
-              {summary.glossary_match_count > 0 && (
-                <li className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 text-status-success">✓</span>
-                  <span className="text-brand-text">
-                    <strong>{summary.glossary_match_count}</strong> glossary terms applied consistently
-                  </span>
-                </li>
-              )}
+            <p className="mb-6 mt-1 text-sm text-brand-muted">
+              Your document was translated, verified against your glossary, and checked for ambiguity — automatically.
+            </p>
+            <div className="space-y-3">
               {summary.memory_reuse_count > 0 && (
-                <li className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 text-status-success">✓</span>
-                  <span className="text-brand-text">
-                    <strong>{memoryPercent}%</strong> translation memory match
+                <div className="flex items-center gap-3 rounded-lg border border-brand-accent/30 bg-brand-accentMid/30 p-3 border-l-4 border-l-brand-accent">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-brand-bg text-base">
+                    🧠
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-brand-text">Translation memory applied</p>
+                    <p className="text-xs text-brand-muted">{memoryPercent}% of blocks matched previous approved translations</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-brand-accentMid px-2.5 py-0.5 text-xs font-medium text-brand-accent">
+                    {memoryPercent}%
                   </span>
-                </li>
+                </div>
               )}
-              {summary.issue_count > 0 && (
-                <li className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 text-status-warning">⚠</span>
-                  <span className="text-status-warning">
-                    <strong>{summary.issue_count}</strong> blocks have ambiguous terms
+              {summary.glossary_match_count > 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-brand-bg text-base">
+                    📖
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-brand-text">{summary.glossary_match_count} glossary terms enforced</p>
+                    <p className="text-xs text-brand-muted">Your glossary was applied consistently across all blocks</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-brand-bg px-2.5 py-0.5 text-xs font-medium text-brand-muted">
+                    {summary.glossary_match_count} terms
                   </span>
-                </li>
+                </div>
               )}
-            </ul>
+              {summary.issue_count === 0 ? (
+                <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-brand-bg text-sm font-bold text-status-success">
+                    ✓
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-brand-text">No ambiguities detected</p>
+                    <p className="text-xs text-brand-muted">All blocks translated cleanly</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warningBg p-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-status-warning/30 bg-status-warningBg text-base">
+                    ⚠
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-status-warning">{summary.issue_count} blocks need attention</p>
+                    <p className="text-xs text-brand-muted">Some terms have multiple valid translations — review recommended</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-status-warningBg px-2.5 py-0.5 text-xs font-medium text-status-warning">
+                    {summary.issue_count}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-brand-bg text-sm font-medium text-brand-muted">
+                  Aa
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-brand-text">{toneLabel} register maintained</p>
+                  <p className="text-xs text-brand-muted">Tone and formality consistent throughout</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* ── Right column ── */}
         <div className="w-full space-y-6 lg:w-80 lg:shrink-0">
-          {/* Action hub */}
-          <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
-            <h3 className="text-sm font-semibold text-brand-text">
-              {hasIssues ? "Review Required" : reviewMode === "manual" ? "Manual Review" : "Ready to Export"}
-            </h3>
-            <p className="mt-1 text-xs text-brand-muted">
-              {hasIssues
-                ? `${summary.issue_count} ${summary.issue_count === 1 ? "block needs" : "blocks need"} attention before export.`
-                : reviewMode === "manual"
-                  ? "Review each block before exporting."
-                  : "Your translation is ready. Download or review."}
-            </p>
-            <div className="mt-5 space-y-2.5">
-              {reviewMode === "autopilot" && !hasIssues && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => triggerExport(false)}
-                    disabled={exporting}
-                    className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
-                  >
-                    {exporting ? "Exporting…" : "Download Translation"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                    className="w-full rounded-full py-2.5 text-center text-sm font-medium text-brand-muted hover:text-brand-text"
-                  >
-                    Switch to full review
-                  </button>
-                </>
-              )}
-              {reviewMode === "autopilot" && hasIssues && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/translation-jobs/${jobId}`)}
-                    className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
-                  >
-                    Review {summary.issue_count} {summary.issue_count === 1 ? "issue" : "issues"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => triggerExport(true)}
-                    disabled={exporting}
-                    className="w-full rounded-full border border-brand-border bg-brand-surface py-2.5 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
-                  >
-                    {exporting ? "Exporting…" : "Download anyway"}
-                  </button>
-                </>
-              )}
-              {reviewMode === "manual" && (
+          {/* Action hub / Post-download confirmation */}
+          {downloaded ? (
+            <div className="rounded-xl border border-status-success/30 bg-status-successBg p-6">
+              <div className="mb-3 text-center text-3xl">✅</div>
+              <h3 className="text-center font-display text-lg font-semibold text-brand-text">
+                Your translation is ready
+              </h3>
+              <p className="mt-2 text-center text-xs text-brand-muted">
+                {data.document_name} has been downloaded. {summary.total_blocks} blocks translated with {summary.quality_score}% quality score.
+              </p>
+              <div className="mt-5 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => triggerExport(false)}
+                  disabled={exporting}
+                  className="w-full rounded-full border border-brand-border bg-brand-surface py-2.5 text-center text-sm font-medium text-brand-text hover:bg-brand-bg disabled:opacity-50"
+                >
+                  {exporting ? "Exporting…" : "Download again"}
+                </button>
                 <button
                   type="button"
                   onClick={() => router.push(`/translation-jobs/${jobId}`)}
                   className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
                 >
-                  Start Review
+                  Review translation
                 </button>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
+              <h3 className="text-sm font-semibold text-brand-text">
+                {hasIssues ? "Review Required" : reviewMode === "manual" ? "Manual Review" : "Ready to Export"}
+              </h3>
+              <p className="mt-1 text-xs text-brand-muted">
+                {hasIssues
+                  ? `${summary.issue_count} ${summary.issue_count === 1 ? "block needs" : "blocks need"} attention before export.`
+                  : reviewMode === "manual"
+                    ? "Review each block before exporting."
+                    : "Your translation is ready. Download or review."}
+              </p>
+              <div className="mt-5 space-y-2.5">
+                {reviewMode === "autopilot" && !hasIssues && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => triggerExport(false)}
+                      disabled={exporting}
+                      className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
+                    >
+                      {exporting ? "Exporting…" : "Download Translation"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/translation-jobs/${jobId}`)}
+                      className="w-full rounded-full py-2.5 text-center text-sm font-medium text-brand-muted hover:text-brand-text"
+                    >
+                      Switch to full review
+                    </button>
+                  </>
+                )}
+                {reviewMode === "autopilot" && hasIssues && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/translation-jobs/${jobId}`)}
+                      className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
+                    >
+                      Review {summary.issue_count} {summary.issue_count === 1 ? "issue" : "issues"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerExport(true)}
+                      disabled={exporting}
+                      className="w-full rounded-full border border-brand-border bg-brand-surface py-2.5 text-center text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-50"
+                    >
+                      {exporting ? "Exporting…" : "Download anyway"}
+                    </button>
+                  </>
+                )}
+                {reviewMode === "manual" && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/translation-jobs/${jobId}`)}
+                    className="w-full rounded-full bg-brand-accent py-2.5 text-center text-sm font-medium text-white hover:bg-brand-accentHov"
+                  >
+                    Start Review
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Metadata */}
           <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
