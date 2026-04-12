@@ -149,7 +149,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         className={`mb-5 cursor-pointer rounded p-8 text-center transition-colors ${
           isDragging
             ? "border-2 border-dashed border-brand-accent bg-brand-accentMid"
-            : "border-2 border-dashed border-[#d4d0c8] bg-[#faf8f3]"
+            : "border-2 border-dashed border-brand-border bg-brand-bg"
         }`}
       >
         {file ? (
@@ -207,7 +207,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           <select
             value={sourceLang}
             onChange={(e) => setSourceLang(e.target.value)}
-            className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -221,7 +221,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           <select
             value={targetLang}
             onChange={(e) => setTargetLang(e.target.value)}
-            className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+            className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
           >
             {LANGUAGE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -238,7 +238,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d0c8] bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent"
         >
           <option value="">No project (standalone)</option>
           {projects.map((p) => (

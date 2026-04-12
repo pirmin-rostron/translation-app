@@ -32,6 +32,15 @@ npm install @tanstack/react-query
 pip install sqlalchemy alembic
 ```
 
+### Design System
+Always read DESIGN_SYSTEM.md in the project root before writing any frontend component or making any UI change. DESIGN_SYSTEM.md is the single source of truth for colours, typography, spacing, buttons, cards, badges, tables, and all UI patterns. Key rules from memory:
+- Buttons: always rounded-full, never rounded-lg
+- Cards: always rounded-xl, never rounded-lg
+- Inputs: always rounded-lg, never rounded-full
+- Never hardcode hex values — always brand.* and status.* tokens
+- Playfair Display for titles only, Inter for all UI chrome
+- One primary button per screen always
+
 ### Stack Rules — Frontend
 - Always use TypeScript. Never use `any` — use proper types or `unknown` with guards.
 - Use Tailwind utility classes for all styling. Do not create custom CSS unless Tailwind cannot handle it.

@@ -54,7 +54,7 @@ function isProcessing(rawStatus: string): boolean {
 
 function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle: string }) {
   return (
-    <div className="group rounded-lg border border-brand-border bg-brand-surface p-6 transition-colors hover:border-t-2 hover:border-t-brand-accent">
+    <div className="group rounded-xl border border-brand-border bg-brand-surface p-6 transition-colors hover:border-t-2 hover:border-t-brand-accent">
       <p className="mb-2 font-sans text-[0.6875rem] font-medium uppercase tracking-widest text-brand-accent">
         {label}
       </p>
@@ -229,7 +229,7 @@ export default function DashboardPage() {
                 <Link
                   key={p.id}
                   href={`/projects/${p.id}`}
-                  className="group rounded-lg border border-brand-border bg-brand-surface p-5 no-underline transition-colors hover:border-brand-accent"
+                  className="group rounded-xl border border-brand-border bg-brand-surface p-5 no-underline transition-colors hover:border-brand-accent"
                 >
                   <p className="font-sans text-sm font-medium text-brand-text group-hover:text-brand-accent">{p.name}</p>
                   <div className="mt-2 flex items-center gap-3 text-xs text-brand-muted">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         {(!projectList || projectList.length === 0) && tierData && tierData.tier !== "free" && (
           <div className="mb-10">
             <TierGate feature="create_projects" tier={tierData.tier}>
-              <div className="rounded-lg border border-brand-border bg-brand-surface px-8 py-10 text-center">
+              <div className="rounded-xl border border-brand-border bg-brand-surface px-8 py-10 text-center">
                 <p className="font-display text-lg font-bold text-brand-text">No projects yet</p>
                 <p className="mt-1 font-sans text-sm text-brand-muted">Create a project to group documents together.</p>
                 <button
@@ -266,7 +266,7 @@ export default function DashboardPage() {
 
         {/* ── Usage Indicator ── */}
         {tierData && tierData.limits.max_jobs !== null && tierData.jobs_this_month > tierData.limits.max_jobs * 0.5 && (
-          <div className={`mb-6 flex items-center justify-between rounded-lg border px-5 py-3 ${
+          <div className={`mb-6 flex items-center justify-between rounded-xl border px-5 py-3 ${
             tierData.jobs_this_month >= tierData.limits.max_jobs
               ? "border-status-error/30 bg-status-errorBg"
               : tierData.jobs_this_month >= tierData.limits.max_jobs * 0.8
@@ -304,7 +304,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Table card */}
-            <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
+            <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-brand-border">
@@ -328,7 +328,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           /* Empty state */
-          <div className="mb-10 rounded-lg border border-brand-border bg-brand-surface px-8 py-20 text-center">
+          <div className="mb-10 rounded-xl border border-brand-border bg-brand-surface px-8 py-20 text-center">
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-brand-muted">
                 <rect x="8" y="4" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.5" />
