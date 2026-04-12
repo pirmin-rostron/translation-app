@@ -1,3 +1,5 @@
+import { trackEvent } from "../utils/analytics";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function getAuthHeaders(): Record<string, string> {
@@ -22,6 +24,7 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: mergedHeaders });
 
   if (res.status === 401 && typeof window !== "undefined") {
+    trackEvent("api.error_401", { path: url });
     const authPaths = ["/login", "/register", "/preview", "/"];
     if (!authPaths.some((p) => window.location.pathname.startsWith(p))) {
       // Debounce: wait 100ms then check if token is still present before clearing.
@@ -44,6 +47,9 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
+    if (res.status >= 500) {
+      trackEvent("api.error_500", { path: url, status: res.status });
+    }
     const payload = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(payload.detail ?? `Request failed (${res.status})`);
   }

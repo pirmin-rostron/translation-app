@@ -7,6 +7,7 @@ import { useAuthStore } from "../../../stores/authStore";
 import { API_URL, overviewApi, translationJobsApi } from "../../../services/api";
 import type { OverviewResponse } from "../../../services/api";
 import { getLanguageDisplayName } from "../../../utils/language";
+import { trackEvent } from "../../../utils/analytics";
 
 type ExportResult = {
   job_id: number;
@@ -102,6 +103,7 @@ export default function OverviewPage() {
         URL.revokeObjectURL(url);
       }
       setDownloaded(true);
+      trackEvent("flow.download_complete", { quality_score: data?.summary.quality_score, has_issues: (data?.summary.issue_count ?? 0) > 0, review_mode: data?.review_mode });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {

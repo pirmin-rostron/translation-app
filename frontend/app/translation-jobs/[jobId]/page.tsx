@@ -9,6 +9,7 @@ import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay"
 import { getLanguageDisplayName } from "../../utils/language";
 
 import posthog from 'posthog-js';
+import { trackEvent } from "../../utils/analytics";
 import { API_URL, documentsApi, glossaryTermsApi, translationJobsApi, translationResultsApi } from "../../services/api";
 
 type TranslationJob = {
@@ -827,6 +828,7 @@ function TranslationReviewPageInner() {
     focusReviewGuidance();
     setMessage("Review complete. Preview your document, then export when ready.");
     setError("");
+    trackEvent("flow.review_complete", { job_id: jobId });
     return true;
   }
 

@@ -6,6 +6,7 @@ import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, queryKeys } from "../services/api";
 import type { ProjectListItem } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
+import { trackEvent } from "../utils/analytics";
 
 const LANGUAGE_OPTIONS = [
   { value: "English",  label: "English" },
@@ -64,7 +65,9 @@ export function NewTranslationModal({ projects }: { projects: ProjectListItem[] 
       fd.append("target_language", targetLang);
       fd.append("translation_style", "natural");
       const prevCount = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
+      trackEvent("flow.upload_started", { target_language: targetLang });
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      trackEvent("flow.upload_complete");
       handleClose();
       // Poll until the new job appears in the list (Celery creates it async)
       let attempts = 0;

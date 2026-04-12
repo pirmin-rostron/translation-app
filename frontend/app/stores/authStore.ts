@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import posthog from 'posthog-js';
+import { trackEvent } from '../utils/analytics';
 
 export type AuthUser = {
   id: number;
@@ -43,11 +44,13 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           posthog.identify(String(user.id), { email: user.email, name: user.full_name ?? undefined });
         }
+        trackEvent('auth.login');
       },
       clearAuth: () => {
         if (typeof document !== "undefined") clearAuthCookie();
         set({ token: null, user: null });
         if (typeof window !== 'undefined') posthog.reset();
+        trackEvent('auth.logout');
       },
     }),
     {
