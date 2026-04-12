@@ -146,7 +146,7 @@ def _run_document_pipeline(document_id: int, user_id: int | None = None):
         db.close()
 
 
-def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None, org_id: int | None = None):
+def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None, org_id: int | None = None, review_mode: str = "autopilot"):
     """Happy-path orchestration: parse document, then create and execute translation job."""
     db = SessionLocal()
     try:
@@ -202,15 +202,26 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
                 current_user=_mock_user,
                 current_org=_mock_org,
             )
+            # Set review_mode on the newly created job
+            if review_mode and review_mode != "autopilot":
+                latest_job = (
+                    db.query(TranslationJob)
+                    .filter(TranslationJob.document_id == document_id)
+                    .order_by(TranslationJob.created_at.desc())
+                    .first()
+                )
+                if latest_job:
+                    latest_job.review_mode = review_mode
+                    db.commit()
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
     finally:
         db.close()
 
 
-def _run_document_pipeline_from_task(document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural") -> None:
+def _run_document_pipeline_from_task(document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural", review_mode: str = "autopilot") -> None:
     """Thin wrapper called by the Celery run_document_pipeline task."""
-    _run_default_upload_to_review_pipeline(document_id=document_id, translation_style=translation_style, user_id=user_id, org_id=org_id)
+    _run_default_upload_to_review_pipeline(document_id=document_id, translation_style=translation_style, user_id=user_id, org_id=org_id, review_mode=review_mode)
 
 
 def _execute_parsing_stage(db: Session, document_id: int):
@@ -511,6 +522,7 @@ def upload_and_translate_document(
     industry: str | None = Form(None, max_length=100),
     domain: str | None = Form(None, max_length=100),
     translation_style: str = Form("natural", min_length=1, max_length=20),
+    review_mode: str = Form("autopilot", min_length=1, max_length=20),
     customer_id: str | None = Form(None, max_length=100),
     project_id: int | None = Form(None),
     db: Session = Depends(get_db),
@@ -624,7 +636,8 @@ def upload_and_translate_document(
         db.commit()
         db.refresh(doc)
     uid = current_user.id if current_user is not None else None
-    run_document_pipeline.delay(doc.id, uid, current_org.id, style_value)
+    rm = review_mode.strip().lower() if review_mode else "autopilot"
+    run_document_pipeline.delay(doc.id, uid, current_org.id, style_value, rm)
     return doc
 
 

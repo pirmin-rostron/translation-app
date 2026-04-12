@@ -32,6 +32,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [targetLang, setTargetLang] = useState("German");
+  const [reviewMode, setReviewMode] = useState<"autopilot" | "manual">("autopilot");
   const [projectId, setProjectId] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +79,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         ? projects.find((p) => String(p.id) === projectId)
         : null;
       fd.append("translation_style", selectedProject?.default_tone ?? "natural");
+      fd.append("review_mode", reviewMode);
       if (selectedProject) {
         fd.append("project_id", String(selectedProject.id));
       }
@@ -212,6 +214,40 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           ))}
         </select>
         <p className="mt-1 text-xs text-brand-subtle">Source language is auto-detected from your document</p>
+      </div>
+
+      {/* Review mode */}
+      <div className="mb-4">
+        <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
+          Review mode
+        </label>
+        <div className="flex overflow-hidden rounded-full border border-brand-border">
+          <button
+            type="button"
+            onClick={() => setReviewMode("autopilot")}
+            className={`flex-1 px-4 py-2 text-center text-sm font-medium transition-colors ${
+              reviewMode === "autopilot"
+                ? "bg-brand-accent text-white"
+                : "bg-brand-surface text-brand-muted hover:bg-brand-bg"
+            }`}
+          >
+            Autopilot
+          </button>
+          <button
+            type="button"
+            onClick={() => setReviewMode("manual")}
+            className={`flex-1 px-4 py-2 text-center text-sm font-medium transition-colors ${
+              reviewMode === "manual"
+                ? "bg-brand-accent text-white"
+                : "bg-brand-surface text-brand-muted hover:bg-brand-bg"
+            }`}
+          >
+            Manual review
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-brand-subtle">
+          {reviewMode === "autopilot" ? "Download when ready — minimal review" : "Review each block before export"}
+        </p>
       </div>
 
       {/* Project selector */}

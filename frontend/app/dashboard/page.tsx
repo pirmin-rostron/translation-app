@@ -19,6 +19,17 @@ function getFirstName(fullName: string | null | undefined, email: string): strin
   return email.split("@")[0];
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const ms = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 // ─── Processing status helpers ──────────────────────────────────────────────
 
 const PROCESSING_STATUSES = new Set([
@@ -169,7 +180,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-brand-bg pt-20">
-      <div className="mx-auto max-w-[1100px] px-10 py-12">
+      <div className="mx-auto max-w-[1200px] px-10 py-12">
 
         {/* ── Hero + Split Button ── */}
         <div className="mb-10 flex items-start justify-between">
@@ -205,6 +216,10 @@ export default function DashboardPage() {
             subtitle="Awaiting approval"
           />
         </div>
+
+        {/* ── Main + Activity Sidebar ── */}
+        <div className="flex gap-8">
+        <div className="min-w-0 flex-1">
 
         {/* ── Projects ── */}
         {(projectList && projectList.length > 0) && (
@@ -353,6 +368,45 @@ export default function DashboardPage() {
           </div>
         )}
 
+
+        </div>
+
+        {/* ── Activity Sidebar ── */}
+        <div className="hidden w-72 shrink-0 lg:block">
+          <div className="sticky top-24">
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-brand-subtle">Recent Activity</h3>
+            <div className="space-y-3">
+              {displayTranslations.slice(0, 8).map((t) => {
+                const dotColor = t.raw_status === "exported" ? "bg-status-success"
+                  : t.raw_status === "in_review" || t.raw_status === "review" ? "bg-brand-accent"
+                  : t.raw_status === "translating" || t.raw_status === "translation_queued" ? "bg-status-warning"
+                  : t.raw_status === "translation_failed" ? "bg-status-error"
+                  : "bg-brand-subtle";
+                const label = t.raw_status === "exported" ? "Exported"
+                  : t.raw_status === "in_review" || t.raw_status === "review" ? "Ready for review"
+                  : t.raw_status === "translating" || t.raw_status === "translation_queued" ? "Translating"
+                  : t.raw_status === "translation_failed" ? "Failed"
+                  : t.raw_status === "ready_for_export" ? "Ready to export"
+                  : t.status;
+                const timeAgo = t.created_at ? formatRelativeTime(t.created_at) : "";
+                return (
+                  <div key={t.id} className="flex items-start gap-2.5">
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-brand-text">{label}</p>
+                      <p className="truncate text-xs text-brand-subtle">{t.document_name ?? `Job #${t.id}`}</p>
+                      {timeAgo && <p className="text-xs text-brand-subtle">{timeAgo}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+              {displayTranslations.length === 0 && (
+                <p className="text-xs text-brand-subtle">No activity yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+        </div>
 
       </div>
 

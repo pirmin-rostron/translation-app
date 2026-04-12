@@ -7,11 +7,11 @@ from celery_app import celery_app
     max_retries=3,
     default_retry_delay=30,
 )
-def run_document_pipeline(self, document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural"):
+def run_document_pipeline(self, document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural", review_mode: str = "autopilot"):
     """Parse and segment a document, then queue translation with the given style."""
     # Import here to avoid circular imports
     from routers.documents import _run_document_pipeline_from_task
-    _run_document_pipeline_from_task(document_id=document_id, user_id=user_id, org_id=org_id, translation_style=translation_style)
+    _run_document_pipeline_from_task(document_id=document_id, user_id=user_id, org_id=org_id, translation_style=translation_style, review_mode=review_mode)
 
 
 @celery_app.task(
