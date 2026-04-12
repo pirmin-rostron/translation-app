@@ -33,7 +33,7 @@ pip install sqlalchemy alembic
 ```
 
 ### Design System
-Always read DESIGN_SYSTEM.md in the project root before writing any frontend component or making any UI change. DESIGN_SYSTEM.md is the single source of truth for colours, typography, spacing, buttons, cards, badges, tables, and all UI patterns. Key rules from memory:
+Always read DESIGN.md in the project root before writing any frontend component or making any UI change. DESIGN.md is the single source of truth for colours, typography, spacing, buttons, cards, badges, tables, and all UI patterns. Key rules:
 - Buttons: always rounded-full, never rounded-lg
 - Cards: always rounded-xl, never rounded-lg
 - Inputs: always rounded-lg, never rounded-full
