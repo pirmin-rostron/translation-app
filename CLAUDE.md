@@ -265,6 +265,15 @@ Always follow this order:
 3. Only then: git push origin main && ./deploy.sh
 Never prompt the user to deploy before confirming local tests pass visually.
 
+### Session close-out (mandatory, every session)
+At the end of every session, always run these steps without being asked:
+1. mempalace mine ~/Documents/Projects/Translation_app
+2. Record completed tickets in KG with status and key implementation notes
+3. Record any architectural decisions made during the session
+4. git push origin main if anything is uncommitted
+
+This is not optional. Do not end a session without running mempalace mine.
+
 ---
 
 ## Post-Ticket Self-Review Checklist
