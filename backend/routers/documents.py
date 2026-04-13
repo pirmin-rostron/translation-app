@@ -146,8 +146,13 @@ def _run_document_pipeline(document_id: int, user_id: int | None = None):
         db.close()
 
 
-def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None, org_id: int | None = None, review_mode: str = "autopilot"):
-    """Happy-path orchestration: parse document, then create and execute translation job."""
+def _run_default_upload_to_review_pipeline(document_id: int, translation_style: str = "natural", user_id: int | None = None, org_id: int | None = None, review_mode: str = "autopilot", fan_out_languages: list[str] | None = None):
+    """Happy-path orchestration: parse document, then create and execute translation job(s).
+
+    When fan_out_languages is provided (from a project upload), one translation
+    job is created per language. Otherwise the document's own target_language is
+    used for a single job (existing behaviour).
+    """
     db = SessionLocal()
     try:
         doc = db.query(Document).filter(Document.id == document_id).first()
@@ -195,33 +200,44 @@ def _run_default_upload_to_review_pipeline(document_id: int, translation_style: 
             from schemas import TranslationJobCreateRequest
 
             style_value = (translation_style or "natural").strip().lower()
-            create_translation_job(
-                document_id=document_id,
-                payload=TranslationJobCreateRequest(translation_style=style_value),
-                db=db,
-                current_user=_mock_user,
-                current_org=_mock_org,
-            )
-            # Set review_mode on the newly created job
-            if review_mode and review_mode != "autopilot":
-                latest_job = (
+            # Determine which languages to create jobs for
+            languages = fan_out_languages if fan_out_languages else [doc.target_language]
+            original_target = doc.target_language
+            for lang in languages:
+                # Temporarily set doc.target_language so create_translation_job reads it
+                doc.target_language = lang
+                db.flush()
+                create_translation_job(
+                    document_id=document_id,
+                    payload=TranslationJobCreateRequest(translation_style=style_value),
+                    db=db,
+                    current_user=_mock_user,
+                    current_org=_mock_org,
+                )
+            # Restore to first language for the document record
+            doc.target_language = languages[0] if fan_out_languages else original_target
+            db.commit()
+            # Set review_mode on all newly created jobs
+            rm = review_mode if review_mode else "autopilot"
+            if rm != "autopilot":
+                new_jobs = (
                     db.query(TranslationJob)
                     .filter(TranslationJob.document_id == document_id)
-                    .order_by(TranslationJob.created_at.desc())
-                    .first()
+                    .all()
                 )
-                if latest_job:
-                    latest_job.review_mode = review_mode
-                    db.commit()
+                for job in new_jobs:
+                    if job.review_mode != rm:
+                        job.review_mode = rm
+                db.commit()
     except Exception:
         logger.exception("Default upload-to-review pipeline failed for document_id=%d", document_id)
     finally:
         db.close()
 
 
-def _run_document_pipeline_from_task(document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural", review_mode: str = "autopilot") -> None:
+def _run_document_pipeline_from_task(document_id: int, user_id: int | None = None, org_id: int | None = None, translation_style: str = "natural", review_mode: str = "autopilot", fan_out_languages: list[str] | None = None) -> None:
     """Thin wrapper called by the Celery run_document_pipeline task."""
-    _run_default_upload_to_review_pipeline(document_id=document_id, translation_style=translation_style, user_id=user_id, org_id=org_id, review_mode=review_mode)
+    _run_default_upload_to_review_pipeline(document_id=document_id, translation_style=translation_style, user_id=user_id, org_id=org_id, review_mode=review_mode, fan_out_languages=fan_out_languages)
 
 
 def _execute_parsing_stage(db: Session, document_id: int):
@@ -541,8 +557,9 @@ def upload_and_translate_document(
     if style_value not in {"natural", "formal", "literal"}:
         raise HTTPException(status_code=400, detail="translation_style must be one of: formal, literal, natural")
 
-    # Validate project belongs to org
+    # Validate project belongs to org and capture fan-out languages
     validated_project_id: int | None = None
+    fan_out_languages: list[str] | None = None
     if project_id is not None:
         proj = db.query(Project).filter(
             Project.id == project_id,
@@ -552,6 +569,9 @@ def upload_and_translate_document(
         if not proj:
             raise HTTPException(status_code=404, detail="Project not found")
         validated_project_id = proj.id
+        # If the project defines target languages, fan out one job per language
+        if proj.target_languages and len(proj.target_languages) > 0:
+            fan_out_languages = proj.target_languages
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
@@ -637,7 +657,7 @@ def upload_and_translate_document(
         db.refresh(doc)
     uid = current_user.id if current_user is not None else None
     rm = review_mode.strip().lower() if review_mode else "autopilot"
-    run_document_pipeline.delay(doc.id, uid, current_org.id, style_value, rm)
+    run_document_pipeline.delay(doc.id, uid, current_org.id, style_value, rm, fan_out_languages)
     return doc
 
 

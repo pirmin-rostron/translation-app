@@ -7,6 +7,7 @@ import { documentsApi, queryKeys } from "../services/api";
 import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 import { trackEvent } from "../utils/analytics";
+import { getLanguageDisplayName, getLanguageFlag } from "../utils/language";
 
 const LANGUAGE_OPTIONS = [
   { value: "English",  label: "English" },
@@ -271,27 +272,57 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         }}
       />
 
-      {/* Target language */}
-      <div className="mb-4">
-        <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
-          Translate to
-        </label>
-        <select
-          value={targetLang}
-          onChange={(e) => setTargetLang(e.target.value)}
-          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-        >
-          {LANGUAGE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-brand-subtle">Source language is auto-detected from your document</p>
-        {sameLanguage && (
-          <p className="mt-1.5 text-xs text-status-warning">
-            Source and target language are the same — please select a different target language.
-          </p>
-        )}
-      </div>
+      {/* Target language — inherited from project or manual selector */}
+      {(() => {
+        const selectedProject = projectId && projectId !== "__new__"
+          ? projects.find((p) => String(p.id) === projectId)
+          : null;
+        const inheritedLangs = selectedProject?.target_languages ?? [];
+        if (inheritedLangs.length > 0) {
+          return (
+            <div className="mb-4">
+              <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
+                Translate to
+              </label>
+              <p className="mb-2 text-xs text-brand-subtle">
+                Languages inherited from project:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {inheritedLangs.map((lang) => (
+                  <span
+                    key={lang}
+                    className="rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent"
+                  >
+                    {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="mb-4">
+            <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
+              Translate to
+            </label>
+            <select
+              value={targetLang}
+              onChange={(e) => setTargetLang(e.target.value)}
+              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+            >
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-brand-subtle">Source language is auto-detected from your document</p>
+            {sameLanguage && (
+              <p className="mt-1.5 text-xs text-status-warning">
+                Source and target language are the same — please select a different target language.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Review mode */}
       <div className="mb-4">

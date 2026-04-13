@@ -48,6 +48,47 @@ export function getLanguageDisplayName(value: string | null | undefined): string
   return CODE_TO_NAME[lower] ?? NAME_TO_CODE[lower] ?? value;
 }
 
+/** Map language name/code to flag emoji for display. */
+const LANG_FLAGS: Record<string, string> = {
+  english: "\u{1F1EC}\u{1F1E7}",
+  german: "\u{1F1E9}\u{1F1EA}",
+  french: "\u{1F1EB}\u{1F1F7}",
+  korean: "\u{1F1F0}\u{1F1F7}",
+  spanish: "\u{1F1EA}\u{1F1F8}",
+  italian: "\u{1F1EE}\u{1F1F9}",
+  japanese: "\u{1F1EF}\u{1F1F5}",
+  dutch: "\u{1F1F3}\u{1F1F1}",
+  portuguese: "\u{1F1F5}\u{1F1F9}",
+  "chinese (simplified)": "\u{1F1E8}\u{1F1F3}",
+  chinese: "\u{1F1E8}\u{1F1F3}",
+  arabic: "\u{1F1E6}\u{1F1EA}",
+  "portuguese (br)": "\u{1F1E7}\u{1F1F7}",
+  swedish: "\u{1F1F8}\u{1F1EA}",
+  polish: "\u{1F1F5}\u{1F1F1}",
+  turkish: "\u{1F1F9}\u{1F1F7}",
+  // ISO codes
+  en: "\u{1F1EC}\u{1F1E7}",
+  de: "\u{1F1E9}\u{1F1EA}",
+  fr: "\u{1F1EB}\u{1F1F7}",
+  ko: "\u{1F1F0}\u{1F1F7}",
+  es: "\u{1F1EA}\u{1F1F8}",
+  it: "\u{1F1EE}\u{1F1F9}",
+  ja: "\u{1F1EF}\u{1F1F5}",
+  nl: "\u{1F1F3}\u{1F1F1}",
+  pt: "\u{1F1F5}\u{1F1F9}",
+  "zh-cn": "\u{1F1E8}\u{1F1F3}",
+  zh: "\u{1F1E8}\u{1F1F3}",
+  ar: "\u{1F1E6}\u{1F1EA}",
+  sv: "\u{1F1F8}\u{1F1EA}",
+  pl: "\u{1F1F5}\u{1F1F1}",
+  tr: "\u{1F1F9}\u{1F1F7}",
+};
+
+export function getLanguageFlag(value: string | null | undefined): string {
+  if (!value) return "";
+  return LANG_FLAGS[value.toLowerCase()] ?? "";
+}
+
 /** Options for manual source language override (value = ISO code). */
 export const SOURCE_LANGUAGE_OVERRIDE_OPTIONS = [
   { value: "en", label: "English" },

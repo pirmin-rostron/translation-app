@@ -321,8 +321,10 @@ export type ProjectResponse = {
   id: number;
   org_id: number;
   name: string;
+  description: string | null;
   target_languages: string[];
   default_tone: string;
+  due_date: string | null;
   document_count: number;
   created_at: string;
   updated_at: string | null;
@@ -340,8 +342,17 @@ export type ProjectDetailResponse = ProjectResponse & {
 
 export type CreateProjectRequest = {
   name: string;
+  description?: string;
   target_languages?: string[];
   default_tone?: string;
+  due_date?: string;
+};
+
+export type ProjectStatsResponse = {
+  total_jobs: number;
+  completed_count: number;
+  in_review_count: number;
+  total_words: number;
 };
 
 export type OverviewResponse = {
@@ -411,6 +422,8 @@ export const projectsApi = {
     }),
   delete: (id: number) =>
     apiFetch<void>(`${API_URL}/projects/${id}`, { method: "DELETE" }),
+  stats: (id: number) =>
+    apiFetch<ProjectStatsResponse>(`${API_URL}/projects/${id}/stats`),
 };
 
 // --- admin types and api ---

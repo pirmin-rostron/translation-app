@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+/**
+ * NewProjectModal — create a project with name, description, target languages,
+ * optional due date, and optional file upload. Every document uploaded to the
+ * project will be translated into all selected languages (fan-out).
+ */
+
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
@@ -8,30 +14,94 @@ import { projectsApi } from "../services/api";
 import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 
+// Ordered list per ticket spec — code is what the backend stores
+const LANGUAGE_OPTIONS = [
+  { code: "German",                flag: "\u{1F1E9}\u{1F1EA}", label: "German" },
+  { code: "French",                flag: "\u{1F1EB}\u{1F1F7}", label: "French" },
+  { code: "Korean",                flag: "\u{1F1F0}\u{1F1F7}", label: "Korean" },
+  { code: "Spanish",               flag: "\u{1F1EA}\u{1F1F8}", label: "Spanish" },
+  { code: "Italian",               flag: "\u{1F1EE}\u{1F1F9}", label: "Italian" },
+  { code: "Japanese",              flag: "\u{1F1EF}\u{1F1F5}", label: "Japanese" },
+  { code: "Dutch",                 flag: "\u{1F1F3}\u{1F1F1}", label: "Dutch" },
+  { code: "Portuguese",            flag: "\u{1F1F5}\u{1F1F9}", label: "Portuguese" },
+  { code: "Chinese (Simplified)",  flag: "\u{1F1E8}\u{1F1F3}", label: "Chinese (Simplified)" },
+  { code: "Arabic",                flag: "\u{1F1E6}\u{1F1EA}", label: "Arabic" },
+  { code: "Portuguese (BR)",       flag: "\u{1F1E7}\u{1F1F7}", label: "Portuguese (BR)" },
+  { code: "Swedish",               flag: "\u{1F1F8}\u{1F1EA}", label: "Swedish" },
+  { code: "Polish",                flag: "\u{1F1F5}\u{1F1F1}", label: "Polish" },
+  { code: "Turkish",               flag: "\u{1F1F9}\u{1F1F7}", label: "Turkish" },
+] as const;
+
+const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
 export function NewProjectModal() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.projectModalOpen);
   const closeModal = useDashboardStore((s) => s.closeProjectModal);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [glossary, setGlossary] = useState("");
+  const [selectedLangs, setSelectedLangs] = useState<Set<string>>(new Set());
+  const [dueDate, setDueDate] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit() {
-    if (!name.trim()) {
-      setError("Project name is required.");
+  function toggleLang(code: string) {
+    setSelectedLangs((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const f = files[0];
+    const ext = f.name.toLowerCase().split(".").pop() ?? "";
+    if (!ALLOWED_EXTS.has(ext)) {
+      setError("Only DOCX, TXT, and RTF files are allowed.");
       return;
     }
+    if (f.size > MAX_FILE_SIZE) {
+      setError("File must be under 10 MB.");
+      return;
+    }
+    setError("");
+    setFile(f);
+  }
+
+  const canSubmit = name.trim().length > 0 && selectedLangs.size > 0 && !submitting;
+
+  async function handleSubmit() {
+    if (!canSubmit) return;
     setSubmitting(true);
     setError("");
     try {
-      const created = await projectsApi.create({ name: name.trim() }) as ProjectResponse;
+      const created = await projectsApi.create({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        target_languages: Array.from(selectedLangs),
+        due_date: dueDate || undefined,
+      }) as ProjectResponse;
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      const projectId = created.id;
+      const pendingFile = file;
       handleClose();
-      router.push(`/projects/${created.id}`);
+      router.push(`/projects/${projectId}`);
+      // If a file was attached, trigger upload after navigation via the
+      // translation modal with the project pre-selected.
+      if (pendingFile) {
+        // Small delay so the project page can mount and register the modal
+        setTimeout(() => {
+          useDashboardStore.getState().openTranslationModal(projectId);
+        }, 400);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
       setSubmitting(false);
@@ -41,7 +111,9 @@ export function NewProjectModal() {
   function handleClose() {
     setName("");
     setDescription("");
-    setGlossary("");
+    setSelectedLangs(new Set());
+    setDueDate("");
+    setFile(null);
     setError("");
     setSubmitting(false);
     closeModal();
@@ -52,14 +124,15 @@ export function NewProjectModal() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h2 className="m-0 font-display text-2xl font-bold text-brand-text">
+          <h2 className="m-0 font-display text-lg font-bold text-brand-text">
             New Project
           </h2>
-          <p className="mt-1 font-sans text-[0.8125rem] text-brand-subtle">
-            Group translations together
+          <p className="mt-1 text-sm text-brand-muted">
+            Group documents and target languages together
           </p>
         </div>
         <button
+          type="button"
           onClick={handleClose}
           className="cursor-pointer border-none bg-transparent p-1 text-xl text-brand-subtle"
         >
@@ -69,7 +142,7 @@ export function NewProjectModal() {
 
       {/* Project name */}
       <div className="mb-4">
-        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
           Project name <span className="text-status-error">*</span>
         </label>
         <input
@@ -77,57 +150,145 @@ export function NewProjectModal() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Legal Docs Q2"
-          className="box-border w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
         />
       </div>
 
       {/* Description */}
       <div className="mb-4">
-        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
           Description
         </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional description"
-          rows={3}
-          className="box-border w-full resize-y rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+          rows={2}
+          className="w-full resize-none rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
         />
       </div>
 
-      {/* Connected glossary */}
-      <div className="mb-6">
-        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
-          Connected glossary
+      {/* Target languages — multi-select pill grid */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
+          Translate into <span className="text-status-error">*</span>
         </label>
-        <select
-          value={glossary}
-          onChange={(e) => setGlossary(e.target.value)}
-          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+        <div className="flex flex-wrap gap-2">
+          {LANGUAGE_OPTIONS.map((lang) => {
+            const selected = selectedLangs.has(lang.code);
+            return (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => toggleLang(lang.code)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  selected
+                    ? "border border-brand-accent bg-brand-accentMid font-semibold text-brand-accent"
+                    : "border border-brand-border bg-brand-surface text-brand-muted hover:border-brand-accent/40"
+                }`}
+              >
+                {selected && <span className="mr-1">✓</span>}
+                {lang.flag} {lang.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-xs text-brand-subtle">
+          Every document uploaded to this project will be translated into all selected languages.
+        </p>
+      </div>
+
+      {/* Due date */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
+          Due date
+        </label>
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 transition-colors"
+        />
+      </div>
+
+      {/* File upload drop zone (optional) */}
+      <div className="mb-2">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
+          Upload a document
+        </label>
+        <div
+          role="button"
+          tabIndex={0}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            handleFiles(e.dataTransfer.files);
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+          }}
+          className={`cursor-pointer rounded-xl p-6 text-center transition-colors ${
+            isDragging
+              ? "border-2 border-dashed border-brand-accent bg-brand-accentMid"
+              : "border-2 border-dashed border-brand-border bg-brand-bg"
+          }`}
         >
-          <option value="">None</option>
-          <option value="legal">Legal &amp; Compliance Terms</option>
-        </select>
+          {file ? (
+            <div>
+              <p className="m-0 text-sm font-medium text-brand-text">{file.name}</p>
+              <p className="mt-1 text-xs text-brand-subtle">Click to change file</p>
+            </div>
+          ) : (
+            <div>
+              <p className="m-0 text-[0.8125rem] font-medium text-brand-muted">
+                Drop file here or click to browse
+              </p>
+              <p className="mt-1 text-[0.6875rem] text-brand-subtle">
+                DOCX, RTF, TXT — max 10 MB
+              </p>
+            </div>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".docx,.txt,.rtf"
+          className="hidden"
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        {!file && (
+          <p className="mt-1.5 text-center text-xs text-brand-subtle underline">
+            Skip for now — I&apos;ll add documents later
+          </p>
+        )}
       </div>
 
       {error && (
-        <p className="mb-4 font-sans text-[0.8125rem] text-status-error">{error}</p>
+        <p className="mb-4 text-[0.8125rem] text-status-error">{error}</p>
       )}
 
       {/* Actions */}
-      <div className="flex justify-end gap-3">
+      <div className="mt-6 flex justify-end gap-3">
         <button
+          type="button"
           onClick={handleClose}
-          className="cursor-pointer border-none bg-transparent px-4 py-2 font-sans text-[0.8125rem] text-brand-muted"
+          className="rounded-full px-4 py-2 text-sm font-medium text-brand-muted hover:text-brand-text underline"
         >
           Cancel
         </button>
         <button
+          type="button"
           onClick={handleSubmit}
-          disabled={submitting || !name.trim()}
-          className="cursor-pointer rounded-full border-none bg-brand-accent px-5 py-2.5 font-sans text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canSubmit}
+          className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
         >
-          {submitting ? "Creating…" : "Create Project"}
+          {submitting ? "Creating…" : "Create project"}
         </button>
       </div>
     </ModalOverlay>
