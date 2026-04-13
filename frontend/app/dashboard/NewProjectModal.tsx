@@ -13,24 +13,7 @@ import { useDashboardStore } from "../stores/dashboardStore";
 import { projectsApi } from "../services/api";
 import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
-
-// Ordered list per ticket spec — code is what the backend stores
-const LANGUAGE_OPTIONS = [
-  { code: "German",                flag: "\u{1F1E9}\u{1F1EA}", label: "German" },
-  { code: "French",                flag: "\u{1F1EB}\u{1F1F7}", label: "French" },
-  { code: "Korean",                flag: "\u{1F1F0}\u{1F1F7}", label: "Korean" },
-  { code: "Spanish",               flag: "\u{1F1EA}\u{1F1F8}", label: "Spanish" },
-  { code: "Italian",               flag: "\u{1F1EE}\u{1F1F9}", label: "Italian" },
-  { code: "Japanese",              flag: "\u{1F1EF}\u{1F1F5}", label: "Japanese" },
-  { code: "Dutch",                 flag: "\u{1F1F3}\u{1F1F1}", label: "Dutch" },
-  { code: "Portuguese",            flag: "\u{1F1F5}\u{1F1F9}", label: "Portuguese" },
-  { code: "Chinese (Simplified)",  flag: "\u{1F1E8}\u{1F1F3}", label: "Chinese (Simplified)" },
-  { code: "Arabic",                flag: "\u{1F1E6}\u{1F1EA}", label: "Arabic" },
-  { code: "Portuguese (BR)",       flag: "\u{1F1E7}\u{1F1F7}", label: "Portuguese (BR)" },
-  { code: "Swedish",               flag: "\u{1F1F8}\u{1F1EA}", label: "Swedish" },
-  { code: "Polish",                flag: "\u{1F1F5}\u{1F1F1}", label: "Polish" },
-  { code: "Turkish",               flag: "\u{1F1F9}\u{1F1F7}", label: "Turkish" },
-] as const;
+import { PROJECT_LANGUAGE_OPTIONS } from "../utils/language";
 
 const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -174,7 +157,7 @@ export function NewProjectModal() {
           Translate into <span className="text-status-error">*</span>
         </label>
         <div className="flex flex-wrap gap-2">
-          {LANGUAGE_OPTIONS.map((lang) => {
+          {PROJECT_LANGUAGE_OPTIONS.map((lang) => {
             const selected = selectedLangs.has(lang.code);
             return (
               <button

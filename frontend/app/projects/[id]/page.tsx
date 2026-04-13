@@ -16,7 +16,8 @@ import { useDashboardStore } from "../../stores/dashboardStore";
 import { projectsApi, translationJobsApi } from "../../services/api";
 import type { ProjectDetailResponse, ProjectStatsResponse, TranslationJobListItem } from "../../services/api";
 import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
-import { getLanguageDisplayName, getLanguageFlag } from "../../utils/language";
+import { ModalOverlay } from "../../dashboard/ModalOverlay";
+import { getLanguageDisplayName, getLanguageFlag, PROJECT_LANGUAGE_OPTIONS } from "../../utils/language";
 
 const PROCESSING_STATUSES = new Set(["queued", "parsing", "translating", "translation_queued"]);
 
@@ -67,6 +68,164 @@ function groupByDocument(jobs: TranslationJobListItem[]): DocGroup[] {
   return Array.from(map.values());
 }
 
+// ── Edit Project Modal ──────────────────────────────────────────────────────
+
+function EditProjectModal({
+  open,
+  onClose,
+  project,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  project: ProjectDetailResponse;
+  onSaved: (updated: ProjectDetailResponse) => void;
+}) {
+  const [name, setName] = useState(project.name);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [selectedLangs, setSelectedLangs] = useState<Set<string>>(new Set(project.target_languages));
+  const [dueDate, setDueDate] = useState(project.due_date ?? "");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Sync form when project prop changes (e.g. after save)
+  useEffect(() => {
+    if (open) {
+      setName(project.name);
+      setDescription(project.description ?? "");
+      setSelectedLangs(new Set(project.target_languages));
+      setDueDate(project.due_date ?? "");
+      setError("");
+      setSubmitting(false);
+    }
+  }, [open, project]);
+
+  function toggleLang(code: string) {
+    setSelectedLangs((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  const canSubmit = name.trim().length > 0 && selectedLangs.size > 0 && !submitting;
+
+  async function handleSubmit() {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await projectsApi.update(project.id, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        target_languages: Array.from(selectedLangs),
+        due_date: dueDate || undefined,
+      });
+      // Re-fetch full project detail to get updated documents list too
+      const refreshed = await projectsApi.get(project.id);
+      onSaved(refreshed);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update project");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalOverlay open={open} onClose={onClose}>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="m-0 font-display text-lg font-bold text-brand-text">Edit Project</h2>
+          <p className="mt-1 text-sm text-brand-muted">Update project settings</p>
+        </div>
+        <button type="button" onClick={onClose} className="border-none bg-transparent p-1 text-xl text-brand-subtle">×</button>
+      </div>
+
+      {/* Project name */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
+          Project name <span className="text-status-error">*</span>
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
+        />
+      </div>
+
+      {/* Description */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">Description</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional description"
+          rows={2}
+          className="w-full resize-none rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
+        />
+      </div>
+
+      {/* Target languages */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
+          Translate into <span className="text-status-error">*</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {PROJECT_LANGUAGE_OPTIONS.map((lang) => {
+            const selected = selectedLangs.has(lang.code);
+            return (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => toggleLang(lang.code)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  selected
+                    ? "border border-brand-accent bg-brand-accentMid font-semibold text-brand-accent"
+                    : "border border-brand-border bg-brand-surface text-brand-muted hover:border-brand-accent/40"
+                }`}
+              >
+                {selected && <span className="mr-1">✓</span>}
+                {lang.flag} {lang.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Due date */}
+      <div className="mb-4">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">Due date</label>
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 transition-colors"
+        />
+      </div>
+
+      {error && <p className="mb-4 text-[0.8125rem] text-status-error">{error}</p>}
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-medium text-brand-muted hover:text-brand-text underline">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+        >
+          {submitting ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -80,6 +239,7 @@ export default function ProjectPage() {
   const [stats, setStats] = useState<ProjectStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -124,7 +284,7 @@ export default function ProjectPage() {
           action={
             <button
               type="button"
-              onClick={() => {/* placeholder for edit */}}
+              onClick={() => setEditModalOpen(true)}
               className="rounded-full px-4 py-2 text-sm font-medium text-brand-muted hover:text-brand-text underline"
             >
               ⚙ Edit project
@@ -298,6 +458,12 @@ export default function ProjectPage() {
 
       {/* Modal — needs projects list for selector */}
       <NewTranslationModal projects={project ? [project] : []} />
+      <EditProjectModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        project={project}
+        onSaved={(updated) => setProject(updated)}
+      />
     </AppShell>
   );
 }
