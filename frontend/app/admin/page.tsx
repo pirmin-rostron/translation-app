@@ -13,12 +13,13 @@ import {
   type OrgMember,
   type AuditEvent,
   type AdminUsageResponse,
+  type AdminCostsResponse,
   type InviteResult,
 } from "../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = "waitlist" | "users" | "usage" | "health";
+type Tab = "waitlist" | "users" | "usage" | "costs" | "health";
 
 type UserMe = {
   id: number;
@@ -126,6 +127,11 @@ export default function AdminPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState("");
 
+  // Costs
+  const [costsData, setCostsData] = useState<AdminCostsResponse | null>(null);
+  const [costsLoading, setCostsLoading] = useState(false);
+  const [costsError, setCostsError] = useState("");
+
   // ── Admin check on mount ─────────────────────────────────────────────────
   useEffect(() => {
     void apiFetch<UserMe>(`${API_URL}/auth/me`)
@@ -194,6 +200,19 @@ export default function AdminPage() {
       .finally(() => setAuditLoading(false));
   }, [authChecked, activeTab]);
 
+  // ── Costs data ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authChecked || activeTab !== "costs") return;
+    setCostsLoading(true);
+    setCostsError("");
+    void adminApi.getCosts()
+      .then(setCostsData)
+      .catch((err) =>
+        setCostsError(err instanceof Error ? err.message : "Failed to load costs")
+      )
+      .finally(() => setCostsLoading(false));
+  }, [authChecked, activeTab]);
+
   // ── Invite handler ───────────────────────────────────────────────────────
   async function handleInvite(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -236,6 +255,7 @@ export default function AdminPage() {
     { key: "waitlist", label: "Waitlist" },
     { key: "users", label: "Users & Orgs" },
     { key: "usage", label: "Usage" },
+    { key: "costs", label: "Costs" },
     { key: "health", label: "System Health" },
   ];
 
@@ -575,6 +595,134 @@ export default function AdminPage() {
                     </table>
                   </div>
                 )}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: Costs
+        ════════════════════════════════════════════════════════════ */}
+        {activeTab === "costs" && (
+          <section>
+            <h2
+              className="mb-6 text-lg font-semibold"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}
+            >
+              API Costs
+            </h2>
+
+            {costsLoading && <p className="text-brand-subtle">Loading…</p>}
+            {costsError && <p className="text-status-error">{costsError}</p>}
+
+            {costsData && (
+              <>
+                {/* Stat tiles */}
+                <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="border border-brand-border bg-white px-5 py-4">
+                    <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+                      Spend this month
+                    </p>
+                    <p className="mt-1 text-3xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
+                      ${costsData.total_cost_usd_this_month.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="border border-brand-border bg-white px-5 py-4">
+                    <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+                      Avg cost per job
+                    </p>
+                    <p className="mt-1 text-3xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
+                      ${costsData.avg_cost_per_job.toFixed(4)}
+                    </p>
+                  </div>
+                  <div className="border border-brand-border bg-white px-5 py-4">
+                    <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+                      Avg per 1k words
+                    </p>
+                    <p className="mt-1 text-3xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
+                      ${costsData.avg_cost_per_1000_words.toFixed(4)}
+                    </p>
+                  </div>
+                  <div className="border border-brand-border bg-white px-5 py-4">
+                    <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "#0D7B6E" }}>
+                      Jobs this month
+                    </p>
+                    <p className="mt-1 text-3xl font-semibold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#1A110A" }}>
+                      {costsData.total_jobs_this_month.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Daily costs table */}
+                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-subtle">
+                  Daily Costs (Last 30 Days)
+                </p>
+                <div className="mb-8 overflow-x-auto border border-brand-border bg-white">
+                  <table className="min-w-full divide-y divide-stone-100 text-sm">
+                    <thead className="bg-brand-bg">
+                      <tr>
+                        {["Date", "Jobs", "Cost (USD)"].map((col) => (
+                          <th key={col} className={TH}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {costsData.daily_costs.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-brand-subtle">
+                            No cost data yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        costsData.daily_costs.map((day) => (
+                          <tr key={day.date} className="hover:bg-brand-bg">
+                            <td className={TD} style={{ color: "#1A110A" }}>{day.date}</td>
+                            <td className={TD}>{day.jobs}</td>
+                            <td className={TD}>${day.cost_usd.toFixed(4)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Cost by language */}
+                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-subtle">
+                  Cost by Language
+                </p>
+                <div className="overflow-x-auto border border-brand-border bg-white">
+                  <table className="min-w-full divide-y divide-stone-100 text-sm">
+                    <thead className="bg-brand-bg">
+                      <tr>
+                        {["Language", "Jobs", "Cost (USD)"].map((col) => (
+                          <th key={col} className={TH}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {costsData.cost_by_language.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-brand-subtle">
+                            No language data yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        costsData.cost_by_language.map((lang) => (
+                          <tr key={lang.language} className="hover:bg-brand-bg">
+                            <td className={TD} style={{ color: "#1A110A" }}>{lang.language}</td>
+                            <td className={TD}>{lang.jobs}</td>
+                            <td className={TD}>${lang.cost_usd.toFixed(4)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* All-time total */}
+                <p className="mt-6 text-sm text-brand-subtle">
+                  All-time total: ${costsData.total_cost_usd_all_time.toFixed(4)} · {costsData.total_words_this_month.toLocaleString()} words this month
+                </p>
               </>
             )}
           </section>

@@ -1,11 +1,13 @@
+from datetime import date, datetime, timedelta
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from database import get_db
-from models import Document, GlossaryTerm, Organisation, TranslationJob, TranslationResult, UsageEvent
-from services.auth import get_current_org
+from models import Document, GlossaryTerm, Organisation, OrgMembership, TranslationJob, TranslationResult, UsageEvent
+from services.auth import get_current_org, require_org_role
 from services.usage import DOCUMENT_INGESTED, WORDS_TRANSLATED
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -138,4 +140,118 @@ def org_stats(
         distinct_languages=distinct_languages,
         total_documents=total_documents,
         total_completed=total_completed,
+    )
+
+
+# ── Admin costs endpoint ─────────────────────────────────────────────────────
+
+
+class DailyCost(BaseModel):
+    date: str
+    cost_usd: float
+    jobs: int
+
+
+class LanguageCost(BaseModel):
+    language: str
+    cost_usd: float
+    jobs: int
+
+
+class AdminCostsResponse(BaseModel):
+    total_cost_usd_this_month: float
+    total_cost_usd_all_time: float
+    avg_cost_per_job: float
+    avg_cost_per_1000_words: float
+    total_jobs_this_month: int
+    total_words_this_month: int
+    daily_costs: list[DailyCost]
+    cost_by_language: list[LanguageCost]
+
+
+@router.get("/admin/costs", response_model=AdminCostsResponse)
+def admin_costs(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+    _membership: OrgMembership = Depends(require_org_role(["owner", "admin"])),
+):
+    """Return API cost breakdown for the current org. Requires owner or admin role."""
+    org_id = current_org.id
+
+    # All jobs with cost data
+    all_jobs = (
+        db.query(TranslationJob)
+        .filter(TranslationJob.org_id == org_id, TranslationJob.deleted_at.is_(None))
+        .all()
+    )
+
+    total_cost_all_time = sum(j.estimated_api_cost_usd or 0 for j in all_jobs)
+    jobs_with_cost = [j for j in all_jobs if j.estimated_api_cost_usd]
+    avg_cost_per_job = total_cost_all_time / len(jobs_with_cost) if jobs_with_cost else 0
+
+    # Words this month (from UsageEvent)
+    month_start = date.today().replace(day=1)
+    words_rows = (
+        db.query(UsageEvent.meta)
+        .filter(
+            UsageEvent.event_type == WORDS_TRANSLATED,
+            UsageEvent.org_id == org_id,
+            UsageEvent.created_at >= datetime(month_start.year, month_start.month, month_start.day),
+        )
+        .all()
+    )
+    total_words_this_month = 0
+    for (meta,) in words_rows:
+        if isinstance(meta, dict):
+            total_words_this_month += int(meta.get("word_count", 0) or 0)
+
+    # All-time words for cost-per-1000-words
+    all_words_rows = (
+        db.query(UsageEvent.meta)
+        .filter(UsageEvent.event_type == WORDS_TRANSLATED, UsageEvent.org_id == org_id)
+        .all()
+    )
+    total_words_all = 0
+    for (meta,) in all_words_rows:
+        if isinstance(meta, dict):
+            total_words_all += int(meta.get("word_count", 0) or 0)
+    avg_cost_per_1000_words = (total_cost_all_time / total_words_all * 1000) if total_words_all > 0 else 0
+
+    # This month's jobs and cost
+    jobs_this_month = [j for j in all_jobs if j.created_at and j.created_at.date() >= month_start]
+    total_cost_this_month = sum(j.estimated_api_cost_usd or 0 for j in jobs_this_month)
+    total_jobs_this_month = len(jobs_this_month)
+
+    # Daily costs (last 30 days)
+    thirty_days_ago = date.today() - timedelta(days=30)
+    daily_map: dict[str, DailyCost] = {}
+    for j in all_jobs:
+        if not j.created_at or j.created_at.date() < thirty_days_ago:
+            continue
+        day_str = j.created_at.date().isoformat()
+        if day_str not in daily_map:
+            daily_map[day_str] = DailyCost(date=day_str, cost_usd=0, jobs=0)
+        daily_map[day_str].cost_usd += j.estimated_api_cost_usd or 0
+        daily_map[day_str].jobs += 1
+    daily_costs = sorted(daily_map.values(), key=lambda d: d.date)
+
+    # Cost by language
+    lang_map: dict[str, LanguageCost] = {}
+    for j in all_jobs:
+        lang = j.target_language
+        if lang not in lang_map:
+            lang_map[lang] = LanguageCost(language=lang, cost_usd=0, jobs=0)
+        lang_map[lang].cost_usd += j.estimated_api_cost_usd or 0
+        lang_map[lang].jobs += 1
+    cost_by_language = sorted(lang_map.values(), key=lambda x: x.cost_usd, reverse=True)
+
+    return AdminCostsResponse(
+        total_cost_usd_this_month=round(total_cost_this_month, 4),
+        total_cost_usd_all_time=round(total_cost_all_time, 4),
+        avg_cost_per_job=round(avg_cost_per_job, 4),
+        avg_cost_per_1000_words=round(avg_cost_per_1000_words, 4),
+        total_jobs_this_month=total_jobs_this_month,
+        total_words_this_month=total_words_this_month,
+        daily_costs=daily_costs,
+        cost_by_language=cost_by_language,
     )

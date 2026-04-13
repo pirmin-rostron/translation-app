@@ -28,6 +28,8 @@ class TranslationSegmentResult:
     primary_translation: str
     ambiguity_detected: bool = False
     ambiguity_details: dict | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class SegmentContext:
@@ -472,13 +474,21 @@ Segment:
             segment.segment_id,
         )
 
+        # Track cumulative token usage across retries
+        _total_input_tokens = 0
+        _total_output_tokens = 0
+
         def _call_api() -> str:
+            nonlocal _total_input_tokens, _total_output_tokens
             resp = self._client.messages.create(
                 model=self._model,
                 max_tokens=self._max_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
+            if hasattr(resp, "usage") and resp.usage:
+                _total_input_tokens += getattr(resp.usage, "input_tokens", 0)
+                _total_output_tokens += getattr(resp.usage, "output_tokens", 0)
             return resp.content[0].text
 
         raw_text = _call_api()
@@ -554,6 +564,8 @@ Segment:
             primary_translation=primary_translation,
             ambiguity_detected=ambiguity_detected,
             ambiguity_details=ambiguity_details,
+            input_tokens=_total_input_tokens,
+            output_tokens=_total_output_tokens,
         )
 
     def translate_batch(
