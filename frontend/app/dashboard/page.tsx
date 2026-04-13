@@ -149,7 +149,7 @@ export default function DashboardPage() {
   if (isNewUser) {
     return (
       <AppShell>
-        <div className="mx-auto max-w-[1200px] px-10 py-8">
+        <div className="px-8 py-8">
           {/* Welcome header */}
           <div className="mb-8">
             <h1 className="mb-1 font-display text-2xl font-bold text-brand-text">
@@ -252,7 +252,7 @@ export default function DashboardPage() {
   // ── Returning user dashboard ────────────────────────────────────────────
   return (
     <AppShell>
-      <div className="mx-auto max-w-[1200px] px-10 py-8">
+      <div className="px-8 py-8">
 
         {/* ── Hero ── */}
         <div className="mb-8">
@@ -285,10 +285,6 @@ export default function DashboardPage() {
             href="/documents"
           />
         </div>
-
-        {/* ── Main + Activity Sidebar ── */}
-        <div className="flex gap-8">
-        <div className="min-w-0 flex-1">
 
         {/* ── Projects ── */}
         {(projectList && projectList.length > 0) && (
@@ -399,13 +395,14 @@ export default function DashboardPage() {
         </div>
 
 
-        </div>
-
-        {/* ── Activity Sidebar ── */}
-        <div className="hidden w-72 shrink-0 lg:block">
-          <div className="sticky top-24">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-brand-subtle">Recent Activity</h3>
-            <div className="space-y-3">
+        {/* ── Recent Activity ── */}
+        {displayTranslations.length > 0 && (
+          <div className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
+              <h3 className="font-display text-xl font-bold text-brand-text">Recent Activity</h3>
+              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+            </div>
+            <div className="grid grid-cols-4 gap-3">
               {displayTranslations.slice(0, 8).map((t) => {
                 const dotColor = t.raw_status === "exported" ? "bg-status-success"
                   : t.raw_status === "in_review" || t.raw_status === "review" ? "bg-brand-accent"
@@ -420,7 +417,7 @@ export default function DashboardPage() {
                   : t.status;
                 const timeAgo = t.created_at ? formatRelativeTime(t.created_at) : "";
                 return (
-                  <div key={t.id} className="flex items-start gap-2.5">
+                  <div key={t.id} className="flex items-start gap-2.5 rounded-xl border border-brand-border bg-brand-surface p-3">
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
                     <div className="min-w-0">
                       <p className="truncate text-sm text-brand-text">{label}</p>
@@ -430,13 +427,9 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-              {displayTranslations.length === 0 && (
-                <p className="text-xs text-brand-subtle">No activity yet</p>
-              )}
             </div>
           </div>
-        </div>
-        </div>
+        )}
 
       </div>
 
