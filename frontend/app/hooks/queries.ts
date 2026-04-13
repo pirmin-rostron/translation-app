@@ -10,12 +10,14 @@ import {
   usageApi,
   tierApi,
   projectsApi,
+  orgStatsApi,
 } from "../services/api";
 import type {
   TranslationJobListItem,
   UsageResponse,
   TierResponse,
   ProjectResponse,
+  OrgStatsResponse,
 } from "../services/api";
 
 // ---------------------------------------------------------------------------
@@ -323,6 +325,14 @@ export function useProjects() {
     queryKey: ["projects"],
     queryFn: () => projectsApi.list(),
     staleTime: 30_000,
+  });
+}
+
+export function useOrgStats() {
+  return useQuery<OrgStatsResponse>({
+    queryKey: ["org-stats"],
+    queryFn: () => orgStatsApi.get(),
+    staleTime: 60_000,
   });
 }
 

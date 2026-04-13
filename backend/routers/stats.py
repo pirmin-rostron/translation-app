@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from database import get_db
-from models import GlossaryTerm, TranslationResult, UsageEvent
+from models import Document, GlossaryTerm, Organisation, TranslationJob, TranslationResult, UsageEvent
+from services.auth import get_current_org
 from services.usage import DOCUMENT_INGESTED, WORDS_TRANSLATED
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -70,4 +71,71 @@ def public_stats(db: Session = Depends(get_db)):
         documents_processed=documents_processed,
         reviewer_approvals=reviewer_approvals,
         glossary_terms=glossary_terms,
+    )
+
+
+class OrgStats(BaseModel):
+    total_words_translated: int
+    time_saved_hours: float
+    distinct_languages: int
+    total_documents: int
+    total_completed: int
+
+
+@router.get("", response_model=OrgStats)
+def org_stats(
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return aggregate usage stats for the current user's organisation."""
+    org_id = current_org.id
+
+    # Words translated — sum meta['word_count'] from org's WORDS_TRANSLATED events
+    words_rows = (
+        db.query(UsageEvent.meta)
+        .filter(UsageEvent.event_type == WORDS_TRANSLATED, UsageEvent.org_id == org_id)
+        .all()
+    )
+    total_words_translated = 0
+    for (meta,) in words_rows:
+        if isinstance(meta, dict):
+            total_words_translated += int(meta.get("word_count", 0) or 0)
+
+    time_saved_hours = round(total_words_translated / 250, 1)
+
+    # Distinct target languages across all org's translation jobs
+    distinct_languages: int = (
+        db.query(func.count(func.distinct(TranslationJob.target_language)))
+        .filter(TranslationJob.org_id == org_id, TranslationJob.deleted_at.is_(None))
+        .scalar()
+        or 0
+    )
+
+    # Total translation jobs
+    total_documents: int = (
+        db.query(func.count(TranslationJob.id))
+        .filter(TranslationJob.org_id == org_id, TranslationJob.deleted_at.is_(None))
+        .scalar()
+        or 0
+    )
+
+    # Completed / exported jobs
+    completed_statuses = {"exported", "completed", "ready_for_export", "review_complete"}
+    total_completed: int = (
+        db.query(func.count(TranslationJob.id))
+        .filter(
+            TranslationJob.org_id == org_id,
+            TranslationJob.deleted_at.is_(None),
+            TranslationJob.status.in_(completed_statuses),
+        )
+        .scalar()
+        or 0
+    )
+
+    return OrgStats(
+        total_words_translated=total_words_translated,
+        time_saved_hours=time_saved_hours,
+        distinct_languages=distinct_languages,
+        total_documents=total_documents,
+        total_completed=total_completed,
     )

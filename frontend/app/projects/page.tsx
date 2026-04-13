@@ -210,12 +210,18 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Stats row */}
-                      <div className="mt-4 grid grid-cols-3 border-t border-brand-border pt-3 text-center">
+                      <div className="mt-4 grid grid-cols-4 border-t border-brand-border pt-3 text-center">
                         <div>
                           <p className={`font-display text-lg font-bold ${p.document_count > 0 ? "text-brand-text" : "text-brand-subtle"}`}>
                             {p.document_count}
                           </p>
                           <p className="text-[0.6875rem] text-brand-subtle">Documents</p>
+                        </div>
+                        <div>
+                          <p className={`font-display text-lg font-bold ${s && s.total_words > 0 ? "text-brand-text" : "text-brand-subtle"}`}>
+                            {(s?.total_words ?? 0).toLocaleString()}
+                          </p>
+                          <p className="text-[0.6875rem] text-brand-subtle">Words</p>
                         </div>
                         <div>
                           <p className={`font-display text-lg font-bold ${s && s.completed_count > 0 ? "text-status-success" : "text-brand-subtle"}`}>

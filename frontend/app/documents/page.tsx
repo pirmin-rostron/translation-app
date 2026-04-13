@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations } from "../hooks/queries";
+import { useDashboardTranslations, useOrgStats } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
@@ -30,6 +30,7 @@ export default function DocumentsPage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
   const { data: translations, isLoading } = useDashboardTranslations();
+  const { data: orgStats } = useOrgStats();
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -67,6 +68,11 @@ export default function DocumentsPage() {
             <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Ready to export</p>
           </div>
         </div>
+
+        {/* Summary line */}
+        <p className="mb-4 text-sm text-brand-muted">
+          {totalDocs} {totalDocs === 1 ? "document" : "documents"} · {(orgStats?.total_words_translated ?? 0).toLocaleString()} words translated · {orgStats?.distinct_languages ?? 0} {(orgStats?.distinct_languages ?? 0) === 1 ? "language" : "languages"}
+        </p>
 
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 

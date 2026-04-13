@@ -355,6 +355,18 @@ export type ProjectStatsResponse = {
   total_words: number;
 };
 
+export type OrgStatsResponse = {
+  total_words_translated: number;
+  time_saved_hours: number;
+  distinct_languages: number;
+  total_documents: number;
+  total_completed: number;
+};
+
+export const orgStatsApi = {
+  get: () => apiFetch<OrgStatsResponse>(`${API_URL}/stats`),
+};
+
 export type OverviewResponse = {
   job_id: number;
   status: string;

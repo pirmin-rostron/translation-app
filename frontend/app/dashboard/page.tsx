@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries";
+import { useDashboardTranslations, useTier, useProjects, useOrgStats } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
 import { NewTranslationModal } from "./NewTranslationModal";
@@ -125,6 +125,7 @@ export default function DashboardPage() {
   const { data: translations } = useDashboardTranslations(hasProcessingJobs);
   const { data: tierData } = useTier();
   const { data: projectList } = useProjects();
+  const { data: orgStats } = useOrgStats();
 
   useEffect(() => {
     const processing = (translations ?? []).some((t) => isProcessing(t.raw_status));
@@ -161,10 +162,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Stat tiles — zeros with helpful sub-text */}
-          <div className="mb-10 grid grid-cols-3 gap-4">
+          <div className="mb-10 grid grid-cols-5 gap-4">
             <StatCard label="Total Documents" value="0" subtitle="Upload your first document" href="/documents" />
             <StatCard label="Active Projects" value="0" subtitle="Create a project to get organised" href="/projects" />
             <StatCard label="Pending Review" value="0" subtitle="Nothing awaiting approval yet" href="/documents" />
+            <StatCard label="Words Translated" value="0" subtitle="Across all completed jobs" href="/documents" />
+            <StatCard label="Time Saved" value="0 hrs" subtitle="vs. manual translation" href="/documents" />
           </div>
 
           {/* Two path cards */}
@@ -265,7 +268,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="mb-10 grid grid-cols-3 gap-4">
+        <div className="mb-10 grid grid-cols-5 gap-4">
           <StatCard
             label="Total Documents"
             value={String(totalDocuments)}
@@ -282,6 +285,18 @@ export default function DashboardPage() {
             label="Pending Review"
             value={String(pendingReviewCount)}
             subtitle="Awaiting approval"
+            href="/documents"
+          />
+          <StatCard
+            label="Words Translated"
+            value={(orgStats?.total_words_translated ?? 0).toLocaleString()}
+            subtitle="Across all completed jobs"
+            href="/documents"
+          />
+          <StatCard
+            label="Time Saved"
+            value={`${orgStats?.time_saved_hours ?? 0} hrs`}
+            subtitle="vs. manual translation"
             href="/documents"
           />
         </div>
