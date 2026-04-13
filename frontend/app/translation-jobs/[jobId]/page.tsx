@@ -1652,11 +1652,11 @@ function TranslationReviewPageInner() {
     <div className="flex h-screen flex-col bg-brand-bg">
       {/* ── Fixed Top Header ── */}
       <header className="flex h-[50px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface px-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text">
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-1 text-sm text-brand-muted no-underline hover:text-brand-text">
             ← <span>Dashboard</span>
           </Link>
-          <span className="text-brand-border">|</span>
+          <span className="mx-1 text-brand-border">|</span>
           <span className="max-w-[240px] truncate font-display text-sm font-semibold text-brand-text">
             {doc?.filename ?? `Document #${job.document_id}`}
           </span>

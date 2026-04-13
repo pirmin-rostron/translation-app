@@ -24,38 +24,60 @@ def _normalize_text(text: str) -> str:
     return "\n".join(line.rstrip() for line in text.splitlines()).strip()
 
 
-def _classify_plain_text_block(text: str) -> ParsedDocumentBlock:
+def _is_heading_line(line: str) -> bool:
+    """Return True if a single line looks like a section heading."""
+    return (
+        len(line) <= 80
+        and len(line.split()) <= 10
+        and not line.endswith((".", "!", "?", ";"))
+        and not line.startswith(("-", "•", "*"))
+        and "@" not in line
+        and "://" not in line
+    )
+
+
+def _classify_plain_text_block(text: str) -> list[ParsedDocumentBlock]:
+    """Classify a raw text block, returning one or more ParsedDocumentBlocks.
+
+    When a block's first line looks like a heading but subsequent lines are body
+    text, the heading is split into its own block so section labels render
+    separately from paragraph content.
+    """
     bullet_match = BULLET_PREFIX_RE.match(text)
     if bullet_match:
         marker, body = bullet_match.groups()
-        return ParsedDocumentBlock(
+        return [ParsedDocumentBlock(
             block_type="bullet_item",
             text_original=body.strip(),
             formatting_json={"marker": marker},
-        )
+        )]
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    single_line = len(lines) == 1
-    heading_like = (
-        single_line
-        and len(lines[0]) <= 80
-        and len(lines[0].split()) <= 10
-        and not lines[0].endswith((".", "!", "?", ";"))
-    )
-    if heading_like:
-        return ParsedDocumentBlock(block_type="heading", text_original=lines[0], formatting_json=None)
 
-    return ParsedDocumentBlock(block_type="paragraph", text_original=text, formatting_json=None)
+    # Single line — classify directly
+    if len(lines) == 1:
+        if _is_heading_line(lines[0]):
+            return [ParsedDocumentBlock(block_type="heading", text_original=lines[0], formatting_json=None)]
+        return [ParsedDocumentBlock(block_type="paragraph", text_original=text, formatting_json=None)]
+
+    # Multi-line: if the first line looks like a heading, split it out
+    if _is_heading_line(lines[0]):
+        heading = ParsedDocumentBlock(block_type="heading", text_original=lines[0], formatting_json=None)
+        rest = "\n".join(lines[1:])
+        body = ParsedDocumentBlock(block_type="paragraph", text_original=rest, formatting_json=None)
+        return [heading, body]
+
+    return [ParsedDocumentBlock(block_type="paragraph", text_original=text, formatting_json=None)]
 
 
 def parse_txt(filepath: Path) -> list[ParsedDocumentBlock]:
     """Parse TXT into headings, paragraphs, and bullet items."""
     text = filepath.read_text(encoding="utf-8", errors="replace")
-    blocks = []
+    blocks: list[ParsedDocumentBlock] = []
     for raw_block in re.split(r"\n\s*\n", text):
         cleaned = _normalize_text(raw_block)
         if cleaned:
-            blocks.append(_classify_plain_text_block(cleaned))
+            blocks.extend(_classify_plain_text_block(cleaned))
     return blocks
 
 
@@ -127,15 +149,28 @@ def _is_rtf_header_noise(text: str) -> bool:
     return False
 
 
+def _decode_rtf_text(raw: str) -> str:
+    """Decode RTF to plain text, handling double-wrapped RTF files.
+
+    Some editors (e.g. macOS TextEdit) wrap RTF content inside an outer RTF
+    envelope.  After the first decode the output is still valid RTF — detect
+    this and decode a second time.
+    """
+    text = rtf_to_text(raw)
+    if text.lstrip().startswith("{\\rtf"):
+        text = rtf_to_text(text)
+    return text
+
+
 def parse_rtf(filepath: Path) -> list[ParsedDocumentBlock]:
     """Parse RTF into simple text blocks using plain-text heuristics."""
     raw = filepath.read_text(encoding="utf-8", errors="replace")
-    text = rtf_to_text(raw)
-    blocks = []
+    text = _decode_rtf_text(raw)
+    blocks: list[ParsedDocumentBlock] = []
     for raw_block in re.split(r"\n\s*\n", text):
         cleaned = _normalize_text(raw_block)
         if cleaned and not _is_rtf_header_noise(cleaned):
-            blocks.append(_classify_plain_text_block(cleaned))
+            blocks.extend(_classify_plain_text_block(cleaned))
     return blocks
 
 
@@ -224,4 +259,4 @@ def parse_document(filepath: Path, file_type: str) -> list[ParsedDocumentBlock]:
         blocks = parse_rtf(filepath)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
-    return group_blocks_by_heading(blocks)
+    return blocks
