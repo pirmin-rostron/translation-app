@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
@@ -27,7 +28,7 @@ export function TopBar() {
 
   return (
     <header className="flex h-[50px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface px-5">
-      <span className="font-display text-lg font-bold text-brand-text">Helvara</span>
+      <Link href="/dashboard" className="font-display text-lg font-bold text-brand-text no-underline cursor-pointer">Helvara</Link>
 
       <div className="flex items-center gap-3">
         <button
