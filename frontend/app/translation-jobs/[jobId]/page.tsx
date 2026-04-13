@@ -1176,6 +1176,7 @@ function TranslationReviewPageInner() {
     setError("");
     try {
       const result = await translationJobsApi.editBlockSource(job.id, blockId, sourceEditDraft);
+      trackEvent("source_edited", { job_id: job.id });
       setEditingSourceBlockId(null);
       setSourceEditDraft("");
       if (result.threshold_exceeded) {
@@ -1236,6 +1237,7 @@ function TranslationReviewPageInner() {
           await persistResult(segment.id, segment.final_translation, "approved");
         }
       }
+      trackEvent("block_approved", { job_id: jobId });
       const [, summary] = await Promise.all([loadReviewBlocks(page), loadReviewSummary(), loadJobMeta(), loadTranslationProgress()]);
       if (transitionToReviewCompleteState(summary as ReviewSummary)) {
         return;
@@ -1481,7 +1483,7 @@ function TranslationReviewPageInner() {
       const exportPayload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(exportPayload);
       triggerExportDownload(exportPayload);
-      posthog.capture('export_completed', { job_id: job.id, file_type: selectedFormat });
+      posthog.capture('translation_exported', { job_id: job.id, language: job.target_language, file_type: selectedFormat });
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage("Export successful. Your file is downloading.");
     } catch (err) {
@@ -1518,7 +1520,7 @@ function TranslationReviewPageInner() {
       const payload = await translationJobsApi.export<ExportResult>(job.id, selectedFormat, selectedMode);
       setExportResult(payload);
       triggerExportDownload(payload);
-      posthog.capture('export_completed', { job_id: job.id, file_type: selectedFormat });
+      posthog.capture('translation_exported', { job_id: job.id, language: job.target_language, file_type: selectedFormat });
       await Promise.all([loadJobMeta(), loadReviewSummary(), loadTranslationProgress(), loadExportHistory()]);
       setMessage("Export successful. Your file is downloading.");
     } catch (err) {

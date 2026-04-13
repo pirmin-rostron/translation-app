@@ -14,6 +14,7 @@ import { projectsApi } from "../services/api";
 import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
 import { PROJECT_LANGUAGE_OPTIONS } from "../utils/language";
+import { trackEvent } from "../utils/analytics";
 
 const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -73,6 +74,7 @@ export function NewProjectModal() {
         due_date: dueDate || undefined,
       }) as ProjectResponse;
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      trackEvent("project_created", { language_count: selectedLangs.size });
       const projectId = created.id;
       const pendingFile = file;
       handleClose();

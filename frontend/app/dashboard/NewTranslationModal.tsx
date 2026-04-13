@@ -158,7 +158,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
       const prevCount = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
       trackEvent("flow.upload_started", { target_language: targetLang });
       await documentsApi.uploadAndTranslate<{ id: number }>(fd);
-      trackEvent("flow.upload_complete");
+      trackEvent("document_uploaded", { language: targetLang, has_project: !!selectedProject });
       handleClose();
       // Poll until the new job appears in the list (Celery creates it async)
       let attempts = 0;
