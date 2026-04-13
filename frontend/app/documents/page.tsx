@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations, useOrgStats } from "../hooks/queries";
+import { useDashboardTranslations, useOrgStats, useProjects } from "../hooks/queries";
 import { queryKeys, translationJobsApi } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
@@ -87,6 +87,58 @@ function InlineDueDateCell({ jobId, dueDate }: { jobId: number; dueDate: string 
         <DueDateBadge dueDate={dueDate} />
       ) : (
         <span className="text-xs text-brand-subtle hover:text-brand-muted">Set date</span>
+      )}
+    </button>
+  );
+}
+
+
+// Inline project selector — clicking opens a dropdown to assign/move document to a project
+function InlineProjectCell({ jobId, projectId, projectName }: { jobId: number; projectId: number | null; projectName: string | null }) {
+  const queryClient = useQueryClient();
+  const { data: projects } = useProjects();
+  const [editing, setEditing] = useState(false);
+
+  async function handleChange(value: string) {
+    setEditing(false);
+    const newProjectId = value === "" ? null : Number(value);
+    if (newProjectId === projectId) return;
+    try {
+      await translationJobsApi.updateProject(jobId, newProjectId);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+    } catch (err) {
+      console.error("[project-assign]", err);
+    }
+  }
+
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={projectId != null ? String(projectId) : ""}
+        onBlur={(e) => handleChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-full rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent"
+      >
+        <option value="">No project (standalone)</option>
+        {(projects ?? []).map((p) => (
+          <option key={p.id} value={String(p.id)}>{p.name}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="cursor-pointer border-none bg-transparent p-0 text-left"
+      title="Click to assign project"
+    >
+      {projectName ? (
+        <span className="text-sm text-brand-muted">{projectName}</span>
+      ) : (
+        <span className="text-sm italic text-brand-subtle">No project</span>
       )}
     </button>
   );
@@ -186,8 +238,8 @@ export default function DocumentsPage() {
                           {t.document_name ?? `Document #${t.id}`}
                         </Link>
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-brand-muted">
-                        {t.project_name ?? <span className="italic text-brand-subtle">No project</span>}
+                      <td className="px-5 py-3.5">
+                        <InlineProjectCell jobId={t.id} projectId={t.project_id} projectName={t.project_name} />
                       </td>
                       <td className="px-5 py-3.5 text-sm text-brand-muted">
                         {t.source_language} → {t.target_language}

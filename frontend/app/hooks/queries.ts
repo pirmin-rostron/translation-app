@@ -284,8 +284,8 @@ function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
   return {
     id: j.id,
     document_name: j.document_name,
-    project_id: null,
-    project_name: null,
+    project_id: j.project_id ?? null,
+    project_name: j.project_name ?? null,
     source_language: src,
     target_language: tgt,
     status: mapJobStatusLabel(j.status),

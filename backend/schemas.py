@@ -121,6 +121,8 @@ class TranslationJobResponse(BaseModel):
     due_date: date | None = None
     deleted_at: datetime | None = None
     document_name: str | None = None
+    project_id: int | None = None
+    project_name: str | None = None
 
     class Config:
         from_attributes = True

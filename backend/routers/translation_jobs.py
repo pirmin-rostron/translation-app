@@ -25,6 +25,7 @@ from models import (
     GlossaryTerm,
     Organisation,
     ProcessingStageJob,
+    Project,
     SegmentAnnotation,
     TranslationJob,
     TranslationResult,
@@ -2153,6 +2154,46 @@ def update_due_date(
     return {"id": job.id, "due_date": str(job.due_date) if job.due_date else None}
 
 
+class ProjectAssignRequest(BaseModel):
+    project_id: int | None = None
+
+
+@router.patch("/{job_id}/project")
+def update_project(
+    job_id: int,
+    body: ProjectAssignRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Assign or remove a translation job's document from a project."""
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    doc = db.query(Document).filter(Document.id == job.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if body.project_id is not None:
+        proj = db.query(Project).filter(
+            Project.id == body.project_id,
+            Project.org_id == current_org.id,
+            Project.deleted_at.is_(None),
+        ).first()
+        if not proj:
+            raise HTTPException(status_code=404, detail="Project not found")
+    doc.project_id = body.project_id
+    db.commit()
+    project_name: str | None = None
+    if doc.project_id is not None:
+        proj = db.query(Project).filter(Project.id == doc.project_id).first()
+        if proj:
+            project_name = proj.name
+    return {"id": job.id, "project_id": doc.project_id, "project_name": project_name}
+
+
 class JobEventResponse(BaseModel):
     id: int
     job_id: int
@@ -2509,12 +2550,29 @@ def list_translation_jobs(
         if doc_ids
         else {}
     )
-    return [
-        TranslationJobResponse.model_validate(job).model_copy(
-            update={"document_name": docs[job.document_id].filename if job.document_id in docs else None}
+    # Resolve project names for documents that belong to a project
+    proj_ids = {d.project_id for d in docs.values() if d.project_id is not None}
+    projects = (
+        {p.id: p.name for p in db.query(Project).filter(Project.id.in_(proj_ids)).all()}
+        if proj_ids
+        else {}
+    )
+    result = []
+    for job in jobs:
+        doc = docs.get(job.document_id)
+        doc_name = doc.filename if doc else None
+        doc_project_id = doc.project_id if doc else None
+        doc_project_name = projects.get(doc_project_id) if doc_project_id else None
+        result.append(
+            TranslationJobResponse.model_validate(job).model_copy(
+                update={
+                    "document_name": doc_name,
+                    "project_id": doc_project_id,
+                    "project_name": doc_project_name,
+                }
+            )
         )
-        for job in jobs
-    ]
+    return result
 
 
 # ---------------------------------------------------------------------------

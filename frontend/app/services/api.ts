@@ -170,6 +170,8 @@ export type TranslationJobListItem = {
   last_saved_at: string | null;
   due_date: string | null;
   document_name: string | null;
+  project_id: number | null;
+  project_name: string | null;
 };
 
 export type UpcomingItem = {
@@ -254,6 +256,13 @@ export const translationJobsApi = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ due_date: dueDate }),
+    }),
+
+  updateProject: (jobId: number, projectId: number | null) =>
+    apiFetch<{ id: number; project_id: number | null; project_name: string | null }>(`${API_URL}/translation-jobs/${jobId}/project`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
     }),
 };
 
