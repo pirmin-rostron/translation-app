@@ -8,6 +8,7 @@ import { useDashboardStore } from "../stores/dashboardStore";
 import { useProjects } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
+import { getLanguageDisplayName, getLanguageFlag } from "../utils/language";
 import { NewProjectModal } from "../dashboard/NewProjectModal";
 
 export default function ProjectsPage() {
@@ -71,7 +72,9 @@ export default function ProjectsPage() {
                 <p className="font-display text-lg font-semibold text-brand-text group-hover:text-brand-accent">{p.name}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {p.target_languages.map((lang) => (
-                    <span key={lang} className="rounded-full bg-brand-accentMid px-2 py-0.5 text-xs font-medium text-brand-accent">{lang}</span>
+                    <span key={lang} className="rounded-full bg-brand-accentMid px-2 py-0.5 text-xs font-medium text-brand-accent">
+                      {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
+                    </span>
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-brand-subtle">

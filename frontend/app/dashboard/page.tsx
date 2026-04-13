@@ -11,6 +11,7 @@ import { AppShell } from "../components/AppShell";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
 import { StatusBadge as StatusBadgeComponent, toJobStatus } from "../components/StatusBadge";
+import { getLanguageDisplayName, getLanguageFlag } from "../utils/language";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -208,11 +209,15 @@ export default function DashboardPage() {
                   className="group rounded-xl border border-brand-border bg-brand-surface p-5 no-underline transition-colors hover:border-brand-accent"
                 >
                   <p className="font-sans text-sm font-medium text-brand-text group-hover:text-brand-accent">{p.name}</p>
-                  <div className="mt-2 flex items-center gap-3 text-xs text-brand-muted">
-                    <span>{p.document_count} {p.document_count === 1 ? "doc" : "docs"}</span>
-                    {p.target_languages.length > 0 && (
-                      <span>{p.target_languages.join(", ")}</span>
-                    )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {p.target_languages.map((lang) => (
+                      <span key={lang} className="rounded-full bg-brand-accentMid px-2 py-0.5 text-xs font-medium text-brand-accent">
+                        {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
+                      </span>
+                    ))}
+                    <span className="rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-muted">
+                      {p.document_count} {p.document_count === 1 ? "doc" : "docs"}
+                    </span>
                   </div>
                 </Link>
               ))}
