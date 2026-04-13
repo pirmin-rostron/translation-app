@@ -274,6 +274,21 @@ At the end of every session, always run these steps without being asked:
 
 This is not optional. Do not end a session without running mempalace mine.
 
+### Claude Code transcript mining (every session)
+At the end of every session, mine the Claude Code transcript so context persists across chat sessions:
+
+1. Find the most recent transcript for this project:
+   find ~/.claude/projects/-Users-pirmin-Documents-Projects-Translation-app/ -name "*.jsonl" -newer ~/Documents/Projects/Translation_app/.git/COMMIT_EDITMSG | sort -t' ' -k6 -r | head -3
+
+2. Copy and mine with convos mode:
+   cp [transcript_path] ~/Documents/Projects/Translation_app/session-transcript-temp.jsonl
+   mempalace mine --mode convos ~/Documents/Projects/Translation_app
+   rm ~/Documents/Projects/Translation_app/session-transcript-temp.jsonl
+
+3. This captures full conversation context — architectural decisions, product discussions, bug findings — not just code changes.
+
+Why: mempalace mine on code alone misses the "why" behind decisions. The transcript captures the reasoning, not just the outcome.
+
 ---
 
 ## Post-Ticket Self-Review Checklist
