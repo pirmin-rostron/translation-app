@@ -143,8 +143,113 @@ export default function DashboardPage() {
 
   const firstName = getFirstName(user?.full_name, user?.email ?? "");
   const displayTranslations = translations ?? [];
-  const hasTranslations = displayTranslations.length > 0;
+  const isNewUser = totalDocuments === 0 && activeProjectCount === 0;
 
+  // ── New user dashboard ──────────────────────────────────────────────────
+  if (isNewUser) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-[1200px] px-10 py-8">
+          {/* Welcome header */}
+          <div className="mb-8">
+            <h1 className="mb-1 font-display text-2xl font-bold text-brand-text">
+              Welcome to Helvara, <em>{firstName}</em>.
+            </h1>
+            <p className="text-sm text-brand-muted">
+              Your translation workspace is ready. Start by uploading a document or creating a project.
+            </p>
+          </div>
+
+          {/* Stat tiles — zeros with helpful sub-text */}
+          <div className="mb-10 grid grid-cols-3 gap-4">
+            <StatCard label="Total Documents" value="0" subtitle="Upload your first document" href="/documents" />
+            <StatCard label="Active Projects" value="0" subtitle="Create a project to get organised" href="/projects" />
+            <StatCard label="Pending Review" value="0" subtitle="Nothing awaiting approval yet" href="/documents" />
+          </div>
+
+          {/* Two path cards */}
+          <div className="mb-10 grid grid-cols-2 gap-4">
+            {/* Quick start — featured teal */}
+            <div className="rounded-xl border border-brand-accent/30 bg-brand-accentMid/30 p-6">
+              <div className="mb-3 text-2xl">⚡</div>
+              <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">Quick start</p>
+              <h3 className="font-display text-lg font-semibold text-brand-text">Translate a document</h3>
+              <p className="mt-2 text-sm text-brand-muted">
+                Upload a single document and get a translation in minutes. Best for one-off jobs or trying it out.
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-brand-muted">
+                <li>Upload DOCX, RTF, or TXT</li>
+                <li>Pick your target language</li>
+                <li>Review and export</li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => openTranslationModal()}
+                className="mt-5 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors"
+              >
+                + New Translation
+              </button>
+            </div>
+
+            {/* For ongoing work — ghost border */}
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
+              <div className="mb-3 text-2xl">📁</div>
+              <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-muted">For ongoing work</p>
+              <h3 className="font-display text-lg font-semibold text-brand-text">Create a project</h3>
+              <p className="mt-2 text-sm text-brand-muted">
+                Group related documents under one project with shared target languages. Best for client work or repeat translation workflows.
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-brand-muted">
+                <li>Set target languages once</li>
+                <li>Fan out to multiple languages automatically</li>
+                <li>Track progress across all documents</li>
+              </ul>
+              <button
+                type="button"
+                onClick={openProjectModal}
+                className="mt-5 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted hover:bg-brand-bg transition-colors"
+              >
+                + New Project
+              </button>
+            </div>
+          </div>
+
+          {/* Recent Translations — empty table with headers */}
+          <div className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="font-display text-xl font-bold text-brand-text">Recent Translations</h2>
+              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+            </div>
+            <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-brand-border">
+                    {["Document", "Language", "Status", "Uploaded"].map((col) => (
+                      <th key={col} className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10 text-center text-sm text-brand-muted">
+                      No translations yet — upload a document above to get started.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <NewTranslationModal projects={projectList ?? []} />
+        <NewProjectModal />
+      </AppShell>
+    );
+  }
+
+  // ── Returning user dashboard ────────────────────────────────────────────
   return (
     <AppShell>
       <div className="mx-auto max-w-[1200px] px-10 py-8">
@@ -224,21 +329,6 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-        {(!projectList || projectList.length === 0) && (
-          <div className="mb-10">
-            <div className="rounded-xl border border-brand-border bg-brand-surface px-8 py-10 text-center">
-              <p className="font-display text-lg font-bold text-brand-text">No projects yet</p>
-              <p className="mt-1 font-sans text-sm text-brand-muted">Create a project to group documents together.</p>
-              <button
-                type="button"
-                onClick={openProjectModal}
-                className="mt-4 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
-              >
-                + New Project
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* ── Usage Indicator ── */}
         {tierData && tierData.limits.max_jobs !== null && tierData.jobs_this_month > tierData.limits.max_jobs * 0.5 && (
@@ -269,65 +359,44 @@ export default function DashboardPage() {
         )}
 
         {/* ── Active Translations ── */}
-        {hasTranslations ? (
-          <div className="mb-10">
-            {/* Section header */}
-            <div className="mb-4 flex items-center gap-3">
-              <h2 className="font-display text-xl font-bold text-brand-text">
-                Active Translations
-              </h2>
-              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
-            </div>
+        <div className="mb-10">
+          <div className="mb-4 flex items-center gap-3">
+            <h2 className="font-display text-xl font-bold text-brand-text">
+              Active Translations
+            </h2>
+            <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+          </div>
 
-            {/* Table card */}
-            <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-brand-border">
-                    {["Document", "Project", "Language", "Status"].map((col) => (
-                      <th
-                        key={col}
-                        className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
-                      >
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayTranslations.map((t) => (
-                    <TranslationRow key={t.id} t={t} />
+          <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-brand-border">
+                  {["Document", "Project", "Language", "Status"].map((col) => (
+                    <th
+                      key={col}
+                      className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
+                    >
+                      {col}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {displayTranslations.length > 0 ? (
+                  displayTranslations.map((t) => (
+                    <TranslationRow key={t.id} t={t} />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10 text-center text-sm text-brand-muted">
+                      No translations yet — upload a document to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          /* Empty state */
-          <div className="mb-10 rounded-xl border border-brand-border bg-brand-surface px-8 py-20 text-center">
-            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-brand-muted">
-                <rect x="8" y="4" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M14 14h12M14 20h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <rect x="16" y="12" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M22 26h12M22 32h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M32 18l4-4m0 0l-2 6-4-2 6-4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <p className="mb-2 font-display text-2xl font-bold text-brand-text">
-              Translate your first document
-            </p>
-            <p className="mx-auto mb-6 max-w-sm font-sans text-sm text-brand-muted">
-              Upload a document and Helvara will translate it, check for ambiguities, and apply your glossary — automatically.
-            </p>
-            <button
-              onClick={() => openTranslationModal()}
-              className="cursor-pointer rounded-full border-none bg-brand-accent px-6 py-2.5 font-sans text-sm font-semibold text-white transition-opacity hover:bg-brand-accentHov"
-            >
-              Upload a document
-            </button>
-          </div>
-        )}
+        </div>
 
 
         </div>
