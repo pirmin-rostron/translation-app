@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useDashboardTranslations, useOrgStats, useProjects } from "../hooks/queries";
-import { queryKeys, translationJobsApi } from "../services/api";
+import { queryKeys, translationJobsApi, documentsApi } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
@@ -146,11 +146,11 @@ function InlineProjectCell({ jobId, projectId, projectName }: { jobId: number; p
 }
 
 
-// Three-dot actions menu for each row
-function RowActionsMenu({ jobId }: { jobId: number }) {
+// Three-dot actions menu for each row — separate delete translation vs delete document
+function RowActionsMenu({ jobId, documentId }: { jobId: number; documentId: number }) {
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"delete" | "retranslate" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"delete_translation" | "delete_document" | "retranslate" | null>(null);
   const [loading, setLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -169,8 +169,10 @@ function RowActionsMenu({ jobId }: { jobId: number }) {
   async function handleConfirm() {
     setLoading(true);
     try {
-      if (confirmAction === "delete") {
+      if (confirmAction === "delete_translation") {
         await translationJobsApi.delete(jobId);
+      } else if (confirmAction === "delete_document") {
+        await documentsApi.delete(documentId);
       } else if (confirmAction === "retranslate") {
         await translationJobsApi.retranslate(jobId);
       }
@@ -196,7 +198,7 @@ function RowActionsMenu({ jobId }: { jobId: number }) {
           ⋯
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-brand-border bg-brand-surface py-1 shadow-lg">
+          <div className="absolute right-0 top-8 z-20 w-48 rounded-xl border border-brand-border bg-brand-surface py-1 shadow-lg">
             <button
               type="button"
               onClick={() => { setMenuOpen(false); setConfirmAction("retranslate"); }}
@@ -206,10 +208,17 @@ function RowActionsMenu({ jobId }: { jobId: number }) {
             </button>
             <button
               type="button"
-              onClick={() => { setMenuOpen(false); setConfirmAction("delete"); }}
+              onClick={() => { setMenuOpen(false); setConfirmAction("delete_translation"); }}
+              className="w-full px-4 py-2 text-left text-sm text-brand-muted hover:bg-brand-bg"
+            >
+              Delete translation
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setConfirmAction("delete_document"); }}
               className="w-full px-4 py-2 text-left text-sm text-status-error hover:bg-brand-bg"
             >
-              Delete
+              Delete document
             </button>
           </div>
         )}
@@ -224,9 +233,18 @@ function RowActionsMenu({ jobId }: { jobId: number }) {
         loading={loading}
       />
       <ConfirmDialog
-        open={confirmAction === "delete"}
+        open={confirmAction === "delete_translation"}
         title="Delete this translation?"
-        description="This will permanently delete the translation and all associated data. This cannot be undone."
+        description="The uploaded document will be kept and can be re-translated."
+        confirmLabel="Delete translation"
+        onConfirm={() => { void handleConfirm(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={loading}
+      />
+      <ConfirmDialog
+        open={confirmAction === "delete_document"}
+        title="Delete this document permanently?"
+        description="This will remove the uploaded file and all translations. This cannot be undone."
         confirmLabel="Delete"
         onConfirm={() => { void handleConfirm(); }}
         onCancel={() => setConfirmAction(null)}
@@ -346,7 +364,7 @@ export default function DocumentsPage() {
                         <StatusBadge status={toJobStatus(t.raw_status)} />
                       </td>
                       <td className="px-5 py-3.5">
-                        <RowActionsMenu jobId={t.id} />
+                        <RowActionsMenu jobId={t.id} documentId={t.document_id} />
                       </td>
                     </tr>
                   ))

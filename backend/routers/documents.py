@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import Document, DocumentBlock, DocumentSegment, Organisation, ProcessingStageJob, Project, SegmentAnnotation, TranslationJob
+from models import Document, DocumentBlock, DocumentSegment, JobEvent, Organisation, ProcessingStageJob, Project, SegmentAnnotation, TranslationJob, TranslationResult, UsageEvent
 from schemas import (
     DocumentProgressResponse,
     DocumentBlockResponse,
@@ -875,14 +875,37 @@ def delete_document(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Soft-delete a document and all its translation jobs."""
+    """Hard-delete a document and ALL translation jobs referencing it.
+
+    Deletes: TranslationResult, ProcessingStageJob, JobEvent, UsageEvent
+    for every job, then the jobs themselves, SegmentAnnotation,
+    DocumentSegment, DocumentBlock, and the Document record.
+    """
     doc = db.query(Document).filter(Document.id == document_id, Document.org_id == current_org.id, Document.deleted_at.is_(None)).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    now = datetime.utcnow()
-    doc.deleted_at = now
-    db.query(TranslationJob).filter(
-        TranslationJob.document_id == document_id,
-        TranslationJob.deleted_at.is_(None),
-    ).update({"deleted_at": now}, synchronize_session=False)
+
+    # Find all translation jobs for this document
+    job_ids = [
+        jid for (jid,) in db.query(TranslationJob.id).filter(TranslationJob.document_id == document_id).all()
+    ]
+    if job_ids:
+        db.query(TranslationResult).filter(TranslationResult.job_id.in_(job_ids)).delete(synchronize_session=False)
+        db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id.in_(job_ids)).delete(synchronize_session=False)
+        db.query(JobEvent).filter(JobEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
+        db.query(UsageEvent).filter(UsageEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
+        db.query(TranslationJob).filter(TranslationJob.id.in_(job_ids)).delete(synchronize_session=False)
+
+    # Delete document structure
+    block_ids = [bid for (bid,) in db.query(DocumentBlock.id).filter(DocumentBlock.document_id == document_id).all()]
+    if block_ids:
+        seg_ids = [sid for (sid,) in db.query(DocumentSegment.id).filter(DocumentSegment.block_id.in_(block_ids)).all()]
+        if seg_ids:
+            db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(seg_ids)).delete(synchronize_session=False)
+    db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete(synchronize_session=False)
+    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete(synchronize_session=False)
+    db.query(ProcessingStageJob).filter(ProcessingStageJob.document_id == document_id).delete(synchronize_session=False)
+    db.query(UsageEvent).filter(UsageEvent.document_id == document_id).delete(synchronize_session=False)
+    db.delete(doc)
     db.commit()
+    logger.info("Hard-deleted document_id=%d with %d translation jobs", document_id, len(job_ids))

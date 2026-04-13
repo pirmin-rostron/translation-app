@@ -152,6 +152,9 @@ export const documentsApi = {
       method: "POST",
       body: formData,
     }),
+
+  delete: (documentId: number) =>
+    apiFetch<void>(`${API_URL}/documents/${documentId}`, { method: "DELETE" }),
 };
 
 // --- dashboard types ---
@@ -406,6 +409,7 @@ export const dashboardApi = {
 
 export type OverviewResponse = {
   job_id: number;
+  document_id: number;
   status: string;
   source_language: string;
   target_language: string;

@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../../../stores/authStore";
-import { API_URL, overviewApi, translationJobsApi } from "../../../services/api";
+import { API_URL, overviewApi, translationJobsApi, documentsApi } from "../../../services/api";
 import type { OverviewResponse } from "../../../services/api";
 import { getLanguageDisplayName } from "../../../utils/language";
 import { trackEvent } from "../../../utils/analytics";
@@ -63,7 +63,7 @@ export default function OverviewPage() {
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"delete" | "retranslate" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"delete_translation" | "delete_document" | "retranslate" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -120,8 +120,13 @@ export default function OverviewPage() {
   async function handleDocAction() {
     setActionLoading(true);
     try {
-      if (confirmAction === "delete") {
+      if (confirmAction === "delete_translation") {
         await translationJobsApi.delete(jobId);
+        router.replace("/documents");
+        return;
+      }
+      if (confirmAction === "delete_document" && data) {
+        await documentsApi.delete(data.document_id);
         router.replace("/documents");
         return;
       }
@@ -440,10 +445,17 @@ export default function OverviewPage() {
             </button>
             <button
               type="button"
-              onClick={() => setConfirmAction("delete")}
-              className="rounded-full px-4 py-2 text-sm font-medium text-status-error hover:opacity-80"
+              onClick={() => setConfirmAction("delete_translation")}
+              className="rounded-full px-4 py-2 text-sm font-medium text-brand-muted hover:text-brand-text"
             >
               Delete translation
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmAction("delete_document")}
+              className="rounded-full px-4 py-2 text-sm font-medium text-status-error hover:opacity-80"
+            >
+              Delete document
             </button>
           </div>
         </div>
@@ -459,9 +471,18 @@ export default function OverviewPage() {
         loading={actionLoading}
       />
       <ConfirmDialog
-        open={confirmAction === "delete"}
+        open={confirmAction === "delete_translation"}
         title="Delete this translation?"
-        description="This will permanently delete the translation and all associated data. This cannot be undone."
+        description="The uploaded document will be kept and can be re-translated."
+        confirmLabel="Delete translation"
+        onConfirm={() => { void handleDocAction(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={confirmAction === "delete_document"}
+        title="Delete this document permanently?"
+        description="This will remove the uploaded file and all translations. This cannot be undone."
         confirmLabel="Delete"
         onConfirm={() => { void handleDocAction(); }}
         onCancel={() => setConfirmAction(null)}

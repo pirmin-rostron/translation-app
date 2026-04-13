@@ -237,6 +237,7 @@ export function useReviewSummary(jobId: number | undefined) {
 
 export type DashboardTranslation = {
   id: number;
+  document_id: number;
   document_name: string | null;
   project_id: number | null;
   project_name: string | null;
@@ -284,6 +285,7 @@ function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
   const tgt = toLangCode(j.target_language);
   return {
     id: j.id,
+    document_id: j.document_id,
     document_name: j.document_name,
     project_id: j.project_id ?? null,
     project_name: j.project_name ?? null,

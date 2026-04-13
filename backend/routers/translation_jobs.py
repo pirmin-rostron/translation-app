@@ -29,6 +29,7 @@ from models import (
     SegmentAnnotation,
     TranslationJob,
     TranslationResult,
+    UsageEvent,
 )
 from schemas import (
     DocumentBlockResponse,
@@ -2014,6 +2015,7 @@ class OverviewSummary(BaseModel):
 
 class OverviewResponse(BaseModel):
     job_id: int
+    document_id: int
     status: str
     source_language: str
     target_language: str
@@ -2099,6 +2101,7 @@ def get_overview(
 
     return OverviewResponse(
         job_id=job.id,
+        document_id=job.document_id,
         status=job.status,
         source_language=job.source_language,
         target_language=job.target_language,
@@ -2500,11 +2503,11 @@ def delete_translation_job(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Hard-delete a translation job and all associated data.
+    """Delete a translation job and its output. Preserves the source document.
 
-    Cascade deletes: TranslationResult, ProcessingStageJob, JobEvent,
-    SegmentAnnotation (via segment). If the source Document has no other
-    translation jobs, the Document and its blocks/segments are also deleted.
+    Deletes: TranslationResult, ProcessingStageJob, JobEvent, UsageEvent,
+    and the TranslationJob record. Resets block translations to None.
+    Never deletes: Document, DocumentBlock, DocumentSegment.
     """
     from models import JobEvent
 
@@ -2520,31 +2523,16 @@ def delete_translation_job(
     db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
     # Delete job events
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
+    # Delete usage events referencing this job (fixes FK violation)
+    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).delete(synchronize_session=False)
+    # Reset block translated text
+    db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).update(
+        {"text_translated": None}, synchronize_session=False,
+    )
     # Delete the job itself
     db.delete(job)
-    db.flush()
-
-    # Check if the Document has any remaining jobs
-    remaining_jobs = db.query(TranslationJob.id).filter(
-        TranslationJob.document_id == document_id,
-        TranslationJob.deleted_at.is_(None),
-    ).count()
-
-    if remaining_jobs == 0:
-        # No other jobs reference this document — cascade delete it
-        block_ids = [bid for (bid,) in db.query(DocumentBlock.id).filter(DocumentBlock.document_id == document_id).all()]
-        if block_ids:
-            seg_ids = [sid for (sid,) in db.query(DocumentSegment.id).filter(DocumentSegment.block_id.in_(block_ids)).all()]
-            if seg_ids:
-                db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(seg_ids)).delete(synchronize_session=False)
-            db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete(synchronize_session=False)
-            db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete(synchronize_session=False)
-        # Delete any document-level stage jobs
-        db.query(ProcessingStageJob).filter(ProcessingStageJob.document_id == document_id).delete(synchronize_session=False)
-        db.query(Document).filter(Document.id == document_id).delete(synchronize_session=False)
-
     db.commit()
-    logger.info("Hard-deleted translation_job_id=%d (document_id=%d, doc_deleted=%s)", job_id, document_id, remaining_jobs == 0)
+    logger.info("Deleted translation_job_id=%d (document preserved, document_id=%d)", job_id, document_id)
 
 
 @router.post("/{job_id}/retranslate", response_model=TranslationJobResponse)
