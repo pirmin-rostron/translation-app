@@ -7,6 +7,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useProjects } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
+import { PageHeader } from "../components/PageHeader";
 import { NewProjectModal } from "../dashboard/NewProjectModal";
 
 export default function ProjectsPage() {
@@ -25,10 +26,21 @@ export default function ProjectsPage() {
   return (
     <AppShell>
       <div className="px-8 py-8">
-        <div className="mb-8">
-          <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">Workspace</p>
-          <h1 className="font-display text-2xl font-bold text-brand-text">Projects</h1>
-        </div>
+        <PageHeader
+          eyebrow="Workspace"
+          title="Projects"
+          action={
+            projects && projects.length > 0 ? (
+              <button
+                type="button"
+                onClick={openProjectModal}
+                className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov"
+              >
+                + New Project
+              </button>
+            ) : undefined
+          }
+        />
 
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
@@ -70,14 +82,6 @@ export default function ProjectsPage() {
                 </p>
               </Link>
             ))}
-            <button
-              type="button"
-              onClick={openProjectModal}
-              className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-brand-border p-6 text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-accent"
-            >
-              <span className="text-2xl">+</span>
-              <span className="mt-1 text-sm font-medium">New Project</span>
-            </button>
           </div>
         )}
       </div>

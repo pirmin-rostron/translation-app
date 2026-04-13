@@ -11,6 +11,7 @@ import { AppShell } from "../components/AppShell";
 import { TierGate } from "../components/TierGate";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
+import { StatusBadge as StatusBadgeComponent, toJobStatus } from "../components/StatusBadge";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,24 +40,6 @@ const PROCESSING_STATUSES = new Set([
   "translation_queued",
 ]);
 
-// ─── Status badge classes ────────────────────────────────────────────────────
-
-function statusBadgeClasses(status: string): string {
-  switch (status) {
-    case "In Review":
-      return "bg-brand-accentMid text-brand-accent";
-    case "Completed":
-    case "Ready for Export":
-      return "bg-status-successBg text-status-success";
-    case "Failed":
-      return "bg-status-errorBg text-status-error";
-    case "Translating…":
-      return "bg-brand-bg text-brand-muted";
-    default:
-      return "bg-brand-bg text-brand-muted";
-  }
-}
-
 function isProcessing(rawStatus: string): boolean {
   return PROCESSING_STATUSES.has(rawStatus);
 }
@@ -79,22 +62,6 @@ function StatCard({ label, value, subtitle, href }: { label: string; value: stri
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const processing = status === "Translating…";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 font-sans text-[0.6875rem] font-medium ${statusBadgeClasses(status)} ${processing ? "animate-pulse" : ""}`}
-    >
-      {processing && (
-        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      )}
-      {status}
-    </span>
-  );
-}
 
 function TranslationRow({ t }: { t: DashboardTranslation }) {
   const processing = isProcessing(t.raw_status);
@@ -112,7 +79,7 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
           {t.source_language} → {t.target_language}
         </td>
         <td className="px-5 py-3.5">
-          <StatusBadge status={t.status} />
+          <StatusBadgeComponent status={toJobStatus(t.raw_status)} />
         </td>
       </tr>
     );
@@ -132,7 +99,7 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
         {t.source_language} → {t.target_language}
       </td>
       <td className="px-5 py-3.5">
-        <StatusBadge status={t.status} />
+        <StatusBadgeComponent status={toJobStatus(t.raw_status)} />
       </td>
     </tr>
   );

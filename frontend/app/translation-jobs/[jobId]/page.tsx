@@ -994,7 +994,7 @@ function TranslationReviewPageInner() {
                 <div className="group/source">
                   {side === "source" && renderSourceChangedLabel(block)}
                   {!(side === "source" && editingSourceBlockId === block.id) && (
-                    <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+                    <p className="text-[15px] leading-7 whitespace-pre-wrap text-brand-text">
                       {renderInlineSegments(block, side)}
                       {side === "source" && renderPencilIcon(block)}
                     </p>
@@ -1017,11 +1017,11 @@ function TranslationReviewPageInner() {
           ref={(el) => {
             blockRefs.current[block.id] = el;
           }}
-          className="group/source p-1"
+          className="group/source p-1 mb-2"
         >
           {side === "source" && renderSourceChangedLabel(block)}
           {!(side === "source" && editingSourceBlockId === block.id) && (
-            <H className="text-xl font-semibold leading-8" style={{ color: "#1A110A" }}>
+            <H className="text-xl font-semibold leading-8 text-brand-text">
               {body}
               {side === "source" && renderPencilIcon(block)}
             </H>
@@ -1039,7 +1039,7 @@ function TranslationReviewPageInner() {
       >
         {side === "source" && renderSourceChangedLabel(block)}
         {!(side === "source" && editingSourceBlockId === block.id) && (
-          <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: "#1A110A" }}>
+          <p className="text-[15px] leading-7 whitespace-pre-wrap text-brand-text">
             {body}
             {side === "source" && renderPencilIcon(block)}
           </p>
@@ -1651,26 +1651,24 @@ function TranslationReviewPageInner() {
   return (
     <div className="flex h-screen flex-col bg-brand-bg">
       {/* ── Fixed Top Header ── */}
-      <header className="flex h-14 shrink-0 items-center border-b border-brand-border bg-brand-surface px-6">
+      <header className="flex h-[50px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface px-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-brand-subtle no-underline hover:text-brand-text">
-            ← Dashboard
+          <Link href="/dashboard" className="flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text">
+            ← <span>Dashboard</span>
           </Link>
           <span className="text-brand-border">|</span>
-          <span className="max-w-[240px] truncate text-sm font-medium text-brand-text">
+          <span className="max-w-[240px] truncate font-display text-sm font-semibold text-brand-text">
             {doc?.filename ?? `Document #${job.document_id}`}
           </span>
-        </div>
-        <div className="ml-4">
-          <span className="rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
+          <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">
             {getLanguageDisplayName(job.source_language)} → {getLanguageDisplayName(job.target_language)}
           </span>
         </div>
-        <div className="flex-1 text-center">
+        <div>
           {reviewCompleteState ? (
             <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Review complete ✓</span>
           ) : (
-            <span className="text-sm font-medium text-brand-text">
+            <span className="text-sm text-brand-muted">
               {reviewCounts.completed_blocks} of {reviewCounts.total_blocks} blocks reviewed
             </span>
           )}
@@ -1689,7 +1687,7 @@ function TranslationReviewPageInner() {
           <button
             type="button"
             onClick={() => { void handleOpenPreviewDocument(); }}
-            className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg"
+            className="rounded-full border border-brand-border px-4 py-1.5 text-sm font-medium text-brand-text hover:bg-brand-bg"
           >
             Preview
           </button>

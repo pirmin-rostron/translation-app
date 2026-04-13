@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "../components/AppShell";
+import { PageHeader } from "../components/PageHeader";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -189,9 +190,7 @@ export default function GlossaryPage() {
     <AppShell>
       <div className="px-8 py-8">
       <main className="mx-auto max-w-5xl px-8 pb-12">
-        <h1 className="mb-10 font-display text-2xl font-semibold text-brand-text">
-          Glossary
-        </h1>
+        <PageHeader eyebrow="Tools" title="Glossary" />
 
         {/* ── CSV Import ── */}
         <div className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "../components/AppShell";
+import { PageHeader } from "../components/PageHeader";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -178,13 +179,7 @@ export default function SettingsPage() {
     <AppShell>
       <div className="px-8 py-8">
       <main className="mx-auto max-w-2xl px-8 py-12 pt-24">
-        <h1
-          className="mb-1 text-2xl font-semibold"
-          
-        >
-          Settings
-        </h1>
-        <p className="mb-8 text-sm text-brand-subtle">Manage your account and preferences.</p>
+        <PageHeader eyebrow="Account" title="Settings" subtitle="Manage your account and preferences." />
 
         <div className="space-y-6">
           {/* ════════════════════════════════════════════════════════════
@@ -238,12 +233,12 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void handleSaveProfile()}
                 disabled={profileSaving}
-                className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
+                className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
               >
                 {profileSaving ? "Saving…" : "Save changes"}
               </button>
               {profileMessage && (
-                <p className="mt-2 text-sm text-[#0D7B6E]">{profileMessage}</p>
+                <p className="mt-2 text-sm text-brand-accent">{profileMessage}</p>
               )}
               {profileError && (
                 <p className="mt-2 text-sm text-status-error">{profileError}</p>

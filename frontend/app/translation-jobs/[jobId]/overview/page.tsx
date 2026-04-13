@@ -135,17 +135,19 @@ export default function OverviewPage() {
   return (
     <div className="min-h-screen bg-brand-bg">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex h-14 items-center border-b border-brand-border bg-brand-surface px-6">
-        <Link href="/dashboard" className="text-sm text-brand-subtle no-underline hover:text-brand-text">
-          ← Dashboard
-        </Link>
-        <span className="mx-3 text-brand-border">|</span>
-        <span className="max-w-[240px] truncate text-sm font-medium text-brand-text">
-          {data.document_name}
-        </span>
-        <span className="ml-4 rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
-          {getLanguageDisplayName(data.source_language)} → {getLanguageDisplayName(data.target_language)}
-        </span>
+      <header className="sticky top-0 z-10 flex h-[50px] items-center border-b border-brand-border bg-brand-surface px-6">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-1 text-sm text-brand-muted no-underline transition-colors hover:text-brand-text">
+            ← <span>Dashboard</span>
+          </Link>
+          <span className="text-brand-border">|</span>
+          <span className="max-w-[240px] truncate font-display text-sm font-semibold text-brand-text">
+            {data.document_name}
+          </span>
+          <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">
+            {getLanguageDisplayName(data.source_language)} → {getLanguageDisplayName(data.target_language)}
+          </span>
+        </div>
       </header>
 
       <div className="mx-auto flex max-w-[1100px] flex-col gap-8 px-8 py-10 lg:flex-row">

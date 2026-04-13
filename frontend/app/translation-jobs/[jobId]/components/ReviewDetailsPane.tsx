@@ -469,19 +469,19 @@ export function ReviewDetailsPane({
       </div>
 
       {/* Health panel — pinned bottom */}
-      <div className="shrink-0 bg-[#082012] p-5">
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-brand-accentMid">
+      <div className="shrink-0 rounded-lg border border-brand-border bg-brand-surface p-4">
+        <p className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">
           Session Health
         </p>
-        <div className="mt-3 flex items-end justify-between">
-          <span className="font-display text-2xl font-bold text-white">{healthPercent}%</span>
-          <span className="text-xs text-brand-accentMid">
+        <div className="flex items-baseline justify-between">
+          <span className="font-display text-2xl font-bold text-brand-text">{healthPercent}%</span>
+          <span className="text-xs text-brand-muted">
             {completedBlocks}/{orderedBlocksLength} blocks
           </span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/20">
+        <div className="mt-2 h-1 w-full rounded-full bg-brand-bg">
           <div
-            className="h-full rounded-full bg-brand-accent transition-[width] duration-300"
+            className="h-1 rounded-full bg-brand-accent transition-all"
             style={{ width: `${healthPercent}%` }}
           />
         </div>

@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardTranslations } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
+import { PageHeader } from "../components/PageHeader";
+import { StatusBadge, toJobStatus } from "../components/StatusBadge";
 
 function formatRelativeDate(dateStr: string): string {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -19,21 +21,6 @@ function formatRelativeDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
-function statusBadge(status: string) {
-  switch (status) {
-    case "In Review":
-      return "bg-brand-accentMid text-brand-accent";
-    case "Completed":
-    case "Ready for Export":
-      return "bg-status-successBg text-status-success";
-    case "Failed":
-      return "bg-status-errorBg text-status-error";
-    case "Translating…":
-      return "bg-brand-bg text-brand-muted";
-    default:
-      return "bg-brand-bg text-brand-muted";
-  }
-}
 
 export default function DocumentsPage() {
   const router = useRouter();
@@ -52,10 +39,7 @@ export default function DocumentsPage() {
   return (
     <AppShell>
       <div className="px-8 py-8">
-        <div className="mb-8">
-          <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">Workspace</p>
-          <h1 className="font-display text-2xl font-bold text-brand-text">Documents</h1>
-        </div>
+        <PageHeader eyebrow="Workspace" title="Documents" />
 
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
@@ -98,9 +82,7 @@ export default function DocumentsPage() {
                       {t.created_at ? formatRelativeDate(t.created_at) : "—"}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${statusBadge(t.status)}`}>
-                        {t.status}
-                      </span>
+                      <StatusBadge status={toJobStatus(t.raw_status)} />
                     </td>
                   </tr>
                 ))}
