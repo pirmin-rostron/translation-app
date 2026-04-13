@@ -123,6 +123,7 @@ class TranslationJobResponse(BaseModel):
     document_name: str | None = None
     project_id: int | None = None
     project_name: str | None = None
+    quality_score: int | None = None
 
     class Config:
         from_attributes = True
@@ -171,6 +172,7 @@ class GlossaryTermResponse(BaseModel):
     industry: str | None
     domain: str | None
     created_at: datetime
+    usage_count: int = 0
 
     class Config:
         from_attributes = True

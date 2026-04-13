@@ -246,6 +246,7 @@ export type DashboardTranslation = {
   raw_status: string;
   created_at: string;
   due_date: string | null;
+  quality_score: number | null;
 };
 
 const PROCESSING_STATUSES = new Set([
@@ -292,6 +293,7 @@ function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
     raw_status: j.status,
     created_at: j.created_at,
     due_date: j.due_date ?? null,
+    quality_score: j.quality_score ?? null,
   };
 }
 

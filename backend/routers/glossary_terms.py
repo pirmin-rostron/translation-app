@@ -3,10 +3,11 @@ import io
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import GlossaryTerm, Organisation
+from models import GlossaryTerm, Organisation, TranslationResult
 from schemas import GlossaryImportResponse, GlossaryTermCreateRequest, GlossaryTermResponse, GlossaryTermUpdateRequest
 from services.auth import get_current_active_user, get_current_org
 from services.glossary import normalize_optional
@@ -45,13 +46,42 @@ def list_glossary_terms(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """List glossary terms for the current user's organisation."""
-    return (
+    """List glossary terms for the current user's organisation, including usage counts."""
+    terms = (
         db.query(GlossaryTerm)
         .filter(GlossaryTerm.org_id == current_org.id)
         .order_by(GlossaryTerm.created_at.desc())
         .all()
     )
+    # Count how many TranslationResult rows have glossary_applied=true per term.
+    # glossary_matches JSONB stores applied terms; we count results that reference
+    # each source_term in their glossary_matches field.
+    # Count glossary usage: how many TranslationResult rows with glossary_applied=true
+    # reference each term's source_term in the glossary_matches JSONB field.
+    usage_counts: dict[int, int] = {}
+    if terms:
+        glossary_results = (
+            db.query(TranslationResult.glossary_matches)
+            .filter(TranslationResult.glossary_applied.is_(True))
+            .all()
+        )
+        if glossary_results:
+            # Build a lookup: count how many results mention each source_term
+            for term in terms:
+                st = term.source_term.lower()
+                count = 0
+                for (matches_json,) in glossary_results:
+                    if matches_json and st in str(matches_json).lower():
+                        count += 1
+                if count > 0:
+                    usage_counts[term.id] = count
+
+    result = []
+    for term in terms:
+        resp = GlossaryTermResponse.model_validate(term)
+        resp.usage_count = usage_counts.get(term.id, 0)
+        result.append(resp)
+    return result
 
 
 @router.patch("/{term_id}", response_model=GlossaryTermResponse)

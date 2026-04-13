@@ -1403,6 +1403,10 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         db.add_all(block_results)
         completed_count += len(block_segs)
         job.progress_completed_segments = completed_count
+        # Accumulate token counts from provider results for cost tracking
+        for res in block_provider_results.values():
+            job.token_count_input = (job.token_count_input or 0) + res.input_tokens
+            job.token_count_output = (job.token_count_output or 0) + res.output_tokens
         db.commit()
 
     translate_end_time = datetime.utcnow()
@@ -1424,6 +1428,14 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
     job.progress_total_segments = total_segments
     job.progress_completed_segments = total_segments
     job.error_message = None
+    # Calculate estimated API cost from accumulated token counts
+    from pricing import calculate_api_cost
+    if job.token_count_input or job.token_count_output:
+        job.estimated_api_cost_usd = calculate_api_cost(
+            model=provider.name if hasattr(provider, '_model') else "claude-sonnet-4-20250514",
+            input_tokens=job.token_count_input or 0,
+            output_tokens=job.token_count_output or 0,
+        )
     db.commit()
 
     total_end_time = datetime.utcnow()
@@ -1997,6 +2009,7 @@ class OverviewSummary(BaseModel):
     ambiguity_count: int
     quality_score: int
     memory_reuse_count: int = 0
+    word_count: int = 0
 
 
 class OverviewResponse(BaseModel):
@@ -2061,6 +2074,7 @@ def get_overview(
 
     memory_reuse_count = sum(1 for r in results if bool(r.semantic_memory_used))
     quality_score = round(((total_blocks - issue_count) / total_blocks) * 100) if total_blocks > 0 else 100
+    word_count = sum(len((b.text_original or "").split()) for b in blocks)
     tone_applied = job.tone or job.translation_style or "natural"
 
     # First 3 blocks preview
@@ -2099,6 +2113,7 @@ def get_overview(
             ambiguity_count=ambiguity_count,
             quality_score=quality_score,
             memory_reuse_count=memory_reuse_count,
+            word_count=word_count,
         ),
         blocks_preview=blocks_preview,
         created_at=job.created_at.isoformat() if job.created_at else None,
@@ -2647,18 +2662,46 @@ def list_translation_jobs(
         if proj_ids
         else {}
     )
+    # Compute quality scores in bulk: count blocks and unresolved ambiguities per job
+    job_ids = [j.id for j in jobs]
+    job_doc_ids = {j.id: j.document_id for j in jobs}
+    block_counts: dict[int, int] = {}
+    if doc_ids:
+        for doc_id, cnt in db.query(DocumentBlock.document_id, func.count(DocumentBlock.id)).filter(
+            DocumentBlock.document_id.in_(doc_ids)
+        ).group_by(DocumentBlock.document_id).all():
+            block_counts[doc_id] = cnt
+
+    issue_counts: dict[int, int] = defaultdict(int)
+    if job_ids:
+        ambiguous_results = (
+            db.query(TranslationResult.job_id, TranslationResult.review_status)
+            .filter(
+                TranslationResult.job_id.in_(job_ids),
+                TranslationResult.ambiguity_detected.is_(True),
+            )
+            .all()
+        )
+        for jr_job_id, review_status in ambiguous_results:
+            if not _is_acceptable_final_status(review_status):
+                issue_counts[jr_job_id] += 1
+
     result = []
     for job in jobs:
         doc = docs.get(job.document_id)
         doc_name = doc.filename if doc else None
         doc_project_id = doc.project_id if doc else None
         doc_project_name = projects.get(doc_project_id) if doc_project_id else None
+        total = block_counts.get(job.document_id, 0)
+        issues = issue_counts.get(job.id, 0)
+        qs = round(((total - issues) / total) * 100) if total > 0 else None
         result.append(
             TranslationJobResponse.model_validate(job).model_copy(
                 update={
                     "document_name": doc_name,
                     "project_id": doc_project_id,
                     "project_name": doc_project_name,
+                    "quality_score": qs,
                 }
             )
         )

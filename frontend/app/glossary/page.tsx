@@ -396,6 +396,11 @@ export default function GlossaryPage() {
                               <span className="rounded-full bg-brand-bg px-1.5 py-0.5 text-xs text-brand-subtle">
                                 {isPhrase ? "Phrase" : "Term"}
                               </span>
+                              {term.usage_count > 0 && (
+                                <span className="text-xs text-brand-muted">
+                                  Used {term.usage_count} {term.usage_count === 1 ? "time" : "times"}
+                                </span>
+                              )}
                             </span>
                           )}
                         </td>

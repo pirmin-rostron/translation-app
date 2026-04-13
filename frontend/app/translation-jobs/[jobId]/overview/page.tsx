@@ -155,6 +155,12 @@ export default function OverviewPage() {
   const memoryPercent = summary.total_blocks > 0
     ? Math.round((summary.memory_reuse_count / summary.total_blocks) * 100)
     : 0;
+  const timeSavedHrs = summary.word_count > 0 ? (summary.word_count / 250).toFixed(1) : null;
+  const complexityLevel = summary.ambiguity_count === 0
+    ? { label: "Low complexity", classes: "bg-status-successBg text-status-success" }
+    : summary.ambiguity_count <= 3
+      ? { label: "Moderate complexity", classes: "bg-status-warningBg text-status-warning" }
+      : { label: "High complexity", classes: "bg-status-errorBg text-status-error" };
   const formattedDate = data.created_at
     ? new Date(data.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -188,6 +194,11 @@ export default function OverviewPage() {
                     ? "Good result — a few blocks need attention"
                     : "Review recommended before exporting"}
               </p>
+              {timeSavedHrs && (
+                <p className="mt-2 text-xs text-brand-muted">
+                  ~{timeSavedHrs} hrs saved on this document
+                </p>
+              )}
             </div>
           </div>
 
@@ -260,6 +271,25 @@ export default function OverviewPage() {
                   <p className="text-sm font-bold text-brand-text">{toneLabel} register maintained</p>
                   <p className="text-xs text-brand-muted">Tone and formality consistent throughout</p>
                 </div>
+              </div>
+              {summary.glossary_match_count > 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-brand-bg text-base">
+                    📖
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-brand-text">{summary.glossary_match_count} glossary {summary.glossary_match_count === 1 ? "term" : "terms"} applied</p>
+                    <p className="text-xs text-brand-muted">Consistent terminology enforced</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
+                <div className="min-w-0 flex-1">
+                  <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${complexityLevel.classes}`}>
+                    {complexityLevel.label}
+                  </span>
+                </div>
+                <span className="text-xs text-brand-muted">{summary.word_count.toLocaleString()} words</span>
               </div>
             </div>
           </div>

@@ -173,6 +173,7 @@ export type TranslationJobListItem = {
   document_name: string | null;
   project_id: number | null;
   project_name: string | null;
+  quality_score: number | null;
 };
 
 export type UpcomingItem = {
@@ -419,6 +420,7 @@ export type OverviewResponse = {
     ambiguity_count: number;
     quality_score: number;
     memory_reuse_count: number;
+    word_count: number;
   };
   blocks_preview: {
     source_text: string;
@@ -539,6 +541,17 @@ export type InviteResult = {
   temporary_password?: string;
 };
 
+export type AdminCostsResponse = {
+  total_cost_usd_this_month: number;
+  total_cost_usd_all_time: number;
+  avg_cost_per_job: number;
+  avg_cost_per_1000_words: number;
+  total_jobs_this_month: number;
+  total_words_this_month: number;
+  daily_costs: { date: string; cost_usd: number; jobs: number }[];
+  cost_by_language: { language: string; cost_usd: number; jobs: number }[];
+};
+
 export const adminApi = {
   getWaitlist: () =>
     apiFetch<WaitlistEntry[]>(`${API_URL}/waitlist`),
@@ -556,6 +569,8 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  getCosts: () =>
+    apiFetch<AdminCostsResponse>(`${API_URL}/stats/admin/costs`),
 };
 
 // --- glossary_terms router ---
@@ -569,6 +584,7 @@ export type GlossaryTerm = {
   industry: string | null;
   domain: string | null;
   created_at: string;
+  usage_count: number;
 };
 
 export const glossaryTermsApi = {

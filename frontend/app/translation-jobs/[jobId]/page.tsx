@@ -1006,6 +1006,26 @@ function TranslationReviewPageInner() {
     );
   }
 
+  function renderBlockIndicators(block: DocumentBlock) {
+    const hasMemory = block.segments.some((s) => s.exact_memory_used || s.semantic_memory_used);
+    const hasGlossary = block.segments.some((s) => s.glossary_applied);
+    if (!hasMemory && !hasGlossary) return null;
+    return (
+      <div className="mb-1 flex items-center gap-1.5">
+        {hasMemory && (
+          <span className="rounded-full bg-brand-accentMid px-2 py-0.5 text-[0.625rem] font-medium text-brand-accent">
+            ↩ Memory
+          </span>
+        )}
+        {hasGlossary && (
+          <span className="rounded-full bg-brand-bg px-2 py-0.5 text-[0.625rem] font-medium text-brand-muted">
+            📖 Glossary
+          </span>
+        )}
+      </div>
+    );
+  }
+
   function renderNode(node: DocumentNode, side: "source" | "target") {
     if (node.type === "bullet_list") {
       return (
@@ -1066,6 +1086,7 @@ function TranslationReviewPageInner() {
         className="group/source p-1"
       >
         {side === "source" && renderSourceChangedLabel(block)}
+        {side === "source" && renderBlockIndicators(block)}
         {!(side === "source" && editingSourceBlockId === block.id) && (
           <p className="text-[15px] leading-7 whitespace-pre-wrap text-brand-text">
             {body}
