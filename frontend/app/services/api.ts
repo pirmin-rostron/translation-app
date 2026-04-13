@@ -168,7 +168,16 @@ export type TranslationJobListItem = {
   progress_completed_segments: number;
   created_at: string;
   last_saved_at: string | null;
+  due_date: string | null;
   document_name: string | null;
+};
+
+export type UpcomingItem = {
+  type: "job" | "project";
+  id: number;
+  name: string;
+  due_date: string;
+  status: string;
 };
 
 export type DashboardStats = {
@@ -238,6 +247,13 @@ export const translationJobsApi = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source_text: sourceText }),
+    }),
+
+  updateDueDate: (jobId: number, dueDate: string | null) =>
+    apiFetch<{ id: number; due_date: string | null }>(`${API_URL}/translation-jobs/${jobId}/due-date`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ due_date: dueDate }),
     }),
 };
 
@@ -365,6 +381,10 @@ export type OrgStatsResponse = {
 
 export const orgStatsApi = {
   get: () => apiFetch<OrgStatsResponse>(`${API_URL}/stats`),
+};
+
+export const dashboardApi = {
+  upcoming: () => apiFetch<UpcomingItem[]>(`${API_URL}/dashboard/upcoming`),
 };
 
 export type OverviewResponse = {

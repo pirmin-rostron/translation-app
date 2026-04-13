@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useDashboardTranslations, useOrgStats } from "../hooks/queries";
+import { queryKeys, translationJobsApi } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
@@ -21,6 +23,73 @@ function formatRelativeDate(dateStr: string): string {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+// Due date badge — color-coded by urgency
+function DueDateBadge({ dueDate }: { dueDate: string | null }) {
+  if (!dueDate) return null;
+  const due = new Date(dueDate);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) {
+    return <span className="rounded-full bg-status-errorBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-error">Overdue</span>;
+  }
+  if (diffDays <= 3) {
+    return <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-warning">Due soon</span>;
+  }
+  return (
+    <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
+      {due.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+    </span>
+  );
+}
+
+// Inline due date editor — clicking the badge/cell opens a date picker
+function InlineDueDateCell({ jobId, dueDate }: { jobId: number; dueDate: string | null }) {
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+
+  async function handleChange(value: string) {
+    setEditing(false);
+    const newDate = value || null;
+    try {
+      await translationJobsApi.updateDueDate(jobId, newDate);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+    } catch (err) {
+      console.error("[due-date update]", err);
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="date"
+        defaultValue={dueDate ?? ""}
+        autoFocus
+        onBlur={(e) => handleChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-28 rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="cursor-pointer border-none bg-transparent p-0"
+      title="Click to set due date"
+    >
+      {dueDate ? (
+        <DueDateBadge dueDate={dueDate} />
+      ) : (
+        <span className="text-xs text-brand-subtle hover:text-brand-muted">Set date</span>
+      )}
+    </button>
+  );
 }
 
 
@@ -82,7 +151,7 @@ export default function DocumentsPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-brand-border">
-                  {["Document", "Project", "Language", "Uploaded", "Status"].map((col) => (
+                  {["Document", "Project", "Language", "Due Date", "Uploaded", "Status"].map((col) => (
                     <th key={col} className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
                       {col}
                     </th>
@@ -92,7 +161,7 @@ export default function DocumentsPage() {
               <tbody>
                 {jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-16 text-center">
+                    <td colSpan={6} className="px-5 py-16 text-center">
                       <div className="mx-auto max-w-sm">
                         <div className="mb-3 text-4xl">📄</div>
                         <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
@@ -122,6 +191,9 @@ export default function DocumentsPage() {
                       </td>
                       <td className="px-5 py-3.5 text-sm text-brand-muted">
                         {t.source_language} → {t.target_language}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <InlineDueDateCell jobId={t.id} dueDate={t.due_date} />
                       </td>
                       <td className="px-5 py-3.5 text-xs text-brand-subtle">
                         {t.created_at ? formatRelativeDate(t.created_at) : "—"}

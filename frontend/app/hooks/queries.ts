@@ -11,6 +11,7 @@ import {
   tierApi,
   projectsApi,
   orgStatsApi,
+  dashboardApi,
 } from "../services/api";
 import type {
   TranslationJobListItem,
@@ -18,6 +19,7 @@ import type {
   TierResponse,
   ProjectResponse,
   OrgStatsResponse,
+  UpcomingItem,
 } from "../services/api";
 
 // ---------------------------------------------------------------------------
@@ -243,6 +245,7 @@ export type DashboardTranslation = {
   status: string;
   raw_status: string;
   created_at: string;
+  due_date: string | null;
 };
 
 const PROCESSING_STATUSES = new Set([
@@ -288,6 +291,7 @@ function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
     status: mapJobStatusLabel(j.status),
     raw_status: j.status,
     created_at: j.created_at,
+    due_date: j.due_date ?? null,
   };
 }
 
@@ -332,6 +336,14 @@ export function useOrgStats() {
   return useQuery<OrgStatsResponse>({
     queryKey: ["org-stats"],
     queryFn: () => orgStatsApi.get(),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpcomingDeadlines() {
+  return useQuery<UpcomingItem[]>({
+    queryKey: ["dashboard", "upcoming"],
+    queryFn: () => dashboardApi.upcoming(),
     staleTime: 60_000,
   });
 }

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
@@ -118,6 +118,7 @@ class TranslationJobResponse(BaseModel):
     translation_provider: str | None
     translation_batch_size: int | None
     created_at: datetime
+    due_date: date | None = None
     deleted_at: datetime | None = None
     document_name: str | None = None
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations, useTier, useProjects, useOrgStats } from "../hooks/queries";
+import { useDashboardTranslations, useTier, useProjects, useOrgStats, useUpcomingDeadlines } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
 import { NewTranslationModal } from "./NewTranslationModal";
@@ -126,6 +126,7 @@ export default function DashboardPage() {
   const { data: tierData } = useTier();
   const { data: projectList } = useProjects();
   const { data: orgStats } = useOrgStats();
+  const { data: upcomingItems } = useUpcomingDeadlines();
 
   useEffect(() => {
     const processing = (translations ?? []).some((t) => isProcessing(t.raw_status));
@@ -409,6 +410,52 @@ export default function DashboardPage() {
           </div>
         </div>
 
+
+        {/* ── Upcoming Deadlines ── */}
+        {upcomingItems && upcomingItems.length > 0 && (
+          <div className="mb-10">
+            <div className="mb-4 flex items-center gap-3">
+              <h3 className="font-display text-xl font-bold text-brand-text">Upcoming Deadlines</h3>
+              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+            </div>
+            <div className="space-y-2">
+              {upcomingItems.slice(0, 3).map((item) => {
+                const due = new Date(item.due_date);
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                const badgeClasses = diffDays < 0
+                  ? "bg-status-errorBg text-status-error"
+                  : diffDays <= 3
+                    ? "bg-status-warningBg text-status-warning"
+                    : "bg-brand-bg text-brand-muted";
+                const badgeLabel = diffDays < 0
+                  ? "Overdue"
+                  : diffDays <= 3
+                    ? "Due soon"
+                    : due.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+                const href = item.type === "job"
+                  ? `/translation-jobs/${item.id}/overview`
+                  : `/projects/${item.id}`;
+                return (
+                  <Link
+                    key={`${item.type}-${item.id}`}
+                    href={href}
+                    className="flex items-center justify-between rounded-xl border border-brand-border bg-brand-surface px-5 py-3 no-underline transition-colors hover:border-brand-accent"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-brand-subtle">{item.type === "job" ? "📄" : "📁"}</span>
+                      <span className="text-sm font-medium text-brand-text">{item.name}</span>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${badgeClasses}`}>
+                      {badgeLabel}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── Recent Activity ── */}
         {displayTranslations.length > 0 && (

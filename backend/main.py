@@ -13,7 +13,7 @@ from sqlalchemy import text
 from database import SessionLocal, engine, init_db
 from limiter import limiter
 from models import Document, TranslationJob
-from routers import auth, documents, glossary_terms, projects, stats, translation_jobs, waitlist
+from routers import auth, dashboard, documents, glossary_terms, projects, stats, translation_jobs, waitlist
 from seeds import seed_initial_admin
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
@@ -49,6 +49,7 @@ app.include_router(projects.router)
 app.include_router(translation_jobs.router)
 app.include_router(waitlist.router)
 app.include_router(stats.router)
+app.include_router(dashboard.router)
 
 
 def recover_stuck_jobs() -> None:

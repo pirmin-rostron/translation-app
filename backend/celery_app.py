@@ -19,4 +19,10 @@ celery_app.conf.update(
     task_acks_late=True,           # only ack after completion — safer on crash
     include=["tasks"],
     broker_connection_retry_on_startup=True,
+    beat_schedule={
+        "check-due-date-reminders": {
+            "task": "tasks.check_due_date_reminders",
+            "schedule": 86400.0,  # once per day (24h)
+        },
+    },
 )

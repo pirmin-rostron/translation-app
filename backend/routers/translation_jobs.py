@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 from collections import defaultdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -2123,6 +2123,34 @@ def update_review_mode(
     db.commit()
     db.refresh(job)
     return {"id": job.id, "review_mode": job.review_mode}
+
+
+class DueDateRequest(BaseModel):
+    due_date: date | None = None
+
+
+@router.patch("/{job_id}/due-date")
+def update_due_date(
+    job_id: int,
+    body: DueDateRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Update the due date for a translation job."""
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    job.due_date = body.due_date
+    # Reset reminder flags when due date changes
+    job.reminder_sent_3day = False
+    job.reminder_sent_1day = False
+    db.commit()
+    db.refresh(job)
+    return {"id": job.id, "due_date": str(job.due_date) if job.due_date else None}
 
 
 class JobEventResponse(BaseModel):

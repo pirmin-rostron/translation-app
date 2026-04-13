@@ -76,6 +76,9 @@ class TranslationJob(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     org_id = Column(Integer, ForeignKey("organisations.id"), nullable=True, index=True)
     source_edit_word_delta = Column(Integer, nullable=False, default=0)
+    due_date = Column(Date, nullable=True)
+    reminder_sent_3day = Column(Boolean, nullable=False, default=False)
+    reminder_sent_1day = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime, nullable=True, default=None)
 
     document = relationship("Document", backref="translation_jobs")
