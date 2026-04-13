@@ -73,9 +73,6 @@ export default function ProjectsPage() {
                   {p.target_languages.map((lang) => (
                     <span key={lang} className="rounded-full bg-brand-accentMid px-2 py-0.5 text-xs font-medium text-brand-accent">{lang}</span>
                   ))}
-                  <span className="rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-muted">
-                    {p.default_tone}
-                  </span>
                 </div>
                 <p className="mt-3 text-xs text-brand-subtle">
                   {p.document_count} {p.document_count === 1 ? "document" : "documents"}

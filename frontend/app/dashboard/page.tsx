@@ -8,7 +8,6 @@ import { useDashboardStore } from "../stores/dashboardStore";
 import { useDashboardTranslations, useTier, useProjects } from "../hooks/queries";
 import type { DashboardTranslation } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
-import { TierGate } from "../components/TierGate";
 import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
 import { StatusBadge as StatusBadgeComponent, toJobStatus } from "../components/StatusBadge";
@@ -193,15 +192,13 @@ export default function DashboardPage() {
                 <h2 className="font-display text-xl font-bold text-brand-text">Projects</h2>
                 <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
               </div>
-              <TierGate feature="create_projects" tier={tierData?.tier ?? "free"}>
-                <button
-                  type="button"
-                  onClick={openProjectModal}
-                  className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
-                >
-                  + New Project
-                </button>
-              </TierGate>
+              <button
+                type="button"
+                onClick={openProjectModal}
+                className="font-sans text-[0.8125rem] font-medium text-brand-accent no-underline hover:underline"
+              >
+                + New Project
+              </button>
             </div>
             <div className="grid grid-cols-3 gap-4">
               {projectList.map((p) => (
@@ -217,29 +214,24 @@ export default function DashboardPage() {
                       <span>{p.target_languages.join(", ")}</span>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-brand-subtle">
-                    {p.default_tone.charAt(0).toUpperCase() + p.default_tone.slice(1)} tone
-                  </p>
                 </Link>
               ))}
             </div>
           </div>
         )}
-        {(!projectList || projectList.length === 0) && tierData && tierData.tier !== "free" && (
+        {(!projectList || projectList.length === 0) && (
           <div className="mb-10">
-            <TierGate feature="create_projects" tier={tierData.tier}>
-              <div className="rounded-xl border border-brand-border bg-brand-surface px-8 py-10 text-center">
-                <p className="font-display text-lg font-bold text-brand-text">No projects yet</p>
-                <p className="mt-1 font-sans text-sm text-brand-muted">Create a project to group documents together.</p>
-                <button
-                  type="button"
-                  onClick={openProjectModal}
-                  className="mt-4 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
-                >
-                  + New Project
-                </button>
-              </div>
-            </TierGate>
+            <div className="rounded-xl border border-brand-border bg-brand-surface px-8 py-10 text-center">
+              <p className="font-display text-lg font-bold text-brand-text">No projects yet</p>
+              <p className="mt-1 font-sans text-sm text-brand-muted">Create a project to group documents together.</p>
+              <button
+                type="button"
+                onClick={openProjectModal}
+                className="mt-4 rounded-full bg-brand-accent px-5 py-2 font-sans text-sm font-medium text-white hover:bg-brand-accentHov"
+              >
+                + New Project
+              </button>
+            </div>
           </div>
         )}
 
