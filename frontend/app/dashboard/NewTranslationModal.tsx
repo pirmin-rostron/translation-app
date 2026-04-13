@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, queryKeys } from "../services/api";
@@ -22,6 +22,58 @@ const LANGUAGE_OPTIONS = [
 const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+const TARGET_LANG_STORAGE_KEY = "helvara_last_target_language";
+
+// Common function words per language for lightweight client-side detection.
+// We only need enough to distinguish the 8 supported languages from each other.
+const LANG_WORD_SETS: Record<string, Set<string>> = {
+  English: new Set(["the", "and", "is", "in", "to", "of", "a", "that", "it", "for", "was", "with", "are", "be", "this", "have", "from", "not", "but", "by"]),
+  German:  new Set(["der", "die", "und", "ist", "das", "den", "ein", "eine", "auf", "für", "mit", "dem", "sich", "nicht", "von", "des", "auch", "nach", "wie", "als"]),
+  French:  new Set(["le", "la", "les", "de", "des", "du", "un", "une", "est", "et", "en", "que", "qui", "dans", "pour", "pas", "sur", "sont", "avec", "ce"]),
+  Dutch:   new Set(["de", "het", "een", "van", "en", "is", "dat", "op", "zijn", "voor", "niet", "met", "aan", "ook", "maar", "wordt", "naar", "bij", "uit", "nog"]),
+  Spanish: new Set(["el", "la", "los", "las", "de", "del", "en", "que", "es", "un", "una", "por", "con", "para", "como", "más", "pero", "sus", "este", "ya"]),
+};
+
+/** Read a text sample from a file and guess the source language. */
+async function detectSourceLanguage(file: File): Promise<string | null> {
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
+  // For DOCX we can't easily read text client-side; skip detection
+  if (ext === "docx") return null;
+
+  const slice = file.slice(0, 8192);
+  const raw = await slice.text();
+
+  // For RTF files, strip control codes to get approximate plain text
+  let text = raw;
+  if (ext === "rtf") {
+    text = text.replace(/\{[^}]*\}/g, " ").replace(/\\[a-zA-Z]+-?\d*\s?/g, " ");
+  }
+
+  const words = text.toLowerCase().match(/[a-zA-Zà-ÿ]+/g);
+  if (!words || words.length < 10) return null;
+
+  // Check for CJK/Thai characters first
+  const cjkCount = (text.match(/[\u3000-\u9FFF\uF900-\uFAFF]/g) ?? []).length;
+  const hangulCount = (text.match(/[\uAC00-\uD7AF\u1100-\u11FF]/g) ?? []).length;
+  const thaiCount = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
+  if (thaiCount > 20) return "Thai";
+  if (hangulCount > 20) return "Korean";
+  if (cjkCount > 20) return "Japanese";
+
+  // Score Latin-script languages by function-word frequency
+  const scores: { lang: string; count: number }[] = [];
+  for (const [lang, wordSet] of Object.entries(LANG_WORD_SETS)) {
+    const count = words.filter((w) => wordSet.has(w)).length;
+    scores.push({ lang, count });
+  }
+  scores.sort((a, b) => b.count - a.count);
+  // Only return if the top language has meaningfully more hits than the second
+  if (scores[0].count >= 3 && scores[0].count > scores[1].count * 1.3) {
+    return scores[0].lang;
+  }
+  return null;
+}
+
 export function NewTranslationModal({ projects }: { projects: ProjectResponse[] }) {
   const queryClient = useQueryClient();
   const open = useDashboardStore((s) => s.translationModalOpen);
@@ -31,11 +83,19 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [targetLang, setTargetLang] = useState("German");
+  const [detectedSourceLang, setDetectedSourceLang] = useState<string | null>(null);
+  const [targetLang, setTargetLang] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(TARGET_LANG_STORAGE_KEY) ?? "German";
+    }
+    return "German";
+  });
   const [reviewMode, setReviewMode] = useState<"autopilot" | "manual">("autopilot");
   const [projectId, setProjectId] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const sameLanguage = detectedSourceLang !== null && detectedSourceLang === targetLang;
 
   // Pre-select project when modal opens with a project context
   const prevPreselected = useRef<number | null>(null);
@@ -46,6 +106,11 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   if (!open && prevPreselected.current !== null) {
     prevPreselected.current = null;
   }
+
+  const runDetection = useCallback(async (f: File) => {
+    const detected = await detectSourceLanguage(f);
+    setDetectedSourceLang(detected);
+  }, []);
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -61,7 +126,13 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
     }
     setError("");
     setFile(f);
+    void runDetection(f);
   }
+
+  // Persist target language preference
+  useEffect(() => {
+    localStorage.setItem(TARGET_LANG_STORAGE_KEY, targetLang);
+  }, [targetLang]);
 
   async function handleSubmit() {
     if (!file) {
@@ -106,6 +177,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
 
   function handleClose() {
     setFile(null);
+    setDetectedSourceLang(null);
     setProjectId("");
     setError("");
     setSubmitting(false);
@@ -214,6 +286,11 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           ))}
         </select>
         <p className="mt-1 text-xs text-brand-subtle">Source language is auto-detected from your document</p>
+        {sameLanguage && (
+          <p className="mt-1.5 text-xs text-status-warning">
+            Source and target language are the same — please select a different target language.
+          </p>
+        )}
       </div>
 
       {/* Review mode */}
@@ -282,7 +359,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         </button>
         <button
           onClick={handleSubmit}
-          disabled={submitting || !file}
+          disabled={submitting || !file || sameLanguage}
           className="cursor-pointer rounded-full border-none bg-brand-accent px-5 py-2.5 font-sans text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Uploading…" : "Upload & Translate"}
