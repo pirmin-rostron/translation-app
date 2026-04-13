@@ -44,18 +44,46 @@ export default function PrivacyPolicyPage() {
 
             {/* 4 */}
             <section>
-              <h2 className="mb-3 font-display text-lg font-semibold text-brand-text">Third parties</h2>
-              <ul className="list-disc space-y-1.5 pl-5 text-brand-muted">
-                <li>
-                  <strong className="text-brand-text">Anthropic API</strong> &mdash; provides the AI translation engine.
-                  Under Anthropic&rsquo;s commercial API terms, customer inputs and outputs are <strong className="text-brand-text">not used for model training</strong> and
-                  are deleted from Anthropic&rsquo;s systems within 7 days.
-                </li>
-                <li>
-                  <strong className="text-brand-text">PostHog</strong> &mdash; collects anonymised product analytics (page views, feature usage).
-                  No document content is sent to PostHog.
-                </li>
-              </ul>
+              <h2 className="mb-3 font-display text-lg font-semibold text-brand-text">Sub-processors</h2>
+              <p className="mb-4 text-brand-muted">
+                Helvara uses the following third-party services to deliver the platform. Each has access only to the data necessary for their specific function.
+              </p>
+              <div className="mb-4 overflow-hidden rounded-lg border border-brand-border">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-brand-border bg-brand-bg px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Sub-processor</th>
+                      <th className="border-b border-brand-border bg-brand-bg px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Purpose</th>
+                      <th className="border-b border-brand-border bg-brand-bg px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Location</th>
+                      <th className="border-b border-brand-border bg-brand-bg px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Data accessed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm font-medium text-brand-text">Amazon Web Services (AWS)</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-text">Cloud infrastructure — compute, storage, database</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-muted">Sydney, Australia (ap-southeast-2)</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-text">All platform data — documents, translations, account information</td>
+                    </tr>
+                    <tr>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm font-medium text-brand-text">Anthropic (Claude API)</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-text">AI translation processing</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-muted">United States</td>
+                      <td className="border-b border-brand-border px-4 py-3 text-sm text-brand-text">Document content — source text is sent to Anthropic&rsquo;s API for translation, then deleted from Anthropic&rsquo;s systems within 7 days. Anthropic&rsquo;s commercial API terms prohibit training on customer content.</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-sm font-medium text-brand-text">PostHog (EU Cloud)</td>
+                      <td className="px-4 py-3 text-sm text-brand-text">Product analytics</td>
+                      <td className="px-4 py-3 text-sm text-brand-muted">Germany (EU, eu-central-1)</td>
+                      <td className="px-4 py-3 text-sm text-brand-text">Usage behaviour only — page views and feature events. Document content is never sent to PostHog.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <h3 className="mb-2 text-sm font-semibold text-brand-text">Data transfers</h3>
+              <p className="text-brand-muted">
+                Your documents are processed on AWS servers in Sydney, Australia. The only exception is translation processing — document text is temporarily sent to Anthropic&rsquo;s API (United States) and deleted within 7 days. Usage analytics are processed by PostHog on EU servers in Germany. No document content is ever sent to PostHog.
+              </p>
             </section>
 
             {/* 5 */}

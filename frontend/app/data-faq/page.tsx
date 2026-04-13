@@ -34,6 +34,10 @@ export default function DataFaqPage() {
                 The only exception: when a document is translated, the text is sent to the Anthropic API
                 (United States) for processing. Anthropic deletes all inputs and outputs within 7 days.
               </p>
+              <p className="mt-2">
+                For a full list of sub-processors and where your data is processed, see our{" "}
+                <a href="/privacy" className="text-brand-accent hover:underline">Privacy Policy</a>.
+              </p>
             </FaqItem>
 
             <FaqItem question="Does Helvara read my documents?">
@@ -49,7 +53,7 @@ export default function DataFaqPage() {
                 <strong className="text-brand-text">No.</strong> Helvara uses Anthropic&rsquo;s commercial
                 API, which explicitly prohibits using customer inputs and outputs for model training.
                 Your content is processed for translation only and is deleted from Anthropic&rsquo;s
-                systems within 7 days.
+                systems within 7 days. Document text sent for translation is deleted from Anthropic&rsquo;s systems within 7 days.
               </p>
             </FaqItem>
 
