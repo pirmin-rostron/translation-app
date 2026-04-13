@@ -839,6 +839,34 @@ function TranslationReviewPageInner() {
       }
     };
 
+    // Source-edited block with no usable translation: show previous translation greyed out
+    if (side === "target" && block.source_edited) {
+      const hasTranslation = block.segments.some((s) => (s.final_translation || "").trim().length > 0);
+      if (!hasTranslation && !block.segments.length) {
+        // No segments at all (deleted during re-translation) — show block-level fallback
+        const fallback = block.translated_text_display || block.text_translated || "";
+        return (
+          <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md opacity-40 transition-colors hover:bg-brand-bg">
+            {fallback || "Re-translating…"}
+          </span>
+        );
+      }
+      if (!hasTranslation && block.segments.length > 0) {
+        // Segments exist but all have empty final_translation — use primary_translation or block fallback
+        const primaryParts = block.segments
+          .map((s) => (s.primary_translation || "").trim())
+          .filter(Boolean);
+        const fallback = primaryParts.length > 0
+          ? primaryParts.join(" ")
+          : block.translated_text_display || block.text_translated || "";
+        return (
+          <span onClick={handleClick} className="cursor-pointer whitespace-pre-wrap rounded-md opacity-40 transition-colors hover:bg-brand-bg">
+            {fallback || "Re-translating…"}
+          </span>
+        );
+      }
+    }
+
     if (!block.segments.length) {
       const fallbackText = side === "source" ? (block.source_text_display || "") : (block.translated_text_display || "");
       return (
@@ -939,7 +967,8 @@ function TranslationReviewPageInner() {
   }
 
   function renderSourceChangedLabel(block: DocumentBlock) {
-    const hasSourceChanged = block.segments.some((s) => s.review_status === "source_changed");
+    const hasSourceChanged = block.segments.some((s) => s.review_status === "source_changed")
+      || (block.source_edited && block.segments.some((s) => !(s.final_translation || "").trim()));
     if (block.source_edited && hasSourceChanged) {
       return (
         <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-700">
@@ -1155,6 +1184,15 @@ function TranslationReviewPageInner() {
         setSourceThresholdWarning(true);
       }
       await Promise.all([loadReviewBlocks(page), loadReviewSummary()]);
+      // Poll until re-translation completes (segments get non-empty final_translation)
+      let pollAttempts = 0;
+      const pollInterval = setInterval(async () => {
+        pollAttempts++;
+        await Promise.all([loadReviewBlocks(page), loadReviewSummary()]);
+        if (pollAttempts >= 15) clearInterval(pollInterval);
+      }, 2000);
+      // Clean up poll when translation lands (checked via block state in next render)
+      setTimeout(() => clearInterval(pollInterval), 32000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save source edit");
     } finally {

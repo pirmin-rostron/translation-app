@@ -2658,19 +2658,19 @@ def edit_block_source(
     if len(segments) == 1:
         segments[0].source_text = new_source
 
-    # Void translation results for all segments in this block
+    # Void translation results for all segments in this block.
+    # Use "source_changed" status so the frontend can detect re-translation in progress.
+    # Keep block.text_translated so the frontend can show the previous translation
+    # as a greyed-out placeholder while re-translation runs.
     segment_ids = [s.id for s in segments]
     if segment_ids:
         db.query(TranslationResult).filter(
             TranslationResult.job_id == job_id,
             TranslationResult.segment_id.in_(segment_ids),
         ).update(
-            {"review_status": "pending", "final_translation": ""},
+            {"review_status": "source_changed", "final_translation": ""},
             synchronize_session="fetch",
         )
-
-    # Clear block translated text
-    block.text_translated = None
 
     # Calculate threshold
     total_source_words = sum(
