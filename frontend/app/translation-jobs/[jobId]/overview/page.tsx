@@ -7,6 +7,7 @@ import { API_URL, overviewApi, translationJobsApi } from "../../../services/api"
 import type { OverviewResponse } from "../../../services/api";
 import { getLanguageDisplayName } from "../../../utils/language";
 import { trackEvent } from "../../../utils/analytics";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 type ExportResult = {
   job_id: number;
@@ -62,6 +63,8 @@ export default function OverviewPage() {
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"delete" | "retranslate" | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -111,6 +114,31 @@ export default function OverviewPage() {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleDocAction() {
+    setActionLoading(true);
+    try {
+      if (confirmAction === "delete") {
+        await translationJobsApi.delete(jobId);
+        router.replace("/documents");
+        return;
+      }
+      if (confirmAction === "retranslate") {
+        await translationJobsApi.retranslate(jobId);
+        // Reload the page to show updated status
+        setData(null);
+        setLoading(true);
+        const fresh = await overviewApi.get(jobId);
+        setData(fresh);
+        setLoading(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
     }
   }
 
@@ -370,8 +398,46 @@ export default function OverviewPage() {
           </div>
 
           {error && <p className="text-sm text-status-error">{error}</p>}
+
+          {/* Document controls */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmAction("retranslate")}
+              className="rounded-full px-4 py-2 text-sm font-medium text-brand-muted hover:text-brand-text"
+            >
+              Re-translate
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmAction("delete")}
+              className="rounded-full px-4 py-2 text-sm font-medium text-status-error hover:opacity-80"
+            >
+              Delete translation
+            </button>
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmAction === "retranslate"}
+        title="Re-translate this document?"
+        description="The existing translation will be replaced. This cannot be undone."
+        confirmLabel="Re-translate"
+        onConfirm={() => { void handleDocAction(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={confirmAction === "delete"}
+        title="Delete this translation?"
+        description="This will permanently delete the translation and all associated data. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { void handleDocAction(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={actionLoading}
+        variant="destructive"
+      />
     </div>
   );
 }

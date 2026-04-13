@@ -2485,14 +2485,104 @@ def delete_translation_job(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Soft-delete a translation job. Exported jobs cannot be deleted."""
+    """Hard-delete a translation job and all associated data.
+
+    Cascade deletes: TranslationResult, ProcessingStageJob, JobEvent,
+    SegmentAnnotation (via segment). If the source Document has no other
+    translation jobs, the Document and its blocks/segments are also deleted.
+    """
+    from models import JobEvent
+
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
-    if job.status == JOB_STATUS_EXPORTED:
-        raise HTTPException(status_code=400, detail="Exported jobs cannot be deleted")
-    job.deleted_at = datetime.utcnow()
+
+    document_id = job.document_id
+
+    # Delete translation results
+    db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
+    # Delete processing stage jobs
+    db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
+    # Delete job events
+    db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
+    # Delete the job itself
+    db.delete(job)
+    db.flush()
+
+    # Check if the Document has any remaining jobs
+    remaining_jobs = db.query(TranslationJob.id).filter(
+        TranslationJob.document_id == document_id,
+        TranslationJob.deleted_at.is_(None),
+    ).count()
+
+    if remaining_jobs == 0:
+        # No other jobs reference this document — cascade delete it
+        block_ids = [bid for (bid,) in db.query(DocumentBlock.id).filter(DocumentBlock.document_id == document_id).all()]
+        if block_ids:
+            seg_ids = [sid for (sid,) in db.query(DocumentSegment.id).filter(DocumentSegment.block_id.in_(block_ids)).all()]
+            if seg_ids:
+                db.query(SegmentAnnotation).filter(SegmentAnnotation.segment_id.in_(seg_ids)).delete(synchronize_session=False)
+            db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete(synchronize_session=False)
+            db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete(synchronize_session=False)
+        # Delete any document-level stage jobs
+        db.query(ProcessingStageJob).filter(ProcessingStageJob.document_id == document_id).delete(synchronize_session=False)
+        db.query(Document).filter(Document.id == document_id).delete(synchronize_session=False)
+
     db.commit()
+    logger.info("Hard-deleted translation_job_id=%d (document_id=%d, doc_deleted=%s)", job_id, document_id, remaining_jobs == 0)
+
+
+@router.post("/{job_id}/retranslate", response_model=TranslationJobResponse)
+def retranslate_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Clear all translation data for a job and re-trigger the translation pipeline.
+
+    Deletes all TranslationResult, ProcessingStageJob, and JobEvent records,
+    resets the job status to translation_queued, and dispatches a new Celery task.
+    The source Document and its blocks/segments are preserved.
+    """
+    from models import JobEvent
+
+    job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    # Clear translation output
+    db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
+    db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
+    db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
+
+    # Reset block translated text
+    db.query(DocumentBlock).filter(DocumentBlock.document_id == job.document_id).update(
+        {"text_translated": None}, synchronize_session=False
+    )
+
+    # Reset job state
+    job.status = JOB_STATUS_TRANSLATION_QUEUED
+    job.error_message = None
+    job.progress_completed_segments = 0
+    job.progress_total_segments = None
+    job.progress_started_at = datetime.utcnow()
+    job.last_saved_at = None
+
+    # Re-create pipeline stage jobs
+    for stage_name in [TRANSLATION_STAGE, AMBIGUITY_STAGE, RECONSTRUCTION_STAGE]:
+        db.add(ProcessingStageJob(
+            document_id=job.document_id,
+            translation_job_id=job.id,
+            stage_name=stage_name,
+            status="queued",
+        ))
+
+    db.commit()
+    db.refresh(job)
+    logger.info("Re-translate queued for translation_job_id=%d", job_id)
+    background_tasks.add_task(_run_translation_pipeline, job.id)
+    return job
 
 
 @router.get("/documents/{document_id}/translation-jobs", response_model=list[TranslationJobResponse])

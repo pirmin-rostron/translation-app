@@ -11,6 +11,7 @@ import { queryKeys, translationJobsApi } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { NewTranslationModal } from "../dashboard/NewTranslationModal";
 
 function formatRelativeDate(dateStr: string): string {
@@ -145,6 +146,97 @@ function InlineProjectCell({ jobId, projectId, projectName }: { jobId: number; p
 }
 
 
+// Three-dot actions menu for each row
+function RowActionsMenu({ jobId }: { jobId: number }) {
+  const queryClient = useQueryClient();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"delete" | "retranslate" | null>(null);
+  const [loading, setLoading] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  async function handleConfirm() {
+    setLoading(true);
+    try {
+      if (confirmAction === "delete") {
+        await translationJobsApi.delete(jobId);
+      } else if (confirmAction === "retranslate") {
+        await translationJobsApi.retranslate(jobId);
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+    } catch (err) {
+      console.error(`[${confirmAction}]`, err);
+    } finally {
+      setLoading(false);
+      setConfirmAction(null);
+      setMenuOpen(false);
+    }
+  }
+
+  return (
+    <>
+      <div ref={menuRef} className="relative">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+          className="rounded-full p-1.5 text-brand-subtle opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-brand-bg hover:text-brand-text"
+          aria-label="Actions"
+        >
+          ⋯
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-brand-border bg-brand-surface py-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setConfirmAction("retranslate"); }}
+              className="w-full px-4 py-2 text-left text-sm text-brand-text hover:bg-brand-bg"
+            >
+              Re-translate
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setConfirmAction("delete"); }}
+              className="w-full px-4 py-2 text-left text-sm text-status-error hover:bg-brand-bg"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+      <ConfirmDialog
+        open={confirmAction === "retranslate"}
+        title="Re-translate this document?"
+        description="The existing translation will be replaced. This cannot be undone."
+        confirmLabel="Re-translate"
+        onConfirm={() => { void handleConfirm(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={loading}
+      />
+      <ConfirmDialog
+        open={confirmAction === "delete"}
+        title="Delete this translation?"
+        description="This will permanently delete the translation and all associated data. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { void handleConfirm(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={loading}
+        variant="destructive"
+      />
+    </>
+  );
+}
+
 export default function DocumentsPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -203,8 +295,8 @@ export default function DocumentsPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-brand-border">
-                  {["Document", "Project", "Language", "Due Date", "Uploaded", "Status"].map((col) => (
-                    <th key={col} className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
+                  {["Document", "Project", "Language", "Due Date", "Uploaded", "Status", ""].map((col) => (
+                    <th key={col || "_actions"} className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
                       {col}
                     </th>
                   ))}
@@ -213,7 +305,7 @@ export default function DocumentsPage() {
               <tbody>
                 {jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center">
+                    <td colSpan={7} className="px-5 py-16 text-center">
                       <div className="mx-auto max-w-sm">
                         <div className="mb-3 text-4xl">📄</div>
                         <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
@@ -232,7 +324,7 @@ export default function DocumentsPage() {
                   </tr>
                 ) : (
                   jobs.map((t) => (
-                    <tr key={t.id} className="border-b border-brand-border last:border-0 transition-colors hover:bg-brand-bg">
+                    <tr key={t.id} className="group/row border-b border-brand-border last:border-0 transition-colors hover:bg-brand-bg">
                       <td className="px-5 py-3.5">
                         <Link href={`/translation-jobs/${t.id}/overview`} className="text-sm font-medium text-brand-text no-underline hover:underline">
                           {t.document_name ?? `Document #${t.id}`}
@@ -252,6 +344,9 @@ export default function DocumentsPage() {
                       </td>
                       <td className="px-5 py-3.5">
                         <StatusBadge status={toJobStatus(t.raw_status)} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <RowActionsMenu jobId={t.id} />
                       </td>
                     </tr>
                   ))

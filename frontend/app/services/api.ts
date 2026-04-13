@@ -53,6 +53,7 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
     const payload = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(payload.detail ?? `Request failed (${res.status})`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -225,6 +226,12 @@ export const translationJobsApi = {
 
   retry: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/retry`, { method: "POST" }),
+
+  delete: (jobId: number) =>
+    apiFetch<void>(`${API_URL}/translation-jobs/${jobId}`, { method: "DELETE" }),
+
+  retranslate: <T>(jobId: number) =>
+    apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/retranslate`, { method: "POST" }),
 
   export: <T>(jobId: number, fileType: string, formattingMode: string) =>
     apiFetch<T>(
