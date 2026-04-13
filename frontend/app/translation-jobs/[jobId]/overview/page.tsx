@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../../../stores/authStore";
@@ -133,15 +132,11 @@ export default function OverviewPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-brand-bg">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex h-[50px] items-center border-b border-brand-border bg-brand-surface px-6">
+    <div>
+      {/* Job Context Sub-header */}
+      <header className="flex items-center border-b border-brand-border bg-brand-surface px-6 py-2">
         <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="flex items-center gap-1 text-sm text-brand-muted no-underline hover:text-brand-text">
-            ← <span>Dashboard</span>
-          </Link>
-          <span className="mx-1 text-brand-border">|</span>
-          <span className="max-w-[240px] truncate font-display text-sm font-semibold text-brand-text">
+          <span className="max-w-[240px] truncate font-display font-semibold text-brand-text">
             {data.document_name}
           </span>
           <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">
