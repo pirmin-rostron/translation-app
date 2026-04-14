@@ -462,7 +462,7 @@ export default function ProjectPage() {
                   <div className="flex items-center gap-3 border-b border-brand-border bg-brand-bg px-4 py-3">
                     <button type="button" onClick={() => toggleDocCollapse(group.documentName)} className="flex h-5 w-5 shrink-0 items-center justify-center border-none bg-transparent text-xs text-brand-muted transition-transform" style={{ transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)" }}>▶</button>
                     <span className="text-base">📄</span>
-                    <span className="text-sm font-semibold text-brand-text">{group.documentName}</span>
+                    <Link href={`/documents/${firstJob?.document_id ?? 0}`} className="text-sm font-semibold text-brand-text no-underline hover:underline">{group.documentName}</Link>
                     <span className="text-xs text-brand-muted">{group.jobs.length} {group.jobs.length === 1 ? "translation" : "translations"}</span>
                     <div className="ml-auto flex items-center gap-2">
                       <button type="button" onClick={() => openTranslationModal(projectId)} className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors">+ Add language</button>

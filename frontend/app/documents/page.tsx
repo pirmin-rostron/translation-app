@@ -100,7 +100,7 @@ function DocumentGroup({
           style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
         >▶</button>
         <span className="text-base">📄</span>
-        <span className="text-sm font-semibold text-brand-text">{doc.filename}</span>
+        <Link href={`/documents/${doc.id}`} className="text-sm font-semibold text-brand-text no-underline hover:underline">{doc.filename}</Link>
         <span className="text-xs text-brand-muted">
           {doc.word_count.toLocaleString()} words · {doc.uploaded_at ? formatRelativeDate(doc.uploaded_at) : "—"} · {doc.jobs.length} {doc.jobs.length === 1 ? "translation" : "translations"}
         </span>

@@ -162,6 +162,16 @@ export const documentsApi = {
 
 // --- dashboard types ---
 
+export type DocumentDetail = {
+  id: number;
+  filename: string;
+  file_type: string;
+  source_language: string | null;
+  target_language: string;
+  status: string;
+  created_at: string;
+};
+
 export type TranslationJobListItem = {
   id: number;
   document_id: number;

@@ -1,519 +1,324 @@
 "use client";
 
-import { AppShell } from "../../components/AppShell";
+/**
+ * Document detail page — central hub for a document and all its translations.
+ * Dark identity band + expandable translation cards with quality rings.
+ */
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { getLanguageDisplayName, SOURCE_LANGUAGE_OVERRIDE_OPTIONS } from "../../utils/language";
-
-import { documentsApi, translationJobsApi } from "../../services/api";
 import { useAuthStore } from "../../stores/authStore";
+import { useDashboardStore } from "../../stores/dashboardStore";
+import { documentsApi, overviewApi, translationJobsApi } from "../../services/api";
+import type { DocumentDetail, OverviewResponse } from "../../services/api";
+import { AppShell } from "../../components/AppShell";
+import { StatusBadge, toJobStatus } from "../../components/StatusBadge";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
+import { getLanguageCode, getLanguageDisplayName, getLanguageFlag } from "../../utils/language";
 
-type Document = {
-  id: number;
-  filename: string;
-  file_type: string;
-  source_language: string | null;
-  target_language: string;
-  industry: string | null;
-  domain: string | null;
-  status: string;
-  error_message?: string | null;
-  created_at: string;
-};
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
-type TranslationJob = {
-  id: number;
-  document_id: number;
-  status: string;
-  translation_style?: "natural" | "literal" | null;
-  error_message?: string | null;
-  created_at: string;
-};
-
-type Segment = {
-  id: number;
-  document_id: number;
-  block_id: number | null;
-  segment_index: number;
-  segment_type: string;
-  source_text: string;
-  context_before: string | null;
-  context_after: string | null;
-  heading_path: string | null;
-  created_at: string;
-};
-
-type DocumentBlock = {
-  id: number;
-  document_id: number;
-  block_index: number;
-  block_type: "heading" | "paragraph" | "bullet_item";
-  text_original: string;
-  text_translated: string | null;
-  formatting_json: Record<string, unknown> | null;
-  created_at: string;
-};
-
-type ProcessingStageJob = {
-  id: number;
-  stage_name: string;
-  status: string;
-  error_message: string | null;
-  attempt_count: number;
-};
-
-type DocumentProgress = {
-  document_id: number;
-  stage_label: string;
-  percentage: number;
-  eta_seconds: number | null;
-  is_complete: boolean;
-  is_active: boolean;
-};
-
-type TranslationProgress = {
-  job_id: number;
-  stage_label: string;
-  total_segments: number;
-  completed_segments: number;
-  percentage: number;
-  eta_seconds: number | null;
-  is_complete: boolean;
-};
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString();
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function formatEta(seconds: number | null) {
-  if (seconds == null) return "Calculating…";
-  if (seconds <= 0) return "Almost done";
-  if (seconds < 60) return `~${seconds}s remaining`;
-  const mins = Math.ceil(seconds / 60);
-  return `~${mins}m remaining`;
+function formatRelative(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const ms = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
+
+// ── Quality ring SVG ────────────────────────────────────────────────────────
+
+function QualityRing({ score }: { score: number }) {
+  const r = 27;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  return (
+    <svg width="68" height="68" viewBox="0 0 68 68">
+      <circle cx="34" cy="34" r={r} fill="none" stroke="#E5E0D8" strokeWidth="5" />
+      <circle cx="34" cy="34" r={r} fill="none" stroke="#0D7B6E" strokeWidth="5" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 34 34)" className="transition-all duration-700" />
+      <text x="34" y="38" textAnchor="middle" className="fill-brand-text text-sm font-bold">{score}%</text>
+    </svg>
+  );
+}
+
+function qualityBadge(score: number): { label: string; sub: string; classes: string } {
+  if (score >= 90) return { label: "Excellent", sub: "Above average for this document type", classes: "bg-status-successBg text-status-success" };
+  if (score >= 70) return { label: "Good", sub: "A few blocks may need attention", classes: "bg-status-warningBg text-status-warning" };
+  return { label: "Needs review", sub: "Review recommended before exporting", classes: "bg-status-errorBg text-status-error" };
+}
+
+// ── Translation card ────────────────────────────────────────────────────────
+
+type JobOverview = OverviewResponse;
+
+function TranslationCard({ overview, onRefresh }: { overview: JobOverview; onRefresh: () => void }) {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<"delete" | "retranslate" | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const s = overview.summary;
+  const qb = qualityBadge(s.quality_score);
+  const style = overview.tone_applied ?? "natural";
+  const styleLabel = style.charAt(0).toUpperCase() + style.slice(1);
+  const reviewMode = overview.review_mode ?? "autopilot";
+
+  const primaryHref = overview.status === "in_review" ? `/translation-jobs/${overview.job_id}` : `/translation-jobs/${overview.job_id}/overview`;
+  const primaryLabel = overview.status === "in_review" ? "Open Review →" : overview.status === "exported" ? "Download" : "View";
+  const isPrimaryCta = overview.status === "in_review";
+
+  async function handleConfirm() {
+    setActionLoading(true);
+    try {
+      if (confirmAction === "delete") await translationJobsApi.delete(overview.job_id);
+      else if (confirmAction === "retranslate") await translationJobsApi.retranslate(overview.job_id);
+      onRefresh();
+    } catch (err) { console.error("[card-action]", err); }
+    finally { setActionLoading(false); setConfirmAction(null); }
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+      {/* Header — always visible */}
+      <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-2 px-5 py-3.5 text-left hover:bg-brand-bg transition-colors">
+        <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-xs font-medium text-brand-accent">{getLanguageCode(overview.source_language)} → {getLanguageCode(overview.target_language)}</span>
+        {s.quality_score > 0 && <span className="text-sm font-semibold text-brand-accent">{s.quality_score}%</span>}
+        <span className="text-xs text-brand-muted">{styleLabel}</span>
+        <StatusBadge status={toJobStatus(overview.status)} />
+        <div className="ml-auto flex items-center gap-2">
+          <Link href={primaryHref} onClick={(e) => e.stopPropagation()} className={`no-underline ${isPrimaryCta ? "rounded-full bg-brand-accent px-3 py-1 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors" : "rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors"}`}>{primaryLabel}</Link>
+          <span className="text-xs text-brand-muted transition-transform" style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+        </div>
+      </button>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div className="flex border-t border-brand-border">
+          {/* Left panel */}
+          <div className="flex-1 space-y-4 p-5">
+            <div className="flex items-center gap-4">
+              <QualityRing score={s.quality_score} />
+              <div>
+                <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${qb.classes}`}>{qb.label}</span>
+                <p className="mt-1 text-xs text-brand-subtle">{qb.sub}</p>
+                {s.word_count > 0 && <p className="mt-0.5 text-xs text-brand-subtle">~{(s.word_count / 250).toFixed(1)} hrs saved</p>}
+              </div>
+            </div>
+            <div>
+              <h4 className="mb-2 font-display text-sm font-semibold text-brand-text">Here&apos;s what Helvara did</h4>
+              <div className="space-y-1.5 text-xs text-brand-muted">
+                {s.ambiguity_count > 0 ? <p className="text-status-warning">{s.ambiguity_count} {s.ambiguity_count === 1 ? "ambiguity" : "ambiguities"} flagged</p> : <p>No ambiguities detected</p>}
+                <p>{styleLabel} register maintained</p>
+                {s.glossary_match_count > 0 && <p>{s.glossary_match_count} glossary {s.glossary_match_count === 1 ? "term" : "terms"} applied</p>}
+              </div>
+            </div>
+            <p className="text-xs text-brand-subtle">{s.word_count.toLocaleString()} words · {s.total_blocks} blocks</p>
+            <div className="rounded-lg border border-brand-border px-3 py-2">
+              <p className="text-xs text-brand-muted">{styleLabel} · General · {reviewMode === "autopilot" ? "Autopilot" : "Manual review"}</p>
+            </div>
+          </div>
+
+          {/* Right panel */}
+          <div className="w-64 shrink-0 space-y-4 border-l border-brand-border bg-brand-bg p-5">
+            <div>
+              {overview.status === "exported" && (<>
+                <p className="mb-1 text-2xl">✅</p>
+                <p className="text-sm font-semibold text-brand-text">Translation ready</p>
+                <div className="mt-3 space-y-2">
+                  <Link href={`/translation-jobs/${overview.job_id}/overview`} className="block w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-center text-xs font-medium text-brand-muted no-underline hover:bg-brand-bg transition-colors">Download again</Link>
+                  <Link href={`/translation-jobs/${overview.job_id}`} className="block w-full rounded-full bg-brand-accent px-3 py-1.5 text-center text-xs font-medium text-white no-underline hover:bg-brand-accentHov transition-colors">Review →</Link>
+                </div>
+              </>)}
+              {overview.status === "in_review" && (<>
+                <p className="mb-1 text-2xl">🔍</p>
+                <p className="text-sm font-semibold text-brand-text">Review before export</p>
+                <Link href={`/translation-jobs/${overview.job_id}`} className="mt-3 block w-full rounded-full bg-brand-accent px-3 py-1.5 text-center text-xs font-medium text-white no-underline hover:bg-brand-accentHov transition-colors">Open Review →</Link>
+              </>)}
+              {overview.status !== "exported" && overview.status !== "in_review" && (<>
+                <p className="mb-1 text-2xl">⏳</p>
+                <p className="text-sm font-semibold text-brand-text">In progress</p>
+                <p className="mt-1 text-xs text-brand-muted">Translation is being processed.</p>
+              </>)}
+            </div>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-brand-muted">Translated</span><span className="text-brand-text">{formatDate(overview.created_at)}</span></div>
+            </div>
+            <div className="flex gap-3 border-t border-brand-border pt-3">
+              <button type="button" onClick={() => setConfirmAction("retranslate")} className="text-xs text-brand-muted hover:text-brand-text">Re-translate</button>
+              <button type="button" onClick={() => setConfirmAction("delete")} className="text-xs text-status-error hover:underline">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog open={confirmAction === "retranslate"} title="Re-translate?" description="The existing translation will be replaced." confirmLabel="Re-translate" onConfirm={() => { void handleConfirm(); }} onCancel={() => setConfirmAction(null)} loading={actionLoading} />
+      <ConfirmDialog open={confirmAction === "delete"} title="Delete this translation?" description="The document will be kept." confirmLabel="Delete" onConfirm={() => { void handleConfirm(); }} onCancel={() => setConfirmAction(null)} loading={actionLoading} variant="destructive" />
+    </div>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export default function DocumentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
-  const id = Number(params.id);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
+  const documentId = Number(params.id);
 
-  // Admin-only page — redirect everyone until is_admin is exposed in AuthUser.
-  // The page remains in the codebase for future internal use.
-  useEffect(() => {
-    router.replace("/dashboard");
-  }, [router]);
-
-  if (!token) return null;
-  const [doc, setDoc] = useState<Document | null>(null);
-  const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
-  const [segments, setSegments] = useState<Segment[]>([]);
-  const [jobs, setJobs] = useState<TranslationJob[]>([]);
-  const [docStages, setDocStages] = useState<ProcessingStageJob[]>([]);
-  const [docProgress, setDocProgress] = useState<DocumentProgress | null>(null);
-  const [translationProgress, setTranslationProgress] = useState<TranslationProgress | null>(null);
+  const [doc, setDoc] = useState<DocumentDetail | null>(null);
+  const [overviews, setOverviews] = useState<JobOverview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [editingSourceLanguage, setEditingSourceLanguage] = useState(false);
-  const [sourceLanguageEdit, setSourceLanguageEdit] = useState("");
-  const [sourceLanguageSuccess, setSourceLanguageSuccess] = useState("");
-  const [translationStyle, setTranslationStyle] = useState<"natural" | "literal">("natural");
-
-  const fetchDoc = () => {
-    documentsApi.getById<Document>(id)
-      .then(setDoc)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load"));
-  };
-
-  const fetchSegments = () => {
-    documentsApi.getSegments<Segment[]>(id)
-      .then(setSegments)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load segments"));
-  };
-
-  const fetchBlocks = () => {
-    documentsApi.getBlocks<DocumentBlock[]>(id)
-      .then(setBlocks)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load blocks"));
-  };
-
-  const fetchJobs = () => {
-    documentsApi.getTranslationJobs<TranslationJob[]>(id)
-      .then(setJobs)
-      .catch(() => setJobs([]));
-  };
-
-  const fetchDocStages = () => {
-    documentsApi.getStages<ProcessingStageJob[]>(id)
-      .then(setDocStages)
-      .catch(() => setDocStages([]));
-  };
-
-  const fetchDocProgress = () => {
-    documentsApi.getProgress<DocumentProgress>(id)
-      .then(setDocProgress)
-      .catch(() => setDocProgress(null));
-  };
-
-  const fetchTranslationProgress = (jobId: number) => {
-    translationJobsApi.getProgress<TranslationProgress>(jobId)
-      .then(setTranslationProgress)
-      .catch(() => setTranslationProgress(null));
-  };
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (Number.isNaN(id)) {
-      setError("Invalid document ID");
-      setLoading(false);
-      return;
-    }
-    Promise.all([
-      documentsApi.getById<Document>(id),
-      documentsApi.getBlocks<DocumentBlock[]>(id).catch(() => [] as DocumentBlock[]),
-      documentsApi.getSegments<Segment[]>(id).catch(() => [] as Segment[]),
-      documentsApi.getTranslationJobs<TranslationJob[]>(id).catch(() => [] as TranslationJob[]),
-      documentsApi.getStages<ProcessingStageJob[]>(id).catch(() => [] as ProcessingStageJob[]),
-      documentsApi.getProgress<DocumentProgress>(id).catch(() => null),
-    ])
-      .then(([d, b, s, j, ds, dp]) => {
+    if (hasHydrated && !token) router.replace("/login");
+  }, [hasHydrated, token, router]);
+
+  function loadPage() {
+    if (!token || Number.isNaN(documentId)) return;
+    setLoading(true);
+    documentsApi.getById<DocumentDetail>(documentId)
+      .then(async (d) => {
         setDoc(d);
-        setBlocks(b);
-        setSegments(s);
-        setJobs(j);
-        setDocStages(ds);
-        setDocProgress(dp);
-        if (j.length > 0) {
-          fetchTranslationProgress(j[0].id);
-        }
+        type JobListItem = { id: number; status: string };
+        const jobs = await documentsApi.getTranslationJobs<JobListItem[]>(documentId);
+        const activeJobs = jobs.filter((j) => !["queued", "parsing"].includes(j.status));
+        const ovs = await Promise.all(
+          activeJobs.map((j) => overviewApi.get(j.id).catch(() => null))
+        );
+        setOverviews(ovs.filter((o): o is JobOverview => o !== null));
       })
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load document"))
       .finally(() => setLoading(false));
-  }, [id]);
+  }
 
-  useEffect(() => {
-    if (!doc) return;
-    const activeStage = docStages.find((stage) => stage.status === "queued" || stage.status === "running");
-    const activeJob = jobs.find((job) => job.status === "translation_queued" || job.status === "translating");
-    if (!activeStage && !activeJob) return;
-    const timer = window.setInterval(() => {
-      fetchDoc();
-      fetchBlocks();
-      fetchSegments();
-      fetchJobs();
-      fetchDocStages();
-      fetchDocProgress();
-      if (jobs.length > 0) {
-        fetchTranslationProgress(jobs[0].id);
-      }
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [doc, docStages, jobs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadPage(); }, [documentId, token]);
 
-  const handleCreateJob = async () => {
-    setError("");
-    try {
-      const job = await documentsApi.createTranslationJob<TranslationJob>(id, translationStyle);
-      fetchJobs();
-      window.location.href = `/translation-jobs/${job.id}`;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create job");
-    }
-  };
+  async function handleDeleteDocument() {
+    setDeleting(true);
+    try { await documentsApi.delete(documentId); router.replace("/documents"); }
+    catch (err) { console.error("[delete-doc]", err); }
+    finally { setDeleting(false); setDeleteConfirmOpen(false); }
+  }
 
-  const handleSaveSourceLanguage = async () => {
-    setError("");
-    setSourceLanguageSuccess("");
-    try {
-      const updated = await documentsApi.updateSourceLanguage<Document>(id, sourceLanguageEdit);
-      setDoc(updated);
-      setEditingSourceLanguage(false);
-      setSourceLanguageSuccess("Source language updated.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
-    }
-  };
+  if (!hasHydrated || !token) return null;
+  if (loading) return <AppShell><div className="px-8 py-10 text-brand-muted">Loading…</div></AppShell>;
+  if (error || !doc) return <AppShell><div className="px-8 py-10 text-status-error">{error || "Document not found"}</div></AppShell>;
 
-  const handleParse = async () => {
-    setError("");
-    setDoc((prev) => (prev ? { ...prev, status: "parsing", error_message: null } : prev));
-    try {
-      const updated = await documentsApi.parse<Document>(id);
-      setDoc(updated);
-      fetchBlocks();
-      fetchSegments();
-      fetchDocStages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Parse failed");
-    }
-  };
-
-  const handleRetryDoc = async () => {
-    setError("");
-    try {
-      const updated = await documentsApi.retry<Document>(id);
-      setDoc(updated);
-      fetchDocStages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Retry failed");
-    }
-  };
-
-  if (loading) return <div className="min-h-screen bg-brand-bg p-6">Loading…</div>;
-  if (error && !doc) return <div className="min-h-screen bg-brand-bg p-6 text-status-error">{error}</div>;
-  if (!doc) return null;
-  const latestDocStage = docStages[docStages.length - 1];
-  const latestJob = jobs[0];
-  const parseFailed = doc.status === "parse_failed";
-  const showActiveParsing = doc.status === "parsing" && Boolean(docProgress?.is_active);
+  const hasJobs = overviews.length > 0;
+  const inReviewCount = overviews.filter((o) => o.status === "in_review").length;
+  const exportedCount = overviews.filter((o) => o.status === "exported").length;
+  const totalWords = overviews.reduce((sum, o) => sum + (o.summary.word_count || 0), 0);
 
   return (
     <AppShell>
-      <div className="px-8 py-8">
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <Link
-          href="/dashboard"
-          className="text-sm text-brand-muted hover:text-brand-text mb-6 inline-block"
-        >
-          ← Back to documents
-        </Link>
-        <h1 className="text-2xl font-bold text-brand-text mb-6">{doc.filename}</h1>
-
-        <div className="bg-brand-surface rounded-xl border border-brand-border p-6  mb-8">
-          <h2 className="text-lg font-semibold text-brand-text mb-4">Metadata</h2>
-          <dl className="grid grid-cols-2 gap-4 text-sm">
+      {/* Dark identity band */}
+      <div className="bg-brand-text px-8 py-8">
+        <div className="mx-auto max-w-[1100px]">
+          <p className="mb-3 text-xs text-white/50">
+            <Link href="/documents" className="text-white/60 no-underline hover:text-white/80">Documents</Link>
+            {" › "}<span className="text-white/40">{doc.filename}</span>
+          </p>
+          <div className="flex items-start justify-between">
             <div>
-              <dt className="text-brand-subtle">Type</dt>
-              <dd className="font-medium">{doc.file_type}</dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Source</dt>
-              <dd className="font-medium flex items-center gap-2">
-                {editingSourceLanguage ? (
-                  <>
-                    <select
-                      value={sourceLanguageEdit}
-                      onChange={(e) => setSourceLanguageEdit(e.target.value)}
-                      className="rounded border border-brand-border px-2 py-1 text-sm bg-brand-surface"
-                    >
-                      {SOURCE_LANGUAGE_OVERRIDE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleSaveSourceLanguage}
-                      className="text-xs px-2 py-1 bg-brand-accent text-white rounded hover:bg-brand-accentHov"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingSourceLanguage(false);
-                        setSourceLanguageEdit("");
-                      }}
-                      className="text-xs px-2 py-1 border border-brand-border rounded hover:bg-brand-bg"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {getLanguageDisplayName(doc.source_language)}
-                    <button
-                      onClick={() => {
-                        const current = doc.source_language?.toLowerCase();
-                        const match = SOURCE_LANGUAGE_OVERRIDE_OPTIONS.find((o) => o.value === current);
-                        setSourceLanguageEdit(match ? match.value : "en");
-                        setEditingSourceLanguage(true);
-                      }}
-                      className="text-xs text-brand-subtle hover:text-brand-text underline"
-                    >
-                      Edit
-                    </button>
-                  </>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Target</dt>
-              <dd className="font-medium">{getLanguageDisplayName(doc.target_language)}</dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Industry</dt>
-              <dd className="font-medium">{doc.industry ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Domain</dt>
-              <dd className="font-medium">{doc.domain ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Document status</dt>
-              <dd>
-                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-brand-bg text-brand-text">
-                  {doc.status}
-                </span>
-                {doc.error_message && <p className="mt-1 text-xs text-status-error">{doc.error_message}</p>}
-                {latestDocStage && (
-                  <p className="mt-1 text-xs text-brand-subtle">
-                    Stage: {latestDocStage.stage_name} ({latestDocStage.status})
-                  </p>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Translation lifecycle</dt>
-              <dd>
-                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-brand-bg text-brand-text">
-                  {latestJob?.status ?? "no_translation_job"}
-                </span>
-                {latestJob?.error_message && <p className="mt-1 text-xs text-status-error">{latestJob.error_message}</p>}
-                {latestJob && (
-                  <p className="mt-1 text-xs text-brand-subtle">
-                    Style: {latestJob.translation_style === "literal" ? "Literal" : "Natural"}
-                  </p>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-brand-subtle">Created</dt>
-              <dd className="font-medium">{formatDate(doc.created_at)}</dd>
-            </div>
-          </dl>
-          {showActiveParsing && docProgress && (
-            <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
-              <p className="text-sm font-medium text-indigo-900">Parsing document…</p>
-              <p className="mt-1 text-sm text-brand-text">{docProgress.stage_label}</p>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-                <div
-                  className="h-full rounded-full bg-indigo-500 transition-all"
-                  style={{ width: `${Math.max(0, Math.min(100, docProgress.percentage))}%` }}
-                />
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📄</span>
+                <h1 className="font-display text-2xl font-bold text-white">{doc.filename}</h1>
               </div>
-              <p className="mt-2 text-xs text-brand-muted">
-                {docProgress.percentage.toFixed(0)}% • {formatEta(docProgress.eta_seconds)}
-              </p>
-            </div>
-          )}
-          {translationProgress && !translationProgress.is_complete && (
-            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-              <p className="text-sm font-medium text-emerald-900">Translating document…</p>
-              <p className="mt-1 text-sm text-brand-text">{translationProgress.stage_label}</p>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${Math.max(0, Math.min(100, translationProgress.percentage))}%` }}
-                />
+              <div className="mt-2 flex items-center gap-3 text-xs text-white/50">
+                {totalWords > 0 && <span>{totalWords.toLocaleString()} words</span>}
+                <span>{getLanguageFlag(doc.source_language)} {getLanguageDisplayName(doc.source_language)}</span>
+                <span>Uploaded {formatRelative(doc.created_at)}</span>
+                <span>{overviews.length} {overviews.length === 1 ? "translation" : "translations"}</span>
               </div>
-              <p className="mt-2 text-xs text-brand-muted">
-                {translationProgress.percentage.toFixed(0)}% • {translationProgress.completed_segments}/
-                {translationProgress.total_segments} segments • {formatEta(translationProgress.eta_seconds)}
-              </p>
             </div>
-          )}
-          <div className="mt-4 flex flex-wrap gap-3">
-            {doc.status === "parsed" && segments.length > 0 && (
-              <div className="w-full rounded-xl border border-brand-border bg-brand-bg p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">Translation style</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text">
-                    <input
-                      type="radio"
-                      name="translation-style"
-                      value="natural"
-                      checked={translationStyle === "natural"}
-                      onChange={() => setTranslationStyle("natural")}
-                    />
-                    <span>Natural (recommended)</span>
-                  </label>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text">
-                    <input
-                      type="radio"
-                      name="translation-style"
-                      value="literal"
-                      checked={translationStyle === "literal"}
-                      onChange={() => setTranslationStyle("literal")}
-                    />
-                    <span>Literal / precise</span>
-                  </label>
-                </div>
-              </div>
-            )}
-            {(doc.status === "uploaded" || parseFailed) && (
-              <button
-                onClick={parseFailed ? handleRetryDoc : handleParse}
-                className="px-4 py-2 bg-brand-accent text-white rounded-full font-medium hover:bg-brand-accentHov"
-              >
-                {parseFailed ? "Retry document processing" : "Parse document"}
-              </button>
-            )}
-            {doc.status === "parsed" && segments.length > 0 && (
-              <button
-                onClick={handleCreateJob}
-                className="px-4 py-2 bg-brand-accent text-white rounded-full font-medium hover:bg-brand-accentHov"
-              >
-                Create Translation Job
-              </button>
-            )}
-            {jobs.length > 0 && (
-              <Link
-                href={`/translation-jobs/${jobs[0].id}`}
-                className="px-4 py-2 border border-brand-border text-brand-text rounded-full font-medium hover:bg-brand-bg inline-block"
-              >
-                View translation results
-              </Link>
-            )}
-            {latestJob?.error_message && <p className="text-status-error text-sm w-full">{latestJob.error_message}</p>}
-            {error && <p className="text-status-error text-sm w-full">{error}</p>}
-            {sourceLanguageSuccess && <p className="text-green-600 text-sm w-full">{sourceLanguageSuccess}</p>}
+            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:border-white/40 transition-colors">Delete document</button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-brand-surface rounded-xl border border-brand-border p-6 ">
-          <h2 className="text-lg font-semibold text-brand-text mb-4">Parsed blocks</h2>
-          {blocks.length === 0 && (doc.status === "uploaded" || parseFailed) && (
-            <p className="text-brand-muted">
-              Parse the document to view headings, paragraphs, and bullet items.
-            </p>
-          )}
-          {blocks.length === 0 && doc.status === "parsed" && (
-            <p className="text-brand-muted">No parsed blocks (document may be empty).</p>
-          )}
-          {doc.status === "parsed" && segments.length > 0 && (
-            <p className="mb-3 text-sm text-emerald-700">
-              Parsed successfully: {segments.length} segments ready for translation.
-            </p>
-          )}
-          {blocks.length > 0 && (
-            <ol className="space-y-4">
-              {blocks.map((block) => (
-                <li
-                  key={block.id}
-                  className="border-l-2 border-brand-border pl-4 py-2"
-                >
-                  <span className="text-xs text-brand-subtle font-mono">
-                    Block {block.block_index + 1} ({block.block_type})
-                  </span>
-                  {block.block_type === "heading" ? (
-                    <h3 className="mt-1 text-lg font-semibold text-brand-text">{block.text_original}</h3>
-                  ) : block.block_type === "bullet_item" ? (
-                    <div className="mt-1 flex gap-3 text-brand-text">
-                      <span className="text-brand-subtle">{String(block.formatting_json?.marker ?? "\u2022")}</span>
-                      <p>{block.text_original}</p>
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-brand-text">{block.text_original}</p>
-                  )}
-                </li>
-              ))}
-            </ol>
+      <div className="mx-auto flex max-w-[1100px] gap-6 px-8 py-8">
+        {/* Main content */}
+        <div className="min-w-0 flex-1 space-y-6">
+          {hasJobs ? (<>
+            {/* Stat strip */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+                <p className="text-xs font-medium text-brand-muted">Translations</p>
+                <p className="mt-1 font-display text-2xl font-bold text-brand-text">{overviews.length}</p>
+              </div>
+              <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+                <p className="text-xs font-medium text-brand-muted">In Review</p>
+                <p className={`mt-1 font-display text-2xl font-bold ${inReviewCount > 0 ? "text-brand-accent" : "text-brand-subtle"}`}>{inReviewCount}</p>
+              </div>
+              <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+                <p className="text-xs font-medium text-brand-muted">Exported</p>
+                <p className={`mt-1 font-display text-2xl font-bold ${exportedCount > 0 ? "text-status-success" : "text-brand-subtle"}`}>{exportedCount}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <h2 className="font-display text-lg font-bold text-brand-text">Translations</h2>
+              <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+            </div>
+            <div className="space-y-4">
+              {overviews.map((ov) => <TranslationCard key={ov.job_id} overview={ov} onRefresh={loadPage} />)}
+            </div>
+          </>) : (
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <h2 className="font-display text-lg font-bold text-brand-text">Translate this document</h2>
+                <div className="h-0.5 w-8 rounded-sm bg-brand-accent" />
+              </div>
+              <p className="mb-6 text-sm text-brand-muted">No translations yet. Choose a target language to get started.</p>
+              <button type="button" onClick={() => openTranslationModal()} className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors">+ New Translation</button>
+            </div>
           )}
         </div>
-      </main>
-    </div>
+
+        {/* Right rail */}
+        <div className="hidden w-64 shrink-0 lg:block">
+          <div className="sticky top-24 space-y-4">
+            <h3 className="font-display text-sm font-semibold text-brand-text">{doc.filename}</h3>
+            <div className="space-y-2 rounded-xl border border-brand-border bg-brand-surface p-4 text-xs">
+              <div className="flex justify-between"><span className="text-brand-muted">Words</span><span className="text-brand-text">{totalWords > 0 ? totalWords.toLocaleString() : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-brand-muted">Source</span><span className="text-brand-text">{getLanguageDisplayName(doc.source_language)}</span></div>
+              <div className="flex justify-between"><span className="text-brand-muted">Type</span><span className="text-brand-text">{doc.file_type.toUpperCase()}</span></div>
+              <div className="flex justify-between"><span className="text-brand-muted">Uploaded</span><span className="text-brand-text">{formatDate(doc.created_at)}</span></div>
+            </div>
+            {overviews.length > 0 && (
+              <div className="space-y-2 rounded-xl border border-brand-border bg-brand-surface p-4 text-xs">
+                <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-subtle">Translations</p>
+                {overviews.map((ov) => (
+                  <div key={ov.job_id} className="flex items-center justify-between">
+                    <span className="text-brand-text">{getLanguageFlag(ov.target_language)} {getLanguageDisplayName(ov.target_language)}</span>
+                    <StatusBadge status={toJobStatus(ov.status)} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="w-full text-xs text-status-error hover:underline">Delete document</button>
+          </div>
+        </div>
+      </div>
+
+      <NewTranslationModal projects={[]} />
+      <ConfirmDialog open={deleteConfirmOpen} title="Delete this document permanently?" description="This will remove the uploaded file and all translations. This cannot be undone." confirmLabel="Delete" onConfirm={() => { void handleDeleteDocument(); }} onCancel={() => setDeleteConfirmOpen(false)} loading={deleting} variant="destructive" />
     </AppShell>
   );
 }
