@@ -299,13 +299,41 @@ function mapJobToTranslation(j: TranslationJobListItem): DashboardTranslation {
   };
 }
 
+export type PaginatedTranslations = {
+  translations: DashboardTranslation[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export function useDashboardTranslations(hasProcessingJobs = false) {
-  return useQuery<DashboardTranslation[]>({
+  return useQuery<PaginatedTranslations>({
     queryKey: queryKeys.translationJobs.recent(),
     queryFn: async () => {
-      const jobs = await translationJobsApi.listRecent(10);
-      if (jobs.length === 0) return [];
-      return jobs.map(mapJobToTranslation);
+      const resp = await translationJobsApi.listRecent(10);
+      return {
+        translations: resp.jobs.map(mapJobToTranslation),
+        total: resp.total,
+        page: resp.page,
+        pageSize: resp.page_size,
+      };
+    },
+    staleTime: hasProcessingJobs ? 2_000 : 30_000,
+    refetchInterval: hasProcessingJobs ? 3_000 : false,
+  });
+}
+
+export function usePaginatedTranslations(page: number, pageSize = 10, hasProcessingJobs = false) {
+  return useQuery<PaginatedTranslations>({
+    queryKey: [...queryKeys.translationJobs.recent(), "page", page, pageSize],
+    queryFn: async () => {
+      const resp = await translationJobsApi.listPaginated(page, pageSize);
+      return {
+        translations: resp.jobs.map(mapJobToTranslation),
+        total: resp.total,
+        page: resp.page,
+        pageSize: resp.page_size,
+      };
     },
     staleTime: hasProcessingJobs ? 2_000 : 30_000,
     refetchInterval: hasProcessingJobs ? 3_000 : false,

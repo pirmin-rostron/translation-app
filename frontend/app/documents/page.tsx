@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useDashboardTranslations, useOrgStats, useProjects } from "../hooks/queries";
+import { usePaginatedTranslations, useOrgStats, useProjects } from "../hooks/queries";
 import { queryKeys, translationJobsApi, documentsApi } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
@@ -147,7 +147,7 @@ function InlineProjectCell({ jobId, projectId, projectName }: { jobId: number; p
 
 
 // Three-dot actions menu for each row — separate delete translation vs delete document
-function RowActionsMenu({ jobId, documentId }: { jobId: number; documentId: number }) {
+function RowActionsMenu({ jobId, documentId, onToast }: { jobId: number; documentId: number; onToast: (msg: string) => void }) {
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"delete_translation" | "delete_document" | "retranslate" | null>(null);
@@ -171,10 +171,13 @@ function RowActionsMenu({ jobId, documentId }: { jobId: number; documentId: numb
     try {
       if (confirmAction === "delete_translation") {
         await translationJobsApi.delete(jobId);
+        onToast("Translation deleted");
       } else if (confirmAction === "delete_document") {
         await documentsApi.delete(documentId);
+        onToast("Document deleted");
       } else if (confirmAction === "retranslate") {
         await translationJobsApi.retranslate(jobId);
+        onToast("Re-translation queued");
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
     } catch (err) {
@@ -255,12 +258,30 @@ function RowActionsMenu({ jobId, documentId }: { jobId: number; documentId: numb
   );
 }
 
+// Simple toast component for action feedback
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 2500);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-text shadow-lg">
+      {message}
+    </div>
+  );
+}
+
 export default function DocumentsPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
-  const { data: translations, isLoading } = useDashboardTranslations();
+
+  const [page, setPage] = useState(1);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const { data: translationsData, isLoading } = usePaginatedTranslations(page, 10);
   const { data: orgStats } = useOrgStats();
 
   useEffect(() => {
@@ -269,8 +290,9 @@ export default function DocumentsPage() {
 
   if (!hasHydrated || !token) return null;
 
-  const jobs = translations ?? [];
-  const totalDocs = jobs.length;
+  const jobs = translationsData?.translations ?? [];
+  const totalDocs = translationsData?.total ?? 0;
+  const totalPages = Math.ceil(totalDocs / 10) || 1;
   const inReviewCount = jobs.filter((t) => t.raw_status === "in_review" || t.raw_status === "review").length;
   const completedCount = jobs.filter((t) => t.raw_status === "exported" || t.raw_status === "completed" || t.raw_status === "ready_for_export" || t.raw_status === "review_complete").length;
 
@@ -308,7 +330,7 @@ export default function DocumentsPage() {
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
         {/* Table — headers always visible */}
-        {!isLoading && (
+        {!isLoading && (<>
           <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
             <table className="w-full border-collapse">
               <thead>
@@ -364,7 +386,7 @@ export default function DocumentsPage() {
                         <StatusBadge status={toJobStatus(t.raw_status)} />
                       </td>
                       <td className="px-5 py-3.5">
-                        <RowActionsMenu jobId={t.id} documentId={t.document_id} />
+                        <RowActionsMenu jobId={t.id} documentId={t.document_id} onToast={setToastMessage} />
                       </td>
                     </tr>
                   ))
@@ -372,9 +394,35 @@ export default function DocumentsPage() {
               </tbody>
             </table>
           </div>
-        )}
+
+          {/* Pagination controls */}
+          {totalDocs > 10 && (
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-brand-muted">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>)}
       </div>
       <NewTranslationModal projects={[]} />
+      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
     </AppShell>
   );
 }

@@ -179,6 +179,13 @@ export type TranslationJobListItem = {
   quality_score: number | null;
 };
 
+export type PaginatedJobsResponse = {
+  jobs: TranslationJobListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 export type UpcomingItem = {
   type: "job" | "project";
   id: number;
@@ -205,10 +212,15 @@ export type ProjectListItem = {
 
 export const translationJobsApi = {
   listRecent: (limit = 10) =>
-    apiFetch<TranslationJobListItem[]>(`${API_URL}/translation-jobs?limit=${limit}&order=desc`),
+    apiFetch<PaginatedJobsResponse>(`${API_URL}/translation-jobs?limit=${limit}&order=desc`),
 
-  listByProject: (projectId: number, limit = 50) =>
-    apiFetch<TranslationJobListItem[]>(`${API_URL}/translation-jobs?project_id=${projectId}&limit=${limit}&order=desc`),
+  listPaginated: (page = 1, pageSize = 10) =>
+    apiFetch<PaginatedJobsResponse>(`${API_URL}/translation-jobs?page=${page}&page_size=${pageSize}&order=desc`),
+
+  listByProject: async (projectId: number, limit = 50): Promise<TranslationJobListItem[]> => {
+    const resp = await apiFetch<PaginatedJobsResponse>(`${API_URL}/translation-jobs?project_id=${projectId}&limit=${limit}&order=desc`);
+    return resp.jobs;
+  },
 
   getById: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}`),

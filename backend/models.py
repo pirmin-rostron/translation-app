@@ -13,6 +13,8 @@ class Organisation(Base):
     tier = Column(String(20), nullable=False, default="free")
     jobs_this_month = Column(Integer, nullable=False, default=0)
     billing_period_start = Column(Date, nullable=False, default=date.today)
+    words_translated_lifetime = Column(Integer, nullable=False, default=0)
+    jobs_completed_lifetime = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 

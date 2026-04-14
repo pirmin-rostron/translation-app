@@ -1484,6 +1484,15 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 
     job.status = JOB_STATUS_IN_REVIEW
     job.error_message = None
+    # Increment org lifetime stats
+    if job.org_id:
+        org = db.query(Organisation).filter(Organisation.id == job.org_id).first()
+        if org:
+            # Count words from segments
+            _segs = db.query(DocumentSegment).filter(DocumentSegment.document_id == job.document_id).all()
+            word_count = sum(len((s.source_text or "").split()) for s in _segs)
+            org.words_translated_lifetime = (org.words_translated_lifetime or 0) + word_count
+            org.jobs_completed_lifetime = (org.jobs_completed_lifetime or 0) + 1
     db.commit()
 
     # Auto-extract glossary suggestions in the background (fire and forget)
@@ -2681,20 +2690,21 @@ def list_document_translation_jobs(
     return jobs
 
 
-@router.get("", response_model=list[TranslationJobResponse])
-@router.get("/", response_model=list[TranslationJobResponse])
+@router.get("")
+@router.get("/")
 def list_translation_jobs(
     limit: int = Query(default=10, ge=1, le=50),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
     project_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """List translation jobs for the current organisation.
+    """List translation jobs for the current organisation (paginated).
 
-    Returns jobs ordered by created_at in the requested direction, capped at
-    `limit` (max 50). Scoped to the authenticated user's organisation.
-    Optionally filter by project_id (matches via document.project_id).
+    Returns jobs ordered by created_at with total count for pagination.
+    Supports both legacy `limit` param and new `page`/`page_size` params.
     """
     order_col = TranslationJob.created_at.desc() if order == "desc" else TranslationJob.created_at.asc()
     query = db.query(TranslationJob).filter(
@@ -2710,7 +2720,10 @@ def list_translation_jobs(
             ).all()
         ]
         query = query.filter(TranslationJob.document_id.in_(project_doc_ids))
-    jobs = query.order_by(order_col).limit(limit).all()
+    total: int = query.count()
+    offset = (page - 1) * page_size
+    effective_limit = min(limit, page_size)
+    jobs = query.order_by(order_col).offset(offset).limit(effective_limit).all()
     doc_ids = [j.document_id for j in jobs]
     docs = (
         {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
@@ -2767,7 +2780,7 @@ def list_translation_jobs(
                 }
             )
         )
-    return result
+    return {"jobs": result, "total": total, "page": page, "page_size": page_size}
 
 
 # ---------------------------------------------------------------------------

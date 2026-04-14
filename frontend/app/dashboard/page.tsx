@@ -144,21 +144,23 @@ export default function DashboardPage() {
 
   // Server state via React Query — poll faster when jobs are processing
   const [hasProcessingJobs, setHasProcessingJobs] = useState(false);
-  const { data: translations } = useDashboardTranslations(hasProcessingJobs);
+  const { data: translationsData } = useDashboardTranslations(hasProcessingJobs);
   const { data: tierData } = useTier();
   const { data: projectList } = useProjects();
   const { data: orgStats } = useOrgStats();
   const { data: upcomingItems } = useUpcomingDeadlines();
 
+  const translations = translationsData?.translations ?? [];
+
   useEffect(() => {
-    const processing = (translations ?? []).some((t) => isProcessing(t.raw_status));
+    const processing = translations.some((t) => isProcessing(t.raw_status));
     setHasProcessingJobs(processing);
   }, [translations]);
 
   // Compute real stats from fetched data
-  const totalDocuments = (translations ?? []).length;
+  const totalDocuments = translationsData?.total ?? translations.length;
   const activeProjectCount = projectList?.length ?? 0;
-  const pendingReviewCount = (translations ?? []).filter(
+  const pendingReviewCount = translations.filter(
     (t) => t.raw_status === "in_review" || t.raw_status === "review"
   ).length;
 
@@ -166,7 +168,7 @@ export default function DashboardPage() {
   if (!token) return null;
 
   const firstName = getFirstName(user?.full_name, user?.email ?? "");
-  const displayTranslations = translations ?? [];
+  const displayTranslations = translations;
   const isNewUser = totalDocuments === 0 && activeProjectCount === 0;
 
   // ── New user dashboard ──────────────────────────────────────────────────
