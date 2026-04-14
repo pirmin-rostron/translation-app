@@ -25,7 +25,7 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (res.status === 401 && typeof window !== "undefined") {
     trackEvent("api.error_401", { path: url });
-    const authPaths = ["/login", "/register", "/preview", "/"];
+    const authPaths = ["/login", "/register", "/"];
     if (!authPaths.some((p) => window.location.pathname.startsWith(p))) {
       // Debounce: wait 100ms then check if token is still present before clearing.
       // This prevents a single transient 401 (race condition on page refresh,
