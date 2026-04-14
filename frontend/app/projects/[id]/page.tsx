@@ -10,10 +10,10 @@ import { AppShell } from "../../components/AppShell";
 import { PageHeader } from "../../components/PageHeader";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
 import { useDashboardStore } from "../../stores/dashboardStore";
-import { projectsApi, translationJobsApi } from "../../services/api";
+import { projectsApi, translationJobsApi, documentsApi } from "../../services/api";
 import type { ProjectDetailResponse, ProjectStatsResponse, TranslationJobListItem } from "../../services/api";
 import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { ModalOverlay } from "../../dashboard/ModalOverlay";
@@ -256,6 +256,39 @@ export default function ProjectPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [collapsedDocs, setCollapsedDocs] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [docDeleteTarget, setDocDeleteTarget] = useState<number | null>(null);
+  const [docDeleteLoading, setDocDeleteLoading] = useState(false);
+
+  function reloadProjectData() {
+    if (!token || Number.isNaN(projectId)) return;
+    Promise.all([
+      projectsApi.get(projectId),
+      translationJobsApi.listByProject(projectId),
+      projectsApi.stats(projectId),
+    ])
+      .then(([proj, jobList, s]) => { setProject(proj); setJobs(jobList); setStats(s); })
+      .catch(() => {});
+  }
+
+  function toggleDocCollapse(docName: string) {
+    setCollapsedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(docName)) next.delete(docName); else next.add(docName);
+      return next;
+    });
+  }
+
+  async function handleDeleteDocument(docId: number) {
+    setDocDeleteLoading(true);
+    try {
+      await documentsApi.delete(docId);
+      setToastMessage("Document deleted");
+      reloadProjectData();
+    } catch (err) { console.error("[delete-doc]", err); }
+    finally { setDocDeleteLoading(false); setDocDeleteTarget(null); }
+  }
 
   async function handleDeleteProject() {
     setDeleting(true);
@@ -272,6 +305,13 @@ export default function ProjectPage() {
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
   }, [hasHydrated, token, router]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toastMessage) return;
+    const t = setTimeout(() => setToastMessage(null), 2500);
+    return () => clearTimeout(t);
+  }, [toastMessage]);
 
   useEffect(() => {
     if (!token || Number.isNaN(projectId)) return;
@@ -427,57 +467,60 @@ export default function ProjectPage() {
                   </td>
                 </tr>
               ) : (
-                docGroups.map((group, gi) =>
-                  group.jobs.map((job, ji) => {
-                    const label = statusLabel(job.status);
-                    const isProc = PROCESSING_STATUSES.has(job.status);
-                    const isFirstInGroup = ji === 0;
-                    const rowCount = group.jobs.length;
-                    const isMultiLang = rowCount > 1;
-                    const groupBorder = gi > 0 && isFirstInGroup ? "border-t-2 border-brand-border" : "";
-
-                    return (
-                      <tr
-                        key={job.id}
-                        className={`${groupBorder} ${
-                          isProc
-                            ? "cursor-not-allowed opacity-60"
-                            : "cursor-pointer transition-colors hover:bg-brand-bg"
-                        } ${!isFirstInGroup ? "border-t border-brand-border" : ""}`}
-                        onClick={() => {
-                          if (!isProc) router.push(`/translation-jobs/${job.id}/overview`);
-                        }}
-                      >
-                        {/* Document name cell — rowspan for multi-language */}
-                        {isFirstInGroup && (
-                          <td
-                            rowSpan={rowCount}
-                            className={`align-middle px-4 py-3.5 text-sm font-medium text-brand-text ${
-                              isMultiLang ? "border-r-2 border-brand-accentMid" : ""
-                            } ${groupBorder}`}
-                          >
-                            {group.documentName}
-                          </td>
-                        )}
-                        <td className="px-4 py-3.5 text-[0.8125rem] text-brand-muted">
-                          {getLanguageFlag(job.source_language)} → {getLanguageFlag(job.target_language)}{" "}
-                          {getLanguageDisplayName(job.target_language)}
-                        </td>
-                        <td className="px-4 py-3.5 text-[0.8125rem] text-brand-muted">
-                          {job.progress_total_segments ?? "—"}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${statusBadgeClasses(label)}`}>
-                            {label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-xs text-brand-subtle">
-                          {new Date(job.created_at).toLocaleDateString()}
+                docGroups.map((group) => {
+                  const isCollapsed = collapsedDocs.has(group.documentName);
+                  const firstJob = group.jobs[0];
+                  // Find document_id from the first job
+                  const docId = firstJob?.document_id;
+                  return (
+                    <Fragment key={group.documentName}>
+                      {/* Document header row */}
+                      <tr className="border-b border-brand-border bg-brand-bg">
+                        <td colSpan={5} className="px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleDocCollapse(group.documentName)}
+                                className="flex h-5 w-5 items-center justify-center rounded border-none bg-transparent text-xs text-brand-muted transition-transform"
+                                style={{ transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)" }}
+                              >▶</button>
+                              <span className="text-sm font-semibold text-brand-text">{group.documentName}</span>
+                              <span className="text-xs text-brand-muted">{group.jobs.length} {group.jobs.length === 1 ? "translation" : "translations"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => openTranslationModal(projectId)} className="text-xs font-medium text-brand-muted hover:text-brand-text underline">+ Add language</button>
+                              {docId && (
+                                <button type="button" onClick={() => setDocDeleteTarget(docId)} className="text-xs font-medium text-status-error hover:underline">Delete document</button>
+                              )}
+                            </div>
+                          </div>
                         </td>
                       </tr>
-                    );
-                  })
-                )
+                      {/* Translation sub-rows */}
+                      {!isCollapsed && group.jobs.map((job) => {
+                        const label = statusLabel(job.status);
+                        const isProc = PROCESSING_STATUSES.has(job.status);
+                        return (
+                          <tr
+                            key={job.id}
+                            className={`border-b border-brand-border last:border-0 ${isProc ? "cursor-not-allowed opacity-60" : "cursor-pointer transition-colors hover:bg-brand-bg"}`}
+                            onClick={() => { if (!isProc) router.push(`/translation-jobs/${job.id}/overview`); }}
+                          >
+                            <td className="py-3 pl-10 pr-4 text-[0.8125rem] text-brand-muted">
+                              {getLanguageFlag(job.source_language)} → {getLanguageFlag(job.target_language)} {getLanguageDisplayName(job.target_language)}
+                            </td>
+                            <td className="px-4 py-3 text-[0.8125rem] text-brand-muted">{job.progress_total_segments ?? "—"}</td>
+                            <td className="px-4 py-3">
+                              <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${statusBadgeClasses(label)}`}>{label}</span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-brand-subtle">{new Date(job.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -503,6 +546,21 @@ export default function ProjectPage() {
         loading={deleting}
         variant="destructive"
       />
+      <ConfirmDialog
+        open={docDeleteTarget !== null}
+        title="Delete this document permanently?"
+        description="This will remove the uploaded file and all translations. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { if (docDeleteTarget) void handleDeleteDocument(docDeleteTarget); }}
+        onCancel={() => setDocDeleteTarget(null)}
+        loading={docDeleteLoading}
+        variant="destructive"
+      />
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-text shadow-lg">
+          {toastMessage}
+        </div>
+      )}
     </AppShell>
   );
 }

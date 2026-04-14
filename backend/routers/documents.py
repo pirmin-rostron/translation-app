@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -867,6 +868,121 @@ def retry_document_pipeline(
     logger.info("Retry queued for document_id=%d with %d failed stages", document_id, len(failed_stages))
     background_tasks.add_task(_run_document_pipeline, document_id)
     return doc
+
+
+@router.get("/grouped")
+def list_grouped_documents(
+    page: int = 1,
+    page_size: int = 10,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return documents with nested translation jobs, paginated at the document level."""
+    from fastapi import Query as _Query  # avoid shadowing
+
+    org_id = current_org.id
+
+    # Total document count for the org
+    total_documents: int = (
+        db.query(func.count(Document.id))
+        .filter(Document.org_id == org_id, Document.deleted_at.is_(None))
+        .scalar()
+        or 0
+    )
+
+    # Total job count
+    total_jobs: int = (
+        db.query(func.count(TranslationJob.id))
+        .filter(TranslationJob.org_id == org_id, TranslationJob.deleted_at.is_(None))
+        .scalar()
+        or 0
+    )
+
+    # Paginated documents
+    offset = (page - 1) * page_size
+    docs = (
+        db.query(Document)
+        .filter(Document.org_id == org_id, Document.deleted_at.is_(None))
+        .order_by(Document.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    doc_ids = [d.id for d in docs]
+
+    # Get all jobs for these documents
+    jobs = (
+        db.query(TranslationJob)
+        .filter(
+            TranslationJob.document_id.in_(doc_ids),
+            TranslationJob.deleted_at.is_(None),
+        )
+        .order_by(TranslationJob.created_at.desc())
+        .all()
+    ) if doc_ids else []
+
+    # Resolve project names
+    proj_ids = set()
+    for d in docs:
+        if d.project_id:
+            proj_ids.add(d.project_id)
+    project_names = (
+        {p.id: p.name for p in db.query(Project).filter(Project.id.in_(proj_ids)).all()}
+        if proj_ids else {}
+    )
+
+    # Word counts per document (approximate from block count × avg words)
+    word_counts: dict[int, int] = {}
+    if doc_ids:
+        for doc_id, cnt in (
+            db.query(
+                DocumentBlock.document_id,
+                func.sum(func.length(DocumentBlock.text_original)),
+            )
+            .filter(DocumentBlock.document_id.in_(doc_ids))
+            .group_by(DocumentBlock.document_id)
+            .all()
+        ):
+            # Rough word count: total chars / 5
+            word_counts[doc_id] = (cnt or 0) // 5
+
+    # Group jobs by document
+    jobs_by_doc: dict[int, list] = {d.id: [] for d in docs}
+    for job in jobs:
+        if job.document_id in jobs_by_doc:
+            doc = next((d for d in docs if d.id == job.document_id), None)
+            proj_id = doc.project_id if doc else None
+            proj_name = project_names.get(proj_id) if proj_id else None
+            jobs_by_doc[job.document_id].append({
+                "id": job.id,
+                "target_language": job.target_language,
+                "source_language": job.source_language,
+                "status": job.status,
+                "quality_score": None,
+                "due_date": str(job.due_date) if job.due_date else None,
+                "project_id": proj_id,
+                "project_name": proj_name,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+            })
+
+    result_docs = []
+    for d in docs:
+        result_docs.append({
+            "id": d.id,
+            "filename": d.filename,
+            "uploaded_at": d.created_at.isoformat() if d.created_at else None,
+            "word_count": word_counts.get(d.id, 0),
+            "jobs": jobs_by_doc.get(d.id, []),
+        })
+
+    return {
+        "documents": result_docs,
+        "total_documents": total_documents,
+        "total_jobs": total_jobs,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.delete("/{document_id}", status_code=204)

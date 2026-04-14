@@ -155,6 +155,9 @@ export const documentsApi = {
 
   delete: (documentId: number) =>
     apiFetch<void>(`${API_URL}/documents/${documentId}`, { method: "DELETE" }),
+
+  listGrouped: (page = 1, pageSize = 10) =>
+    apiFetch<GroupedDocumentsResponse>(`${API_URL}/documents/grouped?page=${page}&page_size=${pageSize}`),
 };
 
 // --- dashboard types ---
@@ -177,6 +180,34 @@ export type TranslationJobListItem = {
   project_id: number | null;
   project_name: string | null;
   quality_score: number | null;
+};
+
+export type GroupedDocJob = {
+  id: number;
+  target_language: string;
+  source_language: string;
+  status: string;
+  quality_score: number | null;
+  due_date: string | null;
+  project_id: number | null;
+  project_name: string | null;
+  created_at: string | null;
+};
+
+export type GroupedDocument = {
+  id: number;
+  filename: string;
+  uploaded_at: string | null;
+  word_count: number;
+  jobs: GroupedDocJob[];
+};
+
+export type GroupedDocumentsResponse = {
+  documents: GroupedDocument[];
+  total_documents: number;
+  total_jobs: number;
+  page: number;
+  page_size: number;
 };
 
 export type PaginatedJobsResponse = {

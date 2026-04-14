@@ -1,13 +1,20 @@
 "use client";
 
+/**
+ * Documents page — grouped by source document with collapsible translation
+ * sub-rows. Each document group shows its filename, metadata, and actions.
+ * Translation sub-rows show language, project, due date, status, and actions.
+ */
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { usePaginatedTranslations, useOrgStats, useProjects } from "../hooks/queries";
+import { useOrgStats, useProjects } from "../hooks/queries";
 import { queryKeys, translationJobsApi, documentsApi } from "../services/api";
+import type { GroupedDocument, GroupedDocJob, GroupedDocumentsResponse } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
@@ -26,275 +33,243 @@ function formatRelativeDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
-// Due date badge — color-coded by urgency
+// Due date badge
 function DueDateBadge({ dueDate }: { dueDate: string | null }) {
   if (!dueDate) return null;
   const due = new Date(dueDate);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) {
-    return <span className="rounded-full bg-status-errorBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-error">Overdue</span>;
-  }
-  if (diffDays <= 3) {
-    return <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-warning">Due soon</span>;
-  }
-  return (
-    <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
-      {due.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-    </span>
-  );
+  if (diffDays < 0) return <span className="rounded-full bg-status-errorBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-error">Overdue</span>;
+  if (diffDays <= 3) return <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-warning">Due soon</span>;
+  return <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">{due.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</span>;
 }
 
-// Inline due date editor — clicking the badge/cell opens a date picker
+// Inline due date editor
 function InlineDueDateCell({ jobId, dueDate }: { jobId: number; dueDate: string | null }) {
   const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
-
   async function handleChange(value: string) {
     setEditing(false);
-    const newDate = value || null;
     try {
-      await translationJobsApi.updateDueDate(jobId, newDate);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-    } catch (err) {
-      console.error("[due-date update]", err);
-    }
+      await translationJobsApi.updateDueDate(jobId, value || null);
+      void queryClient.invalidateQueries({ queryKey: ["documents-grouped"] });
+    } catch (err) { console.error("[due-date]", err); }
   }
-
   if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        type="date"
-        defaultValue={dueDate ?? ""}
-        autoFocus
-        onBlur={(e) => handleChange(e.target.value)}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-28 rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent"
-      />
-    );
+    return <input type="date" defaultValue={dueDate ?? ""} autoFocus onBlur={(e) => handleChange(e.target.value)} onChange={(e) => handleChange(e.target.value)} className="w-28 rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent" />;
   }
-
   return (
-    <button
-      type="button"
-      onClick={() => setEditing(true)}
-      className="cursor-pointer border-none bg-transparent p-0"
-      title="Click to set due date"
-    >
-      {dueDate ? (
-        <DueDateBadge dueDate={dueDate} />
-      ) : (
-        <span className="text-xs text-brand-subtle hover:text-brand-muted">Set date</span>
-      )}
+    <button type="button" onClick={() => setEditing(true)} className="cursor-pointer border-none bg-transparent p-0" title="Click to set due date">
+      {dueDate ? <DueDateBadge dueDate={dueDate} /> : <span className="text-xs text-brand-subtle hover:text-brand-muted">Set date</span>}
     </button>
   );
 }
 
-
-// Inline project selector — clicking opens a dropdown to assign/move document to a project
-function InlineProjectCell({ jobId, projectId, projectName }: { jobId: number; projectId: number | null; projectName: string | null }) {
-  const queryClient = useQueryClient();
-  const { data: projects } = useProjects();
-  const [editing, setEditing] = useState(false);
-
-  async function handleChange(value: string) {
-    setEditing(false);
-    const newProjectId = value === "" ? null : Number(value);
-    if (newProjectId === projectId) return;
-    try {
-      await translationJobsApi.updateProject(jobId, newProjectId);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-    } catch (err) {
-      console.error("[project-assign]", err);
-    }
-  }
-
-  if (editing) {
-    return (
-      <select
-        autoFocus
-        defaultValue={projectId != null ? String(projectId) : ""}
-        onBlur={(e) => handleChange(e.target.value)}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-full rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent"
-      >
-        <option value="">No project (standalone)</option>
-        {(projects ?? []).map((p) => (
-          <option key={p.id} value={String(p.id)}>{p.name}</option>
-        ))}
-      </select>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => setEditing(true)}
-      className="cursor-pointer border-none bg-transparent p-0 text-left"
-      title="Click to assign project"
-    >
-      {projectName ? (
-        <span className="text-sm text-brand-muted">{projectName}</span>
-      ) : (
-        <span className="text-sm italic text-brand-subtle">No project</span>
-      )}
-    </button>
-  );
+// Toast
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => { const t = setTimeout(onDismiss, 2500); return () => clearTimeout(t); }, [onDismiss]);
+  return <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-text shadow-lg">{message}</div>;
 }
 
+// ── Document group component ────────────────────────────────────────────────
 
-// Three-dot actions menu for each row — separate delete translation vs delete document
-function RowActionsMenu({ jobId, documentId, onToast }: { jobId: number; documentId: number; onToast: (msg: string) => void }) {
+function DocumentGroup({
+  doc,
+  onToast,
+  onRefresh,
+}: {
+  doc: GroupedDocument;
+  onToast: (msg: string) => void;
+  onRefresh: () => void;
+}) {
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"delete_translation" | "delete_document" | "retranslate" | null>(null);
+  const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
+  const [expanded, setExpanded] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<"delete_doc" | null>(null);
+  const [confirmJobAction, setConfirmJobAction] = useState<{ type: "delete_translation" | "retranslate"; jobId: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
-
-  async function handleConfirm() {
+  async function handleDeleteDoc() {
     setLoading(true);
     try {
-      if (confirmAction === "delete_translation") {
-        await translationJobsApi.delete(jobId);
+      await documentsApi.delete(doc.id);
+      onToast("Document deleted");
+      onRefresh();
+    } catch (err) { console.error("[delete-doc]", err); }
+    finally { setLoading(false); setConfirmAction(null); }
+  }
+
+  async function handleJobAction() {
+    if (!confirmJobAction) return;
+    setLoading(true);
+    try {
+      if (confirmJobAction.type === "delete_translation") {
+        await translationJobsApi.delete(confirmJobAction.jobId);
         onToast("Translation deleted");
-      } else if (confirmAction === "delete_document") {
-        await documentsApi.delete(documentId);
-        onToast("Document deleted");
-      } else if (confirmAction === "retranslate") {
-        await translationJobsApi.retranslate(jobId);
+      } else {
+        await translationJobsApi.retranslate(confirmJobAction.jobId);
         onToast("Re-translation queued");
       }
-      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-    } catch (err) {
-      console.error(`[${confirmAction}]`, err);
-    } finally {
-      setLoading(false);
-      setConfirmAction(null);
-      setMenuOpen(false);
-    }
+      onRefresh();
+    } catch (err) { console.error("[job-action]", err); }
+    finally { setLoading(false); setConfirmJobAction(null); }
   }
 
   return (
     <>
-      <div ref={menuRef} className="relative">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-          className="rounded-full p-1.5 text-brand-subtle opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-brand-bg hover:text-brand-text"
-          aria-label="Actions"
-        >
-          ⋯
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-8 z-20 w-48 rounded-xl border border-brand-border bg-brand-surface py-1 shadow-lg">
-            <button
-              type="button"
-              onClick={() => { setMenuOpen(false); setConfirmAction("retranslate"); }}
-              className="w-full px-4 py-2 text-left text-sm text-brand-text hover:bg-brand-bg"
-            >
-              Re-translate
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMenuOpen(false); setConfirmAction("delete_translation"); }}
-              className="w-full px-4 py-2 text-left text-sm text-brand-muted hover:bg-brand-bg"
-            >
-              Delete translation
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMenuOpen(false); setConfirmAction("delete_document"); }}
-              className="w-full px-4 py-2 text-left text-sm text-status-error hover:bg-brand-bg"
-            >
-              Delete document
-            </button>
+      {/* Document header row */}
+      <tr className="border-b border-brand-border bg-brand-bg">
+        <td colSpan={6} className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="flex h-6 w-6 items-center justify-center rounded border-none bg-transparent text-brand-muted transition-transform"
+                style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+              >
+                ▶
+              </button>
+              <span className="text-base">📄</span>
+              <span className="text-sm font-semibold text-brand-text">{doc.filename}</span>
+              <span className="text-xs text-brand-muted">
+                Uploaded {doc.uploaded_at ? formatRelativeDate(doc.uploaded_at) : "—"} · {doc.word_count.toLocaleString()} words · {doc.jobs.length} {doc.jobs.length === 1 ? "translation" : "translations"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openTranslationModal()}
+                className="rounded-full px-3 py-1 text-xs font-medium text-brand-muted hover:text-brand-text underline"
+              >
+                + Add language
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAction("delete_doc")}
+                className="text-xs font-medium text-status-error hover:underline"
+              >
+                Delete document
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </td>
+      </tr>
+
+      {/* Translation sub-rows */}
+      {expanded && doc.jobs.map((job) => (
+        <tr
+          key={job.id}
+          className="group/row cursor-pointer border-b border-brand-border transition-colors hover:bg-brand-bg last:border-0"
+          onClick={() => router.push(`/translation-jobs/${job.id}/overview`)}
+        >
+          <td className="py-3 pl-14 pr-4 text-sm font-medium text-brand-text">
+            {(job.source_language ?? "EN").substring(0, 2).toUpperCase()} → {job.target_language.substring(0, 2).toUpperCase()}
+          </td>
+          <td className="px-4 py-3 text-sm text-brand-muted">
+            {job.project_name ?? <span className="italic text-brand-subtle">No project</span>}
+          </td>
+          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+            <InlineDueDateCell jobId={job.id} dueDate={job.due_date} />
+          </td>
+          <td className="px-4 py-3 text-xs text-brand-subtle">
+            {job.created_at ? formatRelativeDate(job.created_at) : "—"}
+          </td>
+          <td className="px-4 py-3">
+            <StatusBadge status={toJobStatus(job.status)} />
+          </td>
+          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover/row:opacity-100">
+              <button
+                type="button"
+                onClick={() => setConfirmJobAction({ type: "retranslate", jobId: job.id })}
+                className="text-xs text-brand-muted hover:text-brand-text"
+                title="Re-translate"
+              >
+                ↻
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmJobAction({ type: "delete_translation", jobId: job.id })}
+                className="text-xs text-brand-subtle hover:text-status-error"
+                title="Delete translation"
+              >
+                ✕
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+
+      {/* Confirm dialogs */}
       <ConfirmDialog
-        open={confirmAction === "retranslate"}
-        title="Re-translate this document?"
-        description="The existing translation will be replaced. This cannot be undone."
-        confirmLabel="Re-translate"
-        onConfirm={() => { void handleConfirm(); }}
-        onCancel={() => setConfirmAction(null)}
-        loading={loading}
-      />
-      <ConfirmDialog
-        open={confirmAction === "delete_translation"}
-        title="Delete this translation?"
-        description="The uploaded document will be kept and can be re-translated."
-        confirmLabel="Delete translation"
-        onConfirm={() => { void handleConfirm(); }}
-        onCancel={() => setConfirmAction(null)}
-        loading={loading}
-      />
-      <ConfirmDialog
-        open={confirmAction === "delete_document"}
+        open={confirmAction === "delete_doc"}
         title="Delete this document permanently?"
         description="This will remove the uploaded file and all translations. This cannot be undone."
         confirmLabel="Delete"
-        onConfirm={() => { void handleConfirm(); }}
+        onConfirm={() => { void handleDeleteDoc(); }}
         onCancel={() => setConfirmAction(null)}
         loading={loading}
         variant="destructive"
+      />
+      <ConfirmDialog
+        open={confirmJobAction?.type === "retranslate"}
+        title="Re-translate this document?"
+        description="The existing translation will be replaced. This cannot be undone."
+        confirmLabel="Re-translate"
+        onConfirm={() => { void handleJobAction(); }}
+        onCancel={() => setConfirmJobAction(null)}
+        loading={loading}
+      />
+      <ConfirmDialog
+        open={confirmJobAction?.type === "delete_translation"}
+        title="Delete this translation?"
+        description="The uploaded document will be kept and can be re-translated."
+        confirmLabel="Delete translation"
+        onConfirm={() => { void handleJobAction(); }}
+        onCancel={() => setConfirmJobAction(null)}
+        loading={loading}
       />
     </>
   );
 }
 
-// Simple toast component for action feedback
-function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 2500);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-text shadow-lg">
-      {message}
-    </div>
-  );
-}
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export default function DocumentsPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
-
-  const [page, setPage] = useState(1);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const { data: translationsData, isLoading } = usePaginatedTranslations(page, 10);
   const { data: orgStats } = useOrgStats();
 
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<GroupedDocumentsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    documentsApi.listGrouped(page, 10)
+      .then(setData)
+      .catch((err: unknown) => console.error("[grouped-docs]", err))
+      .finally(() => setIsLoading(false));
+  }, [page]);
+
   useEffect(() => {
-    if (hasHydrated && !token) router.replace("/login");
-  }, [hasHydrated, token, router]);
+    if (hasHydrated && !token) { router.replace("/login"); return; }
+    if (token) loadData();
+  }, [hasHydrated, token, router, loadData]);
 
   if (!hasHydrated || !token) return null;
 
-  const jobs = translationsData?.translations ?? [];
-  const totalDocs = translationsData?.total ?? 0;
+  const docs = data?.documents ?? [];
+  const totalDocs = data?.total_documents ?? 0;
+  const totalJobs = data?.total_jobs ?? 0;
   const totalPages = Math.ceil(totalDocs / 10) || 1;
-  const inReviewCount = jobs.filter((t) => t.raw_status === "in_review" || t.raw_status === "review").length;
-  const completedCount = jobs.filter((t) => t.raw_status === "exported" || t.raw_status === "completed" || t.raw_status === "ready_for_export" || t.raw_status === "review_complete").length;
+  const readyCount = docs.reduce((sum, d) => sum + d.jobs.filter((j) => j.status === "exported" || j.status === "completed" || j.status === "ready_for_export" || j.status === "review_complete").length, 0);
 
   return (
     <AppShell>
@@ -304,21 +279,19 @@ export default function DocumentsPage() {
         {/* Stat tiles */}
         <div className="mb-6 grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
-            <p className="text-xs font-medium text-brand-muted">Total Documents</p>
+            <p className="text-xs font-medium text-brand-muted">Source Documents</p>
             <p className="mt-1 font-display text-2xl font-bold text-brand-text">{totalDocs}</p>
-            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">
-              {totalDocs === 0 ? "No documents yet" : `${totalDocs} ${totalDocs === 1 ? "document" : "documents"}`}
-            </p>
+            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">{totalDocs === 0 ? "No documents yet" : `${totalDocs} uploaded`}</p>
           </div>
           <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
-            <p className="text-xs font-medium text-brand-muted">In Review</p>
-            <p className={`mt-1 font-display text-2xl font-bold ${inReviewCount > 0 ? "text-brand-accent" : "text-brand-subtle"}`}>{inReviewCount}</p>
-            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Awaiting approval</p>
+            <p className="text-xs font-medium text-brand-muted">Total Translations</p>
+            <p className={`mt-1 font-display text-2xl font-bold ${totalJobs > 0 ? "text-brand-text" : "text-brand-subtle"}`}>{totalJobs}</p>
+            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Across all documents</p>
           </div>
           <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
-            <p className="text-xs font-medium text-brand-muted">Completed</p>
-            <p className={`mt-1 font-display text-2xl font-bold ${completedCount > 0 ? "text-status-success" : "text-brand-subtle"}`}>{completedCount}</p>
-            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Ready to export</p>
+            <p className="text-xs font-medium text-brand-muted">Ready to Export</p>
+            <p className={`mt-1 font-display text-2xl font-bold ${readyCount > 0 ? "text-status-success" : "text-brand-subtle"}`}>{readyCount}</p>
+            <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Completed translations</p>
           </div>
         </div>
 
@@ -329,94 +302,47 @@ export default function DocumentsPage() {
 
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
-        {/* Table — headers always visible */}
         {!isLoading && (<>
           <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-brand-border">
-                  {["Document", "Project", "Language", "Due Date", "Uploaded", "Status", ""].map((col) => (
-                    <th key={col || "_actions"} className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
+                  {["Language", "Project", "Due Date", "Uploaded", "Status", ""].map((col) => (
+                    <th key={col || "_actions"} className="px-4 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
                       {col}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {jobs.length === 0 ? (
+                {docs.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
+                    <td colSpan={6} className="px-5 py-16 text-center">
                       <div className="mx-auto max-w-sm">
                         <div className="mb-3 text-4xl">📄</div>
                         <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
-                        <p className="mt-1 text-sm text-brand-muted">
-                          Upload a document to translate it. Supports DOCX, RTF, and TXT files.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => openTranslationModal()}
-                          className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors"
-                        >
+                        <p className="mt-1 text-sm text-brand-muted">Upload a document to translate it. Supports DOCX, RTF, and TXT files.</p>
+                        <button type="button" onClick={() => openTranslationModal()} className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors">
                           + New Translation
                         </button>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  jobs.map((t) => (
-                    <tr key={t.id} className="group/row border-b border-brand-border last:border-0 transition-colors hover:bg-brand-bg">
-                      <td className="px-5 py-3.5">
-                        <Link href={`/translation-jobs/${t.id}/overview`} className="text-sm font-medium text-brand-text no-underline hover:underline">
-                          {t.document_name ?? `Document #${t.id}`}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <InlineProjectCell jobId={t.id} projectId={t.project_id} projectName={t.project_name} />
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-brand-muted">
-                        {t.source_language} → {t.target_language}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <InlineDueDateCell jobId={t.id} dueDate={t.due_date} />
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-brand-subtle">
-                        {t.created_at ? formatRelativeDate(t.created_at) : "—"}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <StatusBadge status={toJobStatus(t.raw_status)} />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <RowActionsMenu jobId={t.id} documentId={t.document_id} onToast={setToastMessage} />
-                      </td>
-                    </tr>
+                  docs.map((doc) => (
+                    <DocumentGroup key={doc.id} doc={doc} onToast={setToastMessage} onRefresh={loadData} />
                   ))
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination controls */}
+          {/* Pagination */}
           {totalDocs > 10 && (
             <div className="mt-4 flex items-center justify-center gap-4">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-brand-muted">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors"
-              >
-                Next
-              </button>
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors">Previous</button>
+              <span className="text-sm text-brand-muted">Page {page} of {totalPages}</span>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors">Next</button>
             </div>
           )}
         </>)}
