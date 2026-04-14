@@ -42,7 +42,7 @@ const painPoints = [
   {
     n: "01",
     title: "Siloed Translation Assets",
-    body: "You paste into ChatGPT and get output that sounds almost right — until a lawyer reads it.",
+    body: "You paste into ChatGPT and get output that sounds nothing like your brand.",
   },
   {
     n: "02",
@@ -51,8 +51,8 @@ const painPoints = [
   },
   {
     n: "03",
-    title: "No Glossary Enforcement",
-    body: "The same term gets translated five different ways across five documents because no one enforced the glossary.",
+    title: "No Consistency",
+    body: "The same term gets translated differently across documents. No one notices until a client does.",
   },
 ];
 
@@ -65,19 +65,19 @@ const steps = [
 const features = [
   {
     title: "Linguistic Insights",
-    body: "Helvara surfaces glossary matches, translation memory, and semantic context for every block — so reviewers make faster, more confident decisions.",
+    body: "Helvara flags ambiguous phrases, inconsistent terminology, and untranslated words before you export.",
   },
   {
-    title: "Human Review Workflow",
-    body: "Block-by-block structured review with approve, edit, and skip controls. Every decision is tracked and auditable from upload to export.",
+    title: "Glossary Enforcement",
+    body: "Define your key terms once. Every translation applies them automatically.",
   },
   {
-    title: "Connected Glossary",
-    body: "Define terminology once. Helvara enforces it consistently across every document — and lets reviewers add new terms directly from the review workflow.",
+    title: "Block-by-block Review",
+    body: "Review and approve translations one paragraph at a time. Full control, no surprises.",
   },
   {
-    title: "Translation Memory",
-    body: "Approved translations are remembered. Similar content in future documents is surfaced automatically, reducing review time with every job.",
+    title: "Project Management",
+    body: "Group documents into projects. Track progress, set due dates, export when ready.",
   },
 ];
 
@@ -719,7 +719,7 @@ export default function LandingPage() {
               <div ref={langsRef} style={{ minWidth: "120px" }}>
                 <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{langsValue}</p>
                 <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Languages</p>
-                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Supported</p>
+                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Supported</p>
               </div>
 
               {/* Words translated — dynamic, hidden if zero */}
@@ -727,7 +727,7 @@ export default function LandingPage() {
                 <div ref={wordsRef} style={{ minWidth: "120px" }}>
                   <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{wordsValue.toLocaleString()}+</p>
                   <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Words</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Translated</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Translated</p>
                 </div>
               )}
 
@@ -736,7 +736,7 @@ export default function LandingPage() {
                 <div ref={docsRef} style={{ minWidth: "120px" }}>
                   <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{docsValue}+</p>
                   <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Documents</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Processed</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Processed</p>
                 </div>
               )}
 
@@ -745,7 +745,7 @@ export default function LandingPage() {
                 <div ref={glossaryRef} style={{ minWidth: "120px" }}>
                   <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{glossaryValue}+</p>
                   <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Glossary terms</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: "#78716c" }}>Enforced consistently</p>
+                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Enforced consistently</p>
                 </div>
               )}
             </div>
