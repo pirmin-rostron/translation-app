@@ -17,6 +17,7 @@ import { projectsApi, translationJobsApi } from "../../services/api";
 import type { ProjectDetailResponse, ProjectStatsResponse, TranslationJobListItem } from "../../services/api";
 import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { ModalOverlay } from "../../dashboard/ModalOverlay";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { getLanguageDisplayName, getLanguageFlag, PROJECT_LANGUAGE_OPTIONS } from "../../utils/language";
 
 const PROCESSING_STATUSES = new Set(["queued", "parsing", "translating", "translation_queued"]);
@@ -75,11 +76,13 @@ function EditProjectModal({
   onClose,
   project,
   onSaved,
+  onDelete,
 }: {
   open: boolean;
   onClose: () => void;
   project: ProjectDetailResponse;
   onSaved: (updated: ProjectDetailResponse) => void;
+  onDelete: () => void;
 }) {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
@@ -220,6 +223,17 @@ function EditProjectModal({
           {submitting ? "Saving…" : "Save changes"}
         </button>
       </div>
+
+      {/* Destructive action */}
+      <div className="mt-6 border-t border-brand-border pt-4">
+        <button
+          type="button"
+          onClick={() => { onClose(); onDelete(); }}
+          className="text-sm font-medium text-status-error hover:underline"
+        >
+          Delete project
+        </button>
+      </div>
     </ModalOverlay>
   );
 }
@@ -240,6 +254,20 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteProject() {
+    setDeleting(true);
+    try {
+      await projectsApi.delete(projectId);
+      router.replace("/projects");
+    } catch (err) {
+      console.error("[delete-project]", err);
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  }
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -463,6 +491,17 @@ export default function ProjectPage() {
         onClose={() => setEditModalOpen(false)}
         project={project}
         onSaved={(updated) => setProject(updated)}
+        onDelete={() => setDeleteConfirmOpen(true)}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete this project?"
+        description="This will remove the project but keep all associated documents as standalone translations. This cannot be undone."
+        confirmLabel="Delete project"
+        onConfirm={() => { void handleDeleteProject(); }}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        loading={deleting}
+        variant="destructive"
       />
     </AppShell>
   );

@@ -203,7 +203,7 @@ def delete_project(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Soft-delete a project."""
+    """Delete a project. Unlinks all documents (sets project_id=null) and deletes the record."""
     project = (
         db.query(Project)
         .filter(
@@ -215,7 +215,11 @@ def delete_project(
     )
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    project.deleted_at = datetime.utcnow()
+    # Unlink all documents from this project — they become standalone
+    db.query(Document).filter(Document.project_id == project_id).update(
+        {"project_id": None}, synchronize_session=False,
+    )
+    db.delete(project)
     db.commit()
 
 
