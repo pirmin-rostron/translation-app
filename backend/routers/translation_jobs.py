@@ -2541,10 +2541,12 @@ def delete_translation_job(
     db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
     # Delete processing stage jobs
     db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
-    # Delete job events
+    # Delete job events (operational audit — not stats data)
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
-    # Delete usage events referencing this job
-    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).delete(synchronize_session=False)
+    # Detach usage events from this job (preserve for lifetime stats)
+    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).update(
+        {"job_id": None}, synchronize_session=False
+    )
     # Reset block translated text
     db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).update(
         {"text_translated": None}, synchronize_session=False,
@@ -2579,7 +2581,10 @@ def retranslate_job(
     db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
     db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
-    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).delete(synchronize_session=False)
+    # Detach usage events (preserve for lifetime stats — re-translation logs new events)
+    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).update(
+        {"job_id": None}, synchronize_session=False
+    )
 
     # Reset block translated text
     db.query(DocumentBlock).filter(DocumentBlock.document_id == job.document_id).update(

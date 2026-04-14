@@ -69,7 +69,7 @@ function InlineDueDateCell({ jobId, dueDate }: { jobId: number; dueDate: string 
 // Toast
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   useEffect(() => { const t = setTimeout(onDismiss, 2500); return () => clearTimeout(t); }, [onDismiss]);
-  return <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-text shadow-lg">{message}</div>;
+  return <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-brand-text px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-opacity">{message}</div>;
 }
 
 // ── Document group component ────────────────────────────────────────────────

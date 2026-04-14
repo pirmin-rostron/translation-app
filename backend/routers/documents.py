@@ -1011,7 +1011,10 @@ def delete_document(
         db.query(TranslationResult).filter(TranslationResult.job_id.in_(job_ids)).delete(synchronize_session=False)
         db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id.in_(job_ids)).delete(synchronize_session=False)
         db.query(JobEvent).filter(JobEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
-        db.query(UsageEvent).filter(UsageEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
+        # Detach usage events from jobs (preserve for lifetime stats)
+        db.query(UsageEvent).filter(UsageEvent.job_id.in_(job_ids)).update(
+            {"job_id": None}, synchronize_session=False
+        )
         db.query(TranslationJob).filter(TranslationJob.id.in_(job_ids)).delete(synchronize_session=False)
 
     # Delete document structure
@@ -1023,7 +1026,10 @@ def delete_document(
     db.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).delete(synchronize_session=False)
     db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).delete(synchronize_session=False)
     db.query(ProcessingStageJob).filter(ProcessingStageJob.document_id == document_id).delete(synchronize_session=False)
-    db.query(UsageEvent).filter(UsageEvent.document_id == document_id).delete(synchronize_session=False)
+    # Detach usage events from document (preserve for lifetime stats)
+    db.query(UsageEvent).filter(UsageEvent.document_id == document_id).update(
+        {"document_id": None}, synchronize_session=False
+    )
     db.delete(doc)
     db.commit()
     logger.info("Hard-deleted document_id=%d with %d translation jobs", document_id, len(job_ids))
