@@ -1484,15 +1484,21 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
 
     job.status = JOB_STATUS_IN_REVIEW
     job.error_message = None
-    # Increment org lifetime stats
+    # Increment org lifetime stats and write job_completed event
+    _segs = db.query(DocumentSegment).filter(DocumentSegment.document_id == job.document_id).all()
+    word_count = sum(len((s.source_text or "").split()) for s in _segs)
     if job.org_id:
         org = db.query(Organisation).filter(Organisation.id == job.org_id).first()
         if org:
-            # Count words from segments
-            _segs = db.query(DocumentSegment).filter(DocumentSegment.document_id == job.document_id).all()
-            word_count = sum(len((s.source_text or "").split()) for s in _segs)
             org.words_translated_lifetime = (org.words_translated_lifetime or 0) + word_count
             org.jobs_completed_lifetime = (org.jobs_completed_lifetime or 0) + 1
+    from models import JobEvent
+    db.add(JobEvent(
+        job_id=job.id,
+        event_type="job_completed",
+        message=f"Translation completed with {word_count} words",
+        metadata_json={"word_count": word_count},
+    ))
     db.commit()
 
     # Auto-extract glossary suggestions in the background (fire and forget)

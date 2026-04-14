@@ -92,16 +92,8 @@ def org_stats(
     """Return aggregate usage stats for the current user's organisation."""
     org_id = current_org.id
 
-    # Words translated — sum meta['word_count'] from org's WORDS_TRANSLATED events
-    words_rows = (
-        db.query(UsageEvent.meta)
-        .filter(UsageEvent.event_type == WORDS_TRANSLATED, UsageEvent.org_id == org_id)
-        .all()
-    )
-    total_words_translated = 0
-    for (meta,) in words_rows:
-        if isinstance(meta, dict):
-            total_words_translated += int(meta.get("word_count", 0) or 0)
+    # Words translated — use cumulative lifetime field (never decreases on delete)
+    total_words_translated = current_org.words_translated_lifetime or 0
 
     time_saved_hours = round(total_words_translated / 250, 1)
 

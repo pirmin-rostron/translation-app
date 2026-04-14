@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useOrgStats } from "../hooks/queries";
 import { translationJobsApi, documentsApi } from "../services/api";
 import type { GroupedDocument, GroupedDocJob, GroupedDocumentsResponse } from "../services/api";
 import { AppShell } from "../components/AppShell";
@@ -205,7 +204,6 @@ export default function DocumentsPage() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
-  const { data: orgStats } = useOrgStats();
 
   const [page, setPage] = useState(1);
   const [data, setData] = useState<GroupedDocumentsResponse | null>(null);
@@ -216,7 +214,7 @@ export default function DocumentsPage() {
 
   const loadData = useCallback(() => {
     setIsLoading(true);
-    documentsApi.listGrouped(page, 10)
+    documentsApi.listGrouped(page, 20)
       .then(setData)
       .catch((err: unknown) => console.error("[grouped-docs]", err))
       .finally(() => setIsLoading(false));
@@ -232,7 +230,7 @@ export default function DocumentsPage() {
   const docs = data?.documents ?? [];
   const totalDocs = data?.total_documents ?? 0;
   const totalJobs = data?.total_jobs ?? 0;
-  const totalPages = Math.ceil(totalDocs / 10) || 1;
+  const totalPages = Math.ceil(totalDocs / 20) || 1;
   const readyCount = docs.reduce((sum, d) => sum + d.jobs.filter((j) =>
     j.status === "exported" || j.status === "completed" || j.status === "ready_for_export" || j.status === "review_complete"
   ).length, 0);
@@ -283,11 +281,6 @@ export default function DocumentsPage() {
           </div>
         </div>
 
-        {/* Summary line */}
-        <p className="mb-4 text-sm text-brand-muted">
-          {totalDocs} {totalDocs === 1 ? "document" : "documents"} · {(orgStats?.total_words_translated ?? 0).toLocaleString()} words translated · {orgStats?.distinct_languages ?? 0} {(orgStats?.distinct_languages ?? 0) === 1 ? "language" : "languages"}
-        </p>
-
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
         {!isLoading && (<>
@@ -329,7 +322,7 @@ export default function DocumentsPage() {
           )}
 
           {/* Pagination */}
-          {totalDocs > 10 && (
+          {totalDocs > 20 && (
             <div className="mt-4 flex items-center justify-center gap-4">
               <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg disabled:opacity-40 transition-colors">Previous</button>
               <span className="text-sm text-brand-muted">Page {page} of {totalPages}</span>
