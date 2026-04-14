@@ -63,22 +63,6 @@ function StatCard({ label, value, subtitle, href }: { label: string; value: stri
 }
 
 
-function QualityPill({ score }: { score: number | null }) {
-  if (score == null || score < 0) {
-    return <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-subtle">—</span>;
-  }
-  if (score >= 90) {
-    return <span className="rounded-full bg-status-successBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-success">Excellent</span>;
-  }
-  if (score >= 70) {
-    return <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">Good</span>;
-  }
-  if (score >= 50) {
-    return <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-warning">Fair</span>;
-  }
-  return <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-subtle">—</span>;
-}
-
 function TranslationRow({ t }: { t: DashboardTranslation }) {
   const processing = isProcessing(t.raw_status);
 
@@ -97,9 +81,6 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
         <td className="px-5 py-3.5">
           <StatusBadgeComponent status={toJobStatus(t.raw_status)} />
         </td>
-        <td className="px-5 py-3.5">
-          <QualityPill score={null} />
-        </td>
       </tr>
     );
   }
@@ -107,7 +88,7 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
   return (
     <tr className="cursor-pointer transition-colors hover:bg-brand-bg">
       <td className="px-5 py-3.5">
-        <Link href={`/translation-jobs/${t.id}/overview`} className="font-sans text-sm font-medium text-brand-text no-underline hover:underline">
+        <Link href={`/documents/${t.document_id}`} className="font-sans text-sm font-medium text-brand-text no-underline hover:underline">
           {t.document_name ?? `Document #${t.id}`}
         </Link>
       </td>
@@ -119,9 +100,6 @@ function TranslationRow({ t }: { t: DashboardTranslation }) {
       </td>
       <td className="px-5 py-3.5">
         <StatusBadgeComponent status={toJobStatus(t.raw_status)} />
-      </td>
-      <td className="px-5 py-3.5">
-        <QualityPill score={t.quality_score} />
       </td>
     </tr>
   );
@@ -407,7 +385,7 @@ export default function DashboardPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-brand-border">
-                  {["Document", "Project", "Language", "Status", "Quality"].map((col) => (
+                  {["Document", "Project", "Language", "Status"].map((col) => (
                     <th
                       key={col}
                       className="px-5 py-3 text-left font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
