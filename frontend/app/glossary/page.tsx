@@ -25,6 +25,19 @@ const INITIAL_FORM: GlossaryForm = {
   domain: "",
 };
 
+const LANG_CODE_MAP: Record<string, string> = {
+  english: "EN", german: "DE", french: "FR", dutch: "NL", spanish: "ES",
+  japanese: "JA", korean: "KO", thai: "TH", chinese: "ZH", italian: "IT",
+  portuguese: "PT", arabic: "AR", en: "EN", de: "DE", fr: "FR", nl: "NL",
+  es: "ES", ja: "JA", ko: "KO", th: "TH", zh: "ZH", it: "IT", pt: "PT", ar: "AR",
+};
+
+function toLangCode(lang: string): string {
+  const code = LANG_CODE_MAP[lang.toLowerCase()];
+  if (code) return code;
+  return lang.length <= 3 ? lang.toUpperCase() : lang.substring(0, 2).toUpperCase();
+}
+
 export default function GlossaryPage() {
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [form, setForm] = useState<GlossaryForm>(INITIAL_FORM);
@@ -32,6 +45,10 @@ export default function GlossaryPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // Panel visibility
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(false);
 
   // Search + language pair filter
   const [search, setSearch] = useState("");
@@ -63,12 +80,27 @@ export default function GlossaryPage() {
     loadTerms();
   }, []);
 
-  // Unique language pairs for filter pills
+  // Unique language pairs for filter pills (using 2-letter codes)
   const langPairs = useMemo(() => {
     const seen = new Set<string>();
-    terms.forEach((t) => seen.add(`${t.source_language} → ${t.target_language}`));
+    terms.forEach((t) => seen.add(`${toLangCode(t.source_language)} → ${toLangCode(t.target_language)}`));
     return Array.from(seen).sort();
   }, [terms]);
+
+  // Map from display pair back to raw values for filtering
+  const langPairRawMap = useMemo(() => {
+    const map = new Map<string, { src: string; tgt: string }>();
+    terms.forEach((t) => {
+      const key = `${toLangCode(t.source_language)} → ${toLangCode(t.target_language)}`;
+      if (!map.has(key)) map.set(key, { src: t.source_language, tgt: t.target_language });
+    });
+    return map;
+  }, [terms]);
+
+  // Stats
+  const totalTerms = terms.length;
+  const totalUsage = useMemo(() => terms.reduce((sum, t) => sum + (t.usage_count ?? 0), 0), [terms]);
+  const timeSavedHrs = totalUsage > 0 ? ((totalUsage * 2) / 60).toFixed(1) : null;
 
   // Filtered terms
   const displayedTerms = useMemo(() => {
@@ -78,10 +110,14 @@ export default function GlossaryPage() {
         t.source_term.toLowerCase().includes(search.toLowerCase()) ||
         t.target_term.toLowerCase().includes(search.toLowerCase());
       const matchesLang =
-        langFilter === "All" || `${t.source_language} → ${t.target_language}` === langFilter;
+        langFilter === "All" ||
+        `${toLangCode(t.source_language)} → ${toLangCode(t.target_language)}` === langFilter;
       return matchesSearch && matchesLang;
     });
   }, [terms, search, langFilter]);
+
+  // Whether a single-language filter is active (to hide Languages column)
+  const singleLangActive = langFilter !== "All";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -101,6 +137,7 @@ export default function GlossaryPage() {
       const payload = await glossaryTermsApi.create<GlossaryTerm>(termData);
       setTerms((current) => [payload, ...current]);
       setForm(INITIAL_FORM);
+      setShowAddPanel(false);
       setMessage("Glossary term saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save glossary term");
@@ -115,7 +152,6 @@ export default function GlossaryPage() {
     try {
       await glossaryTermsApi.delete<unknown>(termId);
       setTerms((current) => current.filter((term) => term.id !== termId));
-      setMessage("Glossary term deleted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete glossary term");
     }
@@ -170,314 +206,400 @@ export default function GlossaryPage() {
     }
   }
 
-  const INPUT: React.CSSProperties = {
-    borderTop: "none",
-    borderLeft: "none",
-    borderRight: "none",
-    borderBottom: "1px solid rgba(194,200,193,0.5)",
-    borderRadius: 0,
-    background: "transparent",
-    padding: "0.5rem 0",
-    fontSize: "0.9375rem",
-    color: "#1c1c17",
-    outline: "none",
-    width: "100%",
-    fontFamily: "Inter, sans-serif",
-  };
-  const TH = "px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-brand-subtle";
+  const TH = "px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle";
 
   return (
     <AppShell>
       <div className="px-8 py-8">
       <main className="mx-auto max-w-5xl px-8 pb-12">
-        <PageHeader eyebrow="Tools" title="Glossary" />
+        <PageHeader
+          eyebrow="Tools"
+          title="Glossary"
+          action={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowAddPanel(!showAddPanel); setShowImportPanel(false); }}
+                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg transition-colors"
+              >
+                + Add term
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowImportPanel(!showImportPanel); setShowAddPanel(false); }}
+                className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg transition-colors"
+              >
+                ↓ Import CSV
+              </button>
+            </div>
+          }
+        />
 
-        {/* ── CSV Import ── */}
-        <div className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6">
-          <h2 className="mb-1 font-display text-base font-semibold text-brand-text">
-            Bulk CSV import
-          </h2>
-          <p className="mb-4 text-sm text-brand-subtle">
-            Use bulk import to seed terminology quickly, then manage terms here with create/edit/delete actions.
-          </p>
-          <form
-            onSubmit={(e) => { void handleCsvImport(e); }}
-            className="flex flex-wrap items-end gap-3"
-          >
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">CSV file</label>
-              <input
-                type="file"
-                accept=".csv"
-                required
-                disabled={csvImporting}
-                onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-                className="text-sm text-brand-text file:mr-3 file:border-0 file:bg-brand-bg file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-muted hover:file:bg-brand-bg"
-              />
+        {/* Explainer */}
+        <p className="mb-6 max-w-xl text-sm text-brand-muted">
+          Your glossary ensures key terms are translated consistently across every document.
+          When Helvara translates a document, it checks each block against your glossary and
+          applies your preferred translations automatically.
+        </p>
+
+        {/* Stat tiles — only shown when terms exist */}
+        {totalTerms > 0 && (
+          <div className="mb-6 grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+              <p className="text-xs font-medium text-brand-muted">Terms in your glossary</p>
+              <p className="mt-1 font-display text-2xl font-bold text-brand-text">{totalTerms}</p>
+              <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">
+                {langPairs.length} {langPairs.length === 1 ? "language pair" : "language pairs"}
+              </p>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Source language</label>
-              <input
-                value={csvSourceLang}
-                onChange={(e) => setCsvSourceLang(e.target.value)}
-                placeholder="en"
-                required
-                disabled={csvImporting}
-                className="w-24 border border-brand-border bg-brand-surface px-3 py-2 text-sm focus:border-brand-accent focus:outline-none"
-              />
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+              <p className="text-xs font-medium text-brand-muted">Times applied</p>
+              <p className={`mt-1 font-display text-2xl font-bold ${totalUsage > 0 ? "text-brand-accent" : "text-brand-subtle"}`}>
+                {totalUsage}
+              </p>
+              <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">Across all translations</p>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Target language</label>
-              <input
-                value={csvTargetLang}
-                onChange={(e) => setCsvTargetLang(e.target.value)}
-                placeholder="de"
-                required
-                disabled={csvImporting}
-                className="w-24 border border-brand-border bg-brand-surface px-3 py-2 text-sm focus:border-brand-accent focus:outline-none"
-              />
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
+              <p className="text-xs font-medium text-brand-muted">Time saved</p>
+              <p className={`mt-1 font-display text-2xl font-bold ${timeSavedHrs ? "text-brand-text" : "text-brand-subtle"}`}>
+                {timeSavedHrs ? `~${timeSavedHrs} hrs` : "—"}
+              </p>
+              <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">vs manual terminology checking</p>
             </div>
-            <button
-              type="submit"
-              disabled={csvImporting || !csvFile}
-              className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50"
+          </div>
+        )}
+
+        {message && <p className="mb-4 text-sm text-brand-accent">{message}</p>}
+        {error && <p className="mb-4 text-sm text-status-error">{error}</p>}
+
+        {/* ── Add term panel (collapsible) ── */}
+        {showAddPanel && (
+          <div className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-base font-semibold text-brand-text">Add term</h2>
+              <button
+                type="button"
+                onClick={() => setShowAddPanel(false)}
+                className="text-brand-subtle hover:text-brand-text"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <input
+                value={form.source_term}
+                onChange={(e) => setForm((current) => ({ ...current, source_term: e.target.value }))}
+                placeholder="Source term"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+                required
+              />
+              <input
+                value={form.target_term}
+                onChange={(e) => setForm((current) => ({ ...current, target_term: e.target.value }))}
+                placeholder="Target term"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+                required
+              />
+              <input
+                value={form.source_language}
+                onChange={(e) => setForm((current) => ({ ...current, source_language: e.target.value }))}
+                placeholder="Source language"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+                required
+              />
+              <input
+                value={form.target_language}
+                onChange={(e) => setForm((current) => ({ ...current, target_language: e.target.value }))}
+                placeholder="Target language"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+                required
+              />
+              <input
+                value={form.industry}
+                onChange={(e) => setForm((current) => ({ ...current, industry: e.target.value }))}
+                placeholder="Industry (optional)"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+              />
+              <input
+                value={form.domain}
+                onChange={(e) => setForm((current) => ({ ...current, domain: e.target.value }))}
+                placeholder="Domain (optional)"
+                className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+              />
+              <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50 transition-colors"
+                >
+                  {saving ? "Saving…" : "Save glossary term"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ── Import CSV panel (collapsible) ── */}
+        {showImportPanel && (
+          <div className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-base font-semibold text-brand-text">Import CSV</h2>
+              <button
+                type="button"
+                onClick={() => setShowImportPanel(false)}
+                className="text-brand-subtle hover:text-brand-text"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-brand-subtle">
+              CSV must include headers: source_term, target_term. Terms will be merged with your existing glossary.
+            </p>
+            <form
+              onSubmit={(e) => { void handleCsvImport(e); }}
+              className="flex flex-wrap items-end gap-3"
             >
-              {csvImporting ? "Importing…" : "Import"}
-            </button>
-          </form>
-          {csvResult && (
-            <div className="mt-3 text-sm text-brand-accent">
-              Imported {csvResult.imported} terms, skipped {csvResult.skipped}.
-              {csvResult.errors.length > 0 && (
-                <ul className="mt-1 list-inside list-disc text-status-error">
-                  {csvResult.errors.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {csvError && <p className="mt-2 text-sm text-status-error">{csvError}</p>}
-        </div>
-
-        {/* ── Add term ── */}
-        <div className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6">
-          <h2 className="mb-4 font-display text-base font-semibold text-brand-text">
-            Add term
-          </h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <input
-              value={form.source_term}
-              onChange={(e) => setForm((current) => ({ ...current, source_term: e.target.value }))}
-              placeholder="Source term"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-              required
-            />
-            <input
-              value={form.target_term}
-              onChange={(e) => setForm((current) => ({ ...current, target_term: e.target.value }))}
-              placeholder="Target term"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-              required
-            />
-            <input
-              value={form.source_language}
-              onChange={(e) => setForm((current) => ({ ...current, source_language: e.target.value }))}
-              placeholder="Source language"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-              required
-            />
-            <input
-              value={form.target_language}
-              onChange={(e) => setForm((current) => ({ ...current, target_language: e.target.value }))}
-              placeholder="Target language"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-              required
-            />
-            <input
-              value={form.industry}
-              onChange={(e) => setForm((current) => ({ ...current, industry: e.target.value }))}
-              placeholder="Industry (optional)"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-            />
-            <input
-              value={form.domain}
-              onChange={(e) => setForm((current) => ({ ...current, domain: e.target.value }))}
-              placeholder="Domain (optional)"
-              className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-            />
-            <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-brand-subtle">CSV file</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  required
+                  disabled={csvImporting}
+                  onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+                  className="text-sm text-brand-text file:mr-3 file:border-0 file:bg-brand-bg file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-muted hover:file:bg-brand-bg"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Source language</label>
+                <input
+                  value={csvSourceLang}
+                  onChange={(e) => setCsvSourceLang(e.target.value)}
+                  placeholder="en"
+                  required
+                  disabled={csvImporting}
+                  className="w-24 rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm focus:border-brand-accent focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-brand-subtle">Target language</label>
+                <input
+                  value={csvTargetLang}
+                  onChange={(e) => setCsvTargetLang(e.target.value)}
+                  placeholder="de"
+                  required
+                  disabled={csvImporting}
+                  className="w-24 rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm focus:border-brand-accent focus:outline-none"
+                />
+              </div>
               <button
                 type="submit"
-                disabled={saving}
-                className="rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                
+                disabled={csvImporting || !csvFile}
+                className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50 transition-colors"
               >
-                {saving ? "Saving…" : "Save glossary term"}
+                {csvImporting ? "Importing…" : "Import"}
               </button>
-              {message && <span className="text-sm text-brand-accent">{message}</span>}
-              {error && <span className="text-sm text-status-error">{error}</span>}
-            </div>
-          </form>
-        </div>
-
-        {/* ── Terms list ── */}
-        <div className="rounded-xl border border-brand-border bg-brand-surface">
-          <div className="border-b border-brand-border px-6 py-4">
-            <h2 className="mb-3 font-display text-base font-semibold text-brand-text">
-              Glossary terms
-            </h2>
-            {/* Search */}
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search source or target term…"
-              className="mb-3 w-full max-w-sm rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle"
-            />
-            {/* Language pair pills */}
-            {langPairs.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {["All", ...langPairs].map((pair) => (
-                  <button
-                    key={pair}
-                    type="button"
-                    onClick={() => setLangFilter(pair)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      langFilter === pair
-                        ? "bg-brand-accent text-white"
-                        : "border border-brand-border bg-brand-surface text-brand-muted hover:bg-brand-bg"
-                    }`}
-                    
-                  >
-                    {pair}
-                  </button>
-                ))}
+            </form>
+            {csvResult && (
+              <div className="mt-3 text-sm text-brand-accent">
+                Imported {csvResult.imported} terms, skipped {csvResult.skipped}.
+                {csvResult.errors.length > 0 && (
+                  <ul className="mt-1 list-inside list-disc text-status-error">
+                    {csvResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
+            {csvError && <p className="mt-2 text-sm text-status-error">{csvError}</p>}
+          </div>
+        )}
+
+        {/* ── Term table ── */}
+        <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+          {/* Search + language filter bar */}
+          <div className="border-b border-brand-border px-5 py-4">
+            <div className="flex items-center gap-4">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search terms…"
+                className="w-full max-w-xs rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle"
+              />
+              {langPairs.length >= 2 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {["All", ...langPairs].map((pair) => (
+                    <button
+                      key={pair}
+                      type="button"
+                      onClick={() => setLangFilter(pair)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        langFilter === pair
+                          ? "bg-brand-accent text-white"
+                          : "border border-brand-border bg-brand-surface text-brand-muted hover:bg-brand-bg"
+                      }`}
+                    >
+                      {pair === "All" ? "All languages" : pair}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {loading ? (
-            <p className="px-6 py-8 text-sm text-brand-subtle">Loading…</p>
-          ) : displayedTerms.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-brand-subtle">
-              {terms.length === 0
-                ? "No glossary terms yet. Add your first term above or import from a CSV file."
-                : "No terms match your search or filter."}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-brand-border text-sm">
-                <thead className="bg-brand-bg">
-                  <tr>
-                    {["Source", "Target", "Languages", "Industry", "Domain", "Action"].map((col) => (
-                      <th key={col} className={TH}>
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand-border">
-                  {displayedTerms.map((term) => {
-                    const isEditing = editingId === term.id;
-                    const isPhrase = term.source_term.includes(" ");
-                    return (
-                      <tr key={term.id} className="hover:bg-brand-bg">
-                        {/* Source */}
-                        <td className="px-4 py-3 font-medium text-brand-text">
-                          {isEditing ? (
-                            <input
-                              value={editSource}
-                              onChange={(e) => setEditSource(e.target.value)}
-                              className="w-full border border-brand-border px-2 py-1 text-sm focus:border-brand-accent focus:outline-none"
-                            />
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              {term.source_term}
-                              <span className="rounded-full bg-brand-bg px-1.5 py-0.5 text-xs text-brand-subtle">
-                                {isPhrase ? "Phrase" : "Term"}
-                              </span>
-                              {term.usage_count > 0 && (
-                                <span className="text-xs text-brand-muted">
-                                  Used {term.usage_count} {term.usage_count === 1 ? "time" : "times"}
-                                </span>
-                              )}
-                            </span>
-                          )}
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-brand-border">
+                <th className={TH}>Source term</th>
+                <th className={TH}>Translation</th>
+                {!singleLangActive && <th className={TH}>Languages</th>}
+                <th className={TH}>Type</th>
+                <th className={TH}>Usage</th>
+                <th className={TH}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={singleLangActive ? 5 : 6} className="px-5 py-8 text-center text-sm text-brand-subtle">
+                    Loading…
+                  </td>
+                </tr>
+              ) : displayedTerms.length === 0 && terms.length === 0 ? (
+                /* Empty state */
+                <tr>
+                  <td colSpan={singleLangActive ? 5 : 6} className="px-5 py-16 text-center">
+                    <div className="mx-auto max-w-sm">
+                      <div className="mb-3 text-4xl">📖</div>
+                      <p className="font-display text-lg font-bold text-brand-text">No terms yet</p>
+                      <p className="mt-1 text-sm text-brand-muted">
+                        Add terms to ensure Helvara translates your key vocabulary consistently across every document.
+                      </p>
+                      <div className="mt-5 flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddPanel(true); setShowImportPanel(false); }}
+                          className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors"
+                        >
+                          + Add first term
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowImportPanel(true); setShowAddPanel(false); }}
+                          className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted hover:bg-brand-bg transition-colors"
+                        >
+                          Import CSV
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : displayedTerms.length === 0 ? (
+                <tr>
+                  <td colSpan={singleLangActive ? 5 : 6} className="px-5 py-8 text-center text-sm text-brand-subtle">
+                    No terms match your search or filter.
+                  </td>
+                </tr>
+              ) : (
+                displayedTerms.map((term) => {
+                  const isEditing = editingId === term.id;
+                  const isPhrase = term.source_term.includes(" ");
+                  return (
+                    <tr key={term.id} className="group/row border-b border-brand-border last:border-0 transition-colors hover:bg-brand-bg">
+                      {/* Source term */}
+                      <td className="px-5 py-3.5 font-medium text-brand-text">
+                        {isEditing ? (
+                          <input
+                            value={editSource}
+                            onChange={(e) => setEditSource(e.target.value)}
+                            className="w-full rounded-lg border border-brand-border px-2 py-1 text-sm focus:border-brand-accent focus:outline-none"
+                          />
+                        ) : (
+                          term.source_term
+                        )}
+                      </td>
+                      {/* Translation */}
+                      <td className="px-5 py-3.5 text-brand-text">
+                        {isEditing ? (
+                          <input
+                            value={editTarget}
+                            onChange={(e) => setEditTarget(e.target.value)}
+                            className="w-full rounded-lg border border-brand-border px-2 py-1 text-sm focus:border-brand-accent focus:outline-none"
+                          />
+                        ) : (
+                          term.target_term
+                        )}
+                      </td>
+                      {/* Languages */}
+                      {!singleLangActive && (
+                        <td className="px-5 py-3.5 text-brand-muted">
+                          {toLangCode(term.source_language)} → {toLangCode(term.target_language)}
                         </td>
-                        {/* Target */}
-                        <td className="px-4 py-3 font-medium text-brand-text">
-                          {isEditing ? (
-                            <input
-                              value={editTarget}
-                              onChange={(e) => setEditTarget(e.target.value)}
-                              className="w-full border border-brand-border px-2 py-1 text-sm focus:border-brand-accent focus:outline-none"
-                            />
-                          ) : (
-                            term.target_term
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-brand-subtle">
-                          {term.source_language} → {term.target_language}
-                        </td>
-                        <td className="px-4 py-3 text-brand-subtle">
-                          {term.industry ?? <span className="text-brand-subtle">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-brand-subtle">
-                          {term.domain ?? <span className="text-brand-subtle">—</span>}
-                        </td>
-                        {/* Action */}
-                        <td className="px-4 py-3">
-                          {isEditing ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => { void handleSaveEdit(term.id); }}
-                                  disabled={editSaving}
-                                  className="text-sm font-medium disabled:opacity-50"
-                                  
-                                >
-                                  {editSaving ? "Saving…" : "Save"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelEdit}
-                                  disabled={editSaving}
-                                  className="text-sm text-brand-subtle hover:text-brand-muted disabled:opacity-50"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                              {editError && (
-                                <span className="text-xs text-status-error">{editError}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => startEdit(term)}
-                                className="text-sm text-brand-subtle hover:text-brand-text"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { void handleDelete(term.id); }}
-                                className="text-sm text-red-500 hover:text-red-700"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      )}
+                      {/* Type */}
+                      <td className="px-5 py-3.5">
+                        <span className="rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-subtle">
+                          {isPhrase ? "Phrase" : "Term"}
+                        </span>
+                      </td>
+                      {/* Usage */}
+                      <td className="px-5 py-3.5">
+                        {term.usage_count > 0 ? (
+                          <span className="text-xs text-brand-muted">
+                            Used {term.usage_count} {term.usage_count === 1 ? "time" : "times"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-brand-subtle">Not used yet</span>
+                        )}
+                      </td>
+                      {/* Actions */}
+                      <td className="px-5 py-3.5">
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => { void handleSaveEdit(term.id); }}
+                              disabled={editSaving}
+                              className="text-sm font-medium text-brand-accent disabled:opacity-50"
+                            >
+                              {editSaving ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              disabled={editSaving}
+                              className="text-sm text-brand-subtle hover:text-brand-muted disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            {editError && <span className="text-xs text-status-error">{editError}</span>}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover/row:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(term)}
+                              className="text-sm text-brand-subtle hover:text-brand-text"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { void handleDelete(term.id); }}
+                              className="text-sm text-status-error hover:opacity-80"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </main>
     </div>
