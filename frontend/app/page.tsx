@@ -24,16 +24,16 @@ const LANGUAGES = [
   "Thai","Vietnamese",
 ];
 
-// ─── Design tokens ─────────────────────────────────────────────────────────────
+// ─── Design tokens (aligned with DESIGN.md brand palette) ─────────────────────
 
 const T = {
-  surface:             "#fcf9f0",
-  surfaceContainerLow: "#f6f3eb",
-  surfaceContainer:    "#f1eee5",
-  primaryContainer:    "#082012",
-  onSurface:           "#1c1c17",
-  onSurfaceVariant:    "#424843",
-  accent:              "#0D7B6E",
+  surface:             "#F5F2EC",  // brand-bg
+  surfaceContainerLow: "#F5F2EC",  // brand-bg
+  surfaceContainer:    "#E5E0D8",  // brand-border (used as tinted bg)
+  primaryContainer:    "#082012",  // dark hero/CTA background
+  onSurface:           "#1A110A",  // brand-text
+  onSurfaceVariant:    "#6B6158",  // brand-muted
+  accent:              "#0D7B6E",  // brand-accent
 } as const;
 
 // ─── Static data ───────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ const features = [
 // ─── Shared style helpers ──────────────────────────────────────────────────────
 
 const display: React.CSSProperties = {
-  fontFamily: "'Newsreader', Georgia, serif",
+  fontFamily: "'Playfair Display', Georgia, serif",
 };
 
 const inter: React.CSSProperties = {
@@ -314,7 +314,7 @@ export default function LandingPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
         body { margin: 0; background: ${T.surface}; }
@@ -431,7 +431,7 @@ export default function LandingPage() {
               Translation Workflow Platform
             </p>
             <h1 style={{
-              fontFamily: "'Newsreader', Georgia, serif",
+              fontFamily: "'Playfair Display', Georgia, serif",
               fontSize: "clamp(3.5rem, 8vw, 6rem)",
               fontWeight: 700,
               letterSpacing: "-0.02em",
@@ -529,7 +529,7 @@ export default function LandingPage() {
             }}>
               {/* Static: "Translate a" */}
               <span style={{
-                fontFamily: "'Newsreader', Georgia, serif",
+                fontFamily: "'Playfair Display', Georgia, serif",
                 fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                 fontWeight: 700,
                 letterSpacing: "-0.02em",
@@ -549,7 +549,7 @@ export default function LandingPage() {
                 overflow: "hidden",
               }}>
                 <span style={{
-                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontFamily: "'Playfair Display', Georgia, serif",
                   fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
@@ -567,7 +567,7 @@ export default function LandingPage() {
 
               {/* Static: "into" */}
               <span style={{
-                fontFamily: "'Newsreader', Georgia, serif",
+                fontFamily: "'Playfair Display', Georgia, serif",
                 fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                 fontWeight: 700,
                 letterSpacing: "-0.02em",
@@ -587,7 +587,7 @@ export default function LandingPage() {
                 overflow: "hidden",
               }}>
                 <span style={{
-                  fontFamily: "'Newsreader', Georgia, serif",
+                  fontFamily: "'Playfair Display', Georgia, serif",
                   fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
                   fontWeight: 400,
                   fontStyle: "italic",
@@ -857,9 +857,12 @@ export default function LandingPage() {
             <span style={{ ...display, fontSize: "1.1rem", fontWeight: 600, color: "rgba(232,245,226,0.6)", letterSpacing: "-0.01em" }}>
               Helvara
             </span>
-            <span style={{ ...inter, fontSize: "0.75rem", color: "rgba(232,245,226,0.35)" }}>
-              © 2026 Helvara
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", ...inter, fontSize: "0.75rem", color: "rgba(232,245,226,0.35)" }}>
+              <a href="/privacy" style={{ color: "inherit", textDecoration: "none" }}>Privacy</a>
+              <a href="/terms" style={{ color: "inherit", textDecoration: "none" }}>Terms</a>
+              <a href="/data-faq" style={{ color: "inherit", textDecoration: "none" }}>Data &amp; Security</a>
+              <span>© 2026 Helvara</span>
+            </div>
           </div>
         </footer>
 
