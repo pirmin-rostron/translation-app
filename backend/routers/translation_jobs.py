@@ -1486,6 +1486,13 @@ def _execute_reconstruction_stage(db: Session, translation_job_id: int):
     job.error_message = None
     db.commit()
 
+    # Auto-extract glossary suggestions in the background (fire and forget)
+    try:
+        from routers.glossary_suggestions import _extract_suggestions_for_job
+        _extract_suggestions_for_job(db, job, job.org_id or 0)
+    except Exception:
+        logger.exception("Auto glossary extraction failed for job_id=%d (non-blocking)", job.id)
+
 
 @router.post("/documents/{document_id}/translation-jobs", response_model=TranslationJobResponse)
 def create_translation_job(
@@ -2505,11 +2512,11 @@ def delete_translation_job(
 ):
     """Delete a translation job and its output. Preserves the source document.
 
-    Deletes: TranslationResult, ProcessingStageJob, JobEvent, UsageEvent,
-    and the TranslationJob record. Resets block translations to None.
-    Never deletes: Document, DocumentBlock, DocumentSegment.
+    Cascade deletes every FK reference: SegmentAnnotation, GlossaryTermSuggestion,
+    TranslationResult, ProcessingStageJob, JobEvent, UsageEvent, then the job.
+    Resets block translations to None.
     """
-    from models import JobEvent
+    from models import GlossaryTermSuggestion, JobEvent
 
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
@@ -2517,13 +2524,17 @@ def delete_translation_job(
 
     document_id = job.document_id
 
+    # Delete segment annotations referencing this job
+    db.query(SegmentAnnotation).filter(SegmentAnnotation.translation_job_id == job_id).delete(synchronize_session=False)
+    # Delete glossary term suggestions referencing this job
+    db.query(GlossaryTermSuggestion).filter(GlossaryTermSuggestion.job_id == job_id).delete(synchronize_session=False)
     # Delete translation results
     db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
     # Delete processing stage jobs
     db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
     # Delete job events
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
-    # Delete usage events referencing this job (fixes FK violation)
+    # Delete usage events referencing this job
     db.query(UsageEvent).filter(UsageEvent.job_id == job_id).delete(synchronize_session=False)
     # Reset block translated text
     db.query(DocumentBlock).filter(DocumentBlock.document_id == document_id).update(
@@ -2544,20 +2555,22 @@ def retranslate_job(
 ):
     """Clear all translation data for a job and re-trigger the translation pipeline.
 
-    Deletes all TranslationResult, ProcessingStageJob, and JobEvent records,
-    resets the job status to translation_queued, and dispatches a new Celery task.
-    The source Document and its blocks/segments are preserved.
+    Cascade deletes every FK reference, resets job to translation_queued,
+    and dispatches a new Celery task. Source Document and blocks are preserved.
     """
-    from models import JobEvent
+    from models import GlossaryTermSuggestion, JobEvent
 
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
-    # Clear translation output
+    # Clear all FK references to this job
+    db.query(SegmentAnnotation).filter(SegmentAnnotation.translation_job_id == job_id).delete(synchronize_session=False)
+    db.query(GlossaryTermSuggestion).filter(GlossaryTermSuggestion.job_id == job_id).delete(synchronize_session=False)
     db.query(TranslationResult).filter(TranslationResult.job_id == job_id).delete(synchronize_session=False)
     db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id == job_id).delete(synchronize_session=False)
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(synchronize_session=False)
+    db.query(UsageEvent).filter(UsageEvent.job_id == job_id).delete(synchronize_session=False)
 
     # Reset block translated text
     db.query(DocumentBlock).filter(DocumentBlock.document_id == job.document_id).update(
@@ -2586,6 +2599,67 @@ def retranslate_job(
     logger.info("Re-translate queued for translation_job_id=%d", job_id)
     background_tasks.add_task(_run_translation_pipeline, job.id)
     return job
+
+
+# ── Glossary suggestion endpoints (job-scoped) ──────────────────────────────
+
+@router.get("/{job_id}/suggestions")
+def get_job_suggestions(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Return all pending glossary suggestions for this job."""
+    from models import GlossaryTermSuggestion
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    suggestions = (
+        db.query(GlossaryTermSuggestion)
+        .filter(
+            GlossaryTermSuggestion.job_id == job_id,
+            GlossaryTermSuggestion.status == "pending",
+        )
+        .all()
+    )
+    return [
+        {
+            "id": s.id, "job_id": s.job_id, "source_term": s.source_term,
+            "target_term": s.target_term, "source_language": s.source_language,
+            "target_language": s.target_language, "frequency": s.frequency, "status": s.status,
+        }
+        for s in suggestions
+    ]
+
+
+@router.post("/{job_id}/extract-suggestions")
+def extract_suggestions(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Manually trigger glossary term extraction for a completed job."""
+    job = db.query(TranslationJob).filter(
+        TranslationJob.id == job_id,
+        TranslationJob.org_id == current_org.id,
+        TranslationJob.deleted_at.is_(None),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+    from routers.glossary_suggestions import _extract_suggestions_for_job
+    suggestions = _extract_suggestions_for_job(db, job, current_org.id)
+    return [
+        {
+            "id": s.id, "job_id": s.job_id, "source_term": s.source_term,
+            "target_term": s.target_term, "source_language": s.source_language,
+            "target_language": s.target_language, "frequency": s.frequency, "status": s.status,
+        }
+        for s in suggestions
+    ]
 
 
 @router.get("/documents/{document_id}/translation-jobs", response_model=list[TranslationJobResponse])

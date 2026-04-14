@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import Document, DocumentBlock, DocumentSegment, JobEvent, Organisation, ProcessingStageJob, Project, SegmentAnnotation, TranslationJob, TranslationResult, UsageEvent
+from models import Document, DocumentBlock, DocumentSegment, GlossaryTermSuggestion, JobEvent, Organisation, ProcessingStageJob, Project, SegmentAnnotation, TranslationJob, TranslationResult, UsageEvent
 from schemas import (
     DocumentProgressResponse,
     DocumentBlockResponse,
@@ -890,6 +890,8 @@ def delete_document(
         jid for (jid,) in db.query(TranslationJob.id).filter(TranslationJob.document_id == document_id).all()
     ]
     if job_ids:
+        db.query(SegmentAnnotation).filter(SegmentAnnotation.translation_job_id.in_(job_ids)).delete(synchronize_session=False)
+        db.query(GlossaryTermSuggestion).filter(GlossaryTermSuggestion.job_id.in_(job_ids)).delete(synchronize_session=False)
         db.query(TranslationResult).filter(TranslationResult.job_id.in_(job_ids)).delete(synchronize_session=False)
         db.query(ProcessingStageJob).filter(ProcessingStageJob.translation_job_id.in_(job_ids)).delete(synchronize_session=False)
         db.query(JobEvent).filter(JobEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
