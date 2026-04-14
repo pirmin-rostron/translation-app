@@ -141,6 +141,21 @@ class GlossaryTerm(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class GlossaryTermSuggestion(Base):
+    __tablename__ = "glossary_term_suggestions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organisations.id"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("translation_jobs.id"), nullable=False, index=True)
+    source_term = Column(String(255), nullable=False)
+    target_term = Column(String(255), nullable=False)
+    source_language = Column(String(50), nullable=False)
+    target_language = Column(String(50), nullable=False)
+    frequency = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), nullable=False, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Project(Base):
     __tablename__ = "projects"
 

@@ -5,6 +5,10 @@ ANTHROPIC_PRICING: dict[str, dict[str, float]] = {
         "input_per_million": 3.00,
         "output_per_million": 15.00,
     },
+    "claude-haiku-4-5-20251001": {
+        "input_per_million": 0.80,
+        "output_per_million": 4.00,
+    },
 }
 
 # Fallback model key if exact model not found in pricing table

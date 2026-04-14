@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 
 import { useEffect, useMemo, useState } from "react";
 
-import { glossaryTermsApi, type GlossaryTerm, type GlossaryTermCreate } from "../services/api";
+import { glossaryTermsApi, glossarySuggestionsApi, type GlossaryTerm, type GlossaryTermCreate, type GlossarySuggestion } from "../services/api";
 
 type GlossaryForm = {
   source_term: string;
@@ -69,6 +69,9 @@ export default function GlossaryPage() {
   const [csvResult, setCsvResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [csvError, setCsvError] = useState("");
 
+  // Glossary suggestions
+  const [pendingSuggestions, setPendingSuggestions] = useState<GlossarySuggestion[]>([]);
+
   function loadTerms() {
     glossaryTermsApi.list<GlossaryTerm[]>()
       .then(setTerms)
@@ -78,6 +81,9 @@ export default function GlossaryPage() {
 
   useEffect(() => {
     loadTerms();
+    glossarySuggestionsApi.getPending()
+      .then(setPendingSuggestions)
+      .catch(() => { /* non-critical */ });
   }, []);
 
   // Unique language pairs for filter pills (using 2-letter codes)
@@ -265,6 +271,74 @@ export default function GlossaryPage() {
                 {timeSavedHrs ? `~${timeSavedHrs} hrs` : "—"}
               </p>
               <p className="mt-0.5 text-[0.6875rem] text-brand-subtle">vs manual terminology checking</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Suggested terms from recent translations ── */}
+        {pendingSuggestions.length > 0 && (
+          <div className="mb-6 rounded-xl border border-brand-accent/30 bg-brand-accentMid/30 p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium text-brand-text">
+                From your recent translations, we suggest adding these terms:
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const ids = pendingSuggestions.map((s) => s.id);
+                  void glossarySuggestionsApi.bulkAccept(ids).then(() => {
+                    setPendingSuggestions([]);
+                    loadTerms();
+                  });
+                }}
+                className="rounded-full border border-brand-accent bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent hover:bg-brand-accent hover:text-white transition-colors"
+              >
+                Add all {pendingSuggestions.length} terms
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-brand-border">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Source</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Translation</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-brand-subtle">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingSuggestions.map((s) => (
+                    <tr key={s.id} className="border-b border-brand-border last:border-0">
+                      <td className="px-4 py-2 font-medium text-brand-text">{s.source_term}</td>
+                      <td className="px-4 py-2 text-brand-muted">{s.target_term}</td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void glossarySuggestionsApi.accept(s.id).then(() => {
+                              setPendingSuggestions((prev) => prev.filter((p) => p.id !== s.id));
+                              loadTerms();
+                            });
+                          }}
+                          className="mr-2 text-status-success hover:underline"
+                        >
+                          ✓ Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void glossarySuggestionsApi.reject(s.id).then(() => {
+                              setPendingSuggestions((prev) => prev.filter((p) => p.id !== s.id));
+                            });
+                          }}
+                          className="text-brand-subtle hover:text-brand-text"
+                        >
+                          ✗ Skip
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

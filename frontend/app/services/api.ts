@@ -623,3 +623,45 @@ export const glossaryTermsApi = {
   delete: <T>(id: number) =>
     apiFetch<T>(`${API_URL}/glossary-terms/${id}`, { method: "DELETE" }),
 };
+
+// --- Glossary suggestions ---
+
+export type GlossarySuggestion = {
+  id: number;
+  job_id: number;
+  source_term: string;
+  target_term: string;
+  source_language: string;
+  target_language: string;
+  frequency: number;
+  status: string;
+};
+
+export const glossarySuggestionsApi = {
+  getForJob: (jobId: number) =>
+    apiFetch<GlossarySuggestion[]>(`${API_URL}/translation-jobs/${jobId}/suggestions`),
+
+  getPending: () =>
+    apiFetch<GlossarySuggestion[]>(`${API_URL}/glossary-suggestions/pending`),
+
+  accept: (id: number) =>
+    apiFetch<GlossarySuggestion>(`${API_URL}/glossary-suggestions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "accepted" }),
+    }),
+
+  reject: (id: number) =>
+    apiFetch<GlossarySuggestion>(`${API_URL}/glossary-suggestions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "rejected" }),
+    }),
+
+  bulkAccept: (ids: number[]) =>
+    apiFetch<GlossarySuggestion[]>(`${API_URL}/glossary-suggestions/bulk-accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ suggestion_ids: ids }),
+    }),
+};

@@ -3,8 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../../../stores/authStore";
-import { API_URL, overviewApi, translationJobsApi, documentsApi } from "../../../services/api";
-import type { OverviewResponse } from "../../../services/api";
+import { API_URL, overviewApi, translationJobsApi, documentsApi, glossarySuggestionsApi } from "../../../services/api";
+import type { OverviewResponse, GlossarySuggestion } from "../../../services/api";
 import { getLanguageDisplayName } from "../../../utils/language";
 import { trackEvent } from "../../../utils/analytics";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
@@ -65,6 +65,9 @@ export default function OverviewPage() {
   const [downloaded, setDownloaded] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"delete_translation" | "delete_document" | "retranslate" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<GlossarySuggestion[]>([]);
+  const [suggestionsVisible, setSuggestionsVisible] = useState(true);
+  const [suggestionsExpanded, setSuggestionsExpanded] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
@@ -77,7 +80,34 @@ export default function OverviewPage() {
       .then(setData)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load overview"))
       .finally(() => setLoading(false));
+    // Fetch glossary suggestions for this job
+    glossarySuggestionsApi.getForJob(jobId)
+      .then(setSuggestions)
+      .catch(() => { /* non-critical */ });
   }, [jobId, token]);
+
+  async function handleSuggestionAction(id: number, action: "accept" | "reject") {
+    try {
+      if (action === "accept") {
+        await glossarySuggestionsApi.accept(id);
+      } else {
+        await glossarySuggestionsApi.reject(id);
+      }
+      setSuggestions((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error("[suggestion-action]", err);
+    }
+  }
+
+  async function handleAcceptAll() {
+    const ids = suggestions.map((s) => s.id);
+    try {
+      await glossarySuggestionsApi.bulkAccept(ids);
+      setSuggestions([]);
+    } catch (err) {
+      console.error("[bulk-accept]", err);
+    }
+  }
 
   async function triggerExport(approveAll: boolean) {
     setExporting(true);
@@ -206,6 +236,85 @@ export default function OverviewPage() {
               )}
             </div>
           </div>
+
+          {/* Glossary suggestions callout */}
+          {suggestions.length > 0 && suggestionsVisible && (
+            <div className="rounded-xl border border-brand-accent/30 bg-brand-accentMid/30 p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-brand-text">
+                  📖 We found {suggestions.length} potential glossary {suggestions.length === 1 ? "term" : "terms"} in this document.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSuggestionsExpanded(!suggestionsExpanded)}
+                    className="rounded-full bg-brand-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors"
+                  >
+                    {suggestionsExpanded ? "Hide" : "Review suggestions"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSuggestionsVisible(false)}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium text-brand-muted hover:text-brand-text"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+
+              {suggestionsExpanded && (
+                <div className="mt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs text-brand-muted">{suggestions.length} pending</span>
+                    <button
+                      type="button"
+                      onClick={() => { void handleAcceptAll(); }}
+                      className="rounded-full border border-brand-accent bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent hover:bg-brand-accent hover:text-white transition-colors"
+                    >
+                      Add all {suggestions.length} terms
+                    </button>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-brand-border">
+                          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Source term</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-brand-subtle">Translation</th>
+                          <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-brand-subtle">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {suggestions.map((s) => (
+                          <tr key={s.id} className="border-b border-brand-border last:border-0">
+                            <td className="px-4 py-2 font-medium text-brand-text">{s.source_term}</td>
+                            <td className="px-4 py-2 text-brand-muted">{s.target_term}</td>
+                            <td className="px-4 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => { void handleSuggestionAction(s.id, "accept"); }}
+                                className="mr-2 text-status-success hover:underline"
+                                title="Add to glossary"
+                              >
+                                ✓ Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { void handleSuggestionAction(s.id, "reject"); }}
+                                className="text-brand-subtle hover:text-brand-text"
+                                title="Skip"
+                              >
+                                ✗ Skip
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Here's what Helvara did */}
           <div className="rounded-xl border border-brand-border bg-brand-surface p-6">
