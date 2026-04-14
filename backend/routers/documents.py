@@ -683,27 +683,41 @@ def list_grouped_documents(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Return documents with nested translation jobs, paginated at the document level."""
+    """Return documents with nested translation jobs, paginated at the document level.
+
+    Only includes documents that have at least one non-deleted translation job.
+    """
     org_id = current_org.id
 
-    total_documents: int = (
-        db.query(func.count(Document.id))
-        .filter(Document.org_id == org_id, Document.deleted_at.is_(None))
-        .scalar() or 0
-    )
+    # IDs of documents that have at least one active job
+    doc_ids_with_jobs = [
+        doc_id for (doc_id,) in
+        db.query(TranslationJob.document_id)
+        .join(Document, Document.id == TranslationJob.document_id)
+        .filter(
+            Document.org_id == org_id,
+            Document.deleted_at.is_(None),
+            TranslationJob.deleted_at.is_(None),
+        )
+        .distinct()
+        .all()
+    ]
+
+    total_documents = len(doc_ids_with_jobs)
     total_jobs: int = (
         db.query(func.count(TranslationJob.id))
         .filter(TranslationJob.org_id == org_id, TranslationJob.deleted_at.is_(None))
         .scalar() or 0
     )
 
+    # Paginate document IDs, then fetch docs
     offset = (page - 1) * page_size
     docs = (
         db.query(Document)
-        .filter(Document.org_id == org_id, Document.deleted_at.is_(None))
+        .filter(Document.id.in_(doc_ids_with_jobs), Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
         .offset(offset).limit(page_size).all()
-    )
+    ) if doc_ids_with_jobs else []
     doc_ids = [d.id for d in docs]
 
     jobs = (

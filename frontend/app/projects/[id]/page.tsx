@@ -18,7 +18,9 @@ import type { ProjectDetailResponse, ProjectStatsResponse, TranslationJobListIte
 import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { ModalOverlay } from "../../dashboard/ModalOverlay";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { getLanguageDisplayName, getLanguageFlag, PROJECT_LANGUAGE_OPTIONS } from "../../utils/language";
+import { StatusBadge, toJobStatus } from "../../components/StatusBadge";
+import { getLanguageCode, getLanguageDisplayName, getLanguageFlag, PROJECT_LANGUAGE_OPTIONS } from "../../utils/language";
+import Link from "next/link";
 
 const PROCESSING_STATUSES = new Set(["queued", "parsing", "translating", "translation_queued"]);
 
@@ -345,6 +347,12 @@ export default function ProjectPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-[1100px] px-8 py-8">
+        {/* Breadcrumb */}
+        <p className="mb-1 text-xs text-brand-subtle">
+          <Link href="/projects" className="text-brand-accent no-underline hover:underline">Projects</Link>
+          {" › "}
+          <span className="text-brand-muted">{project.name}</span>
+        </p>
         {/* 1. PageHeader */}
         <PageHeader
           eyebrow="Project"
@@ -411,119 +419,88 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* 4. Documents table — headers always visible */}
-        <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+        {/* 4. Documents — pill-row grouped layout */}
+        <div className="overflow-hidden rounded-xl border border-brand-border">
           {/* Toolbar */}
-          <div className="flex items-center justify-between border-b border-brand-border px-5 py-3">
-            <span className="text-sm text-brand-muted">
-              {totalDocs} {totalDocs === 1 ? "document" : "documents"} · {totalJobs} translation jobs
-            </span>
-            <button
-              type="button"
-              onClick={() => openTranslationModal(projectId)}
-              className="rounded-full bg-brand-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors"
-            >
-              + Upload document
-            </button>
+          <div className="flex items-center justify-between border-b border-brand-border bg-brand-surface px-4 py-2.5">
+            <span className="text-sm text-brand-muted">{totalDocs} {totalDocs === 1 ? "document" : "documents"} · {totalJobs} translation jobs</span>
+            <div className="flex items-center gap-3">
+              {docGroups.length > 0 && (
+                <button type="button" onClick={() => {
+                  if (collapsedDocs.size === docGroups.length) setCollapsedDocs(new Set());
+                  else setCollapsedDocs(new Set(docGroups.map((g) => g.documentName)));
+                }} className="text-xs font-medium text-brand-muted hover:text-brand-text">
+                  {collapsedDocs.size === docGroups.length ? "Expand all" : "Collapse all"}
+                </button>
+              )}
+              <button type="button" onClick={() => openTranslationModal(projectId)} className="rounded-full bg-brand-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors">+ Upload document</button>
+            </div>
           </div>
 
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-brand-border">
-                {["Document", "Language", "Words", "Status", "Uploaded"].map((col) => (
-                  <th
-                    key={col}
-                    className="px-4 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle"
-                  >
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.length === 0 ? (
-                /* Teal callout empty state */
-                <tr>
-                  <td colSpan={5} className="p-4">
-                    <div className="rounded-xl border border-brand-accent/30 bg-brand-accentMid/30 p-6 text-center">
-                      <p className="font-display text-lg font-semibold text-brand-text">Ready for your first document</p>
-                      <p className="mx-auto mt-2 max-w-md text-sm text-brand-muted">
-                        Every file you upload will be automatically translated into{" "}
-                        {project.target_languages.map((lang, i) => (
-                          <span key={lang}>
-                            {i > 0 && (i === project.target_languages.length - 1 ? " and " : ", ")}
-                            {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
-                          </span>
-                        ))}.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => openTranslationModal(projectId)}
-                        className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors"
-                      >
-                        + Upload document
-                      </button>
+          {jobs.length === 0 ? (
+            <div className="rounded-xl border border-brand-accent/30 bg-brand-accentMid/30 p-6 m-4 text-center">
+              <p className="font-display text-lg font-semibold text-brand-text">Ready for your first document</p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-brand-muted">
+                Every file you upload will be automatically translated into{" "}
+                {project.target_languages.map((lang, i) => (
+                  <span key={lang}>
+                    {i > 0 && (i === project.target_languages.length - 1 ? " and " : ", ")}
+                    {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
+                  </span>
+                ))}.
+              </p>
+              <button type="button" onClick={() => openTranslationModal(projectId)} className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors">+ Upload document</button>
+            </div>
+          ) : (
+            docGroups.map((group) => {
+              const isCollapsed = collapsedDocs.has(group.documentName);
+              const firstJob = group.jobs[0];
+              const docId = firstJob?.document_id;
+              return (
+                <Fragment key={group.documentName}>
+                  {/* Document parent row */}
+                  <div className="flex items-center gap-3 border-b border-brand-border bg-brand-bg px-4 py-3">
+                    <button type="button" onClick={() => toggleDocCollapse(group.documentName)} className="flex h-5 w-5 shrink-0 items-center justify-center border-none bg-transparent text-xs text-brand-muted transition-transform" style={{ transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)" }}>▶</button>
+                    <span className="text-base">📄</span>
+                    <span className="text-sm font-semibold text-brand-text">{group.documentName}</span>
+                    <span className="text-xs text-brand-muted">{group.jobs.length} {group.jobs.length === 1 ? "translation" : "translations"}</span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <button type="button" onClick={() => openTranslationModal(projectId)} className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors">+ Add language</button>
+                      {docId && (
+                        <button type="button" onClick={() => setDocDeleteTarget(docId)} className="rounded-full border border-status-error/30 px-3 py-1 text-xs font-medium text-status-error hover:bg-status-errorBg transition-colors">Delete</button>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              ) : (
-                docGroups.map((group) => {
-                  const isCollapsed = collapsedDocs.has(group.documentName);
-                  const firstJob = group.jobs[0];
-                  // Find document_id from the first job
-                  const docId = firstJob?.document_id;
-                  return (
-                    <Fragment key={group.documentName}>
-                      {/* Document header row */}
-                      <tr className="border-b border-brand-border bg-brand-bg">
-                        <td colSpan={5} className="px-4 py-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleDocCollapse(group.documentName)}
-                                className="flex h-5 w-5 items-center justify-center rounded border-none bg-transparent text-xs text-brand-muted transition-transform"
-                                style={{ transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)" }}
-                              >▶</button>
-                              <span className="text-sm font-semibold text-brand-text">{group.documentName}</span>
-                              <span className="text-xs text-brand-muted">{group.jobs.length} {group.jobs.length === 1 ? "translation" : "translations"}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => openTranslationModal(projectId)} className="text-xs font-medium text-brand-muted hover:text-brand-text underline">+ Add language</button>
-                              {docId && (
-                                <button type="button" onClick={() => setDocDeleteTarget(docId)} className="text-xs font-medium text-status-error hover:underline">Delete document</button>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Translation sub-rows */}
-                      {!isCollapsed && group.jobs.map((job) => {
-                        const label = statusLabel(job.status);
-                        const isProc = PROCESSING_STATUSES.has(job.status);
-                        return (
-                          <tr
-                            key={job.id}
-                            className={`border-b border-brand-border last:border-0 ${isProc ? "cursor-not-allowed opacity-60" : "cursor-pointer transition-colors hover:bg-brand-bg"}`}
-                            onClick={() => { if (!isProc) router.push(`/translation-jobs/${job.id}/overview`); }}
+                  </div>
+                  {/* Job sub-rows */}
+                  {!isCollapsed && group.jobs.map((job) => {
+                    const isProc = PROCESSING_STATUSES.has(job.status);
+                    return (
+                      <div
+                        key={job.id}
+                        className={`flex items-center gap-2 border-b border-brand-border bg-brand-surface px-4 py-2.5 pl-12 transition-colors ${isProc ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-brand-bg"}`}
+                        onClick={() => { if (!isProc) router.push(`/translation-jobs/${job.id}/overview`); }}
+                      >
+                        <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-xs font-medium text-brand-accent">
+                          {getLanguageCode(job.source_language)} → {getLanguageCode(job.target_language)}
+                        </span>
+                        <StatusBadge status={toJobStatus(job.status)} />
+                        <span className="text-xs text-brand-subtle">{new Date(job.created_at).toLocaleDateString()}</span>
+                        <div className="ml-auto">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); if (!isProc) router.push(`/translation-jobs/${job.id}/overview`); }}
+                            className={job.status === "in_review" ? "rounded-full bg-brand-accent px-3 py-1 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors" : "rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors"}
                           >
-                            <td className="py-3 pl-10 pr-4 text-[0.8125rem] text-brand-muted">
-                              {getLanguageFlag(job.source_language)} → {getLanguageFlag(job.target_language)} {getLanguageDisplayName(job.target_language)}
-                            </td>
-                            <td className="px-4 py-3 text-[0.8125rem] text-brand-muted">{job.progress_total_segments ?? "—"}</td>
-                            <td className="px-4 py-3">
-                              <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${statusBadgeClasses(label)}`}>{label}</span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-brand-subtle">{new Date(job.created_at).toLocaleDateString()}</td>
-                          </tr>
-                        );
-                      })}
-                    </Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            {job.status === "in_review" ? "Open Review →" : job.status === "exported" ? "Download" : "View"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              );
+            })
+          )}
         </div>
       </div>
 

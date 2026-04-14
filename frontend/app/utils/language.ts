@@ -48,6 +48,25 @@ export function getLanguageDisplayName(value: string | null | undefined): string
   return CODE_TO_NAME[lower] ?? NAME_TO_CODE[lower] ?? value;
 }
 
+/** Map any language value (name or code) to its uppercase 2-letter ISO code. */
+const NAME_TO_ISO: Record<string, string> = {
+  english: "EN", german: "DE", french: "FR", spanish: "ES", italian: "IT",
+  portuguese: "PT", dutch: "NL", polish: "PL", russian: "RU", japanese: "JA",
+  chinese: "ZH", "chinese (simplified)": "ZH", korean: "KO", arabic: "AR",
+  hindi: "HI", turkish: "TR", swedish: "SV", danish: "DA", norwegian: "NO",
+  finnish: "FI", thai: "TH", vietnamese: "VI", "portuguese (br)": "PT",
+  en: "EN", de: "DE", fr: "FR", es: "ES", it: "IT", pt: "PT", nl: "NL",
+  pl: "PL", ru: "RU", ja: "JA", zh: "ZH", "zh-cn": "ZH", ko: "KO",
+  ar: "AR", hi: "HI", tr: "TR", sv: "SV", da: "DA", no: "NO", fi: "FI",
+  th: "TH", vi: "VI",
+};
+
+export function getLanguageCode(value: string | null | undefined): string {
+  if (!value) return "??";
+  const lower = value.toLowerCase();
+  return NAME_TO_ISO[lower] ?? (value.length <= 3 ? value.toUpperCase() : value.substring(0, 2).toUpperCase());
+}
+
 /** Map language name/code to flag emoji for display. */
 const LANG_FLAGS: Record<string, string> = {
   english: "\u{1F1EC}\u{1F1E7}",

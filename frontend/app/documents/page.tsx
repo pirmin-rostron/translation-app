@@ -1,25 +1,24 @@
 "use client";
 
 /**
- * Documents page — grouped by source document with collapsible translation
- * sub-rows. Each document group shows its filename, metadata, and actions.
- * Translation sub-rows show language, project, due date, status, and actions.
+ * Documents page — pill-row grouped table. Document parent rows always visible,
+ * translation job sub-rows toggle with chevron. No column headers.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { useOrgStats, useProjects } from "../hooks/queries";
-import { queryKeys, translationJobsApi, documentsApi } from "../services/api";
+import { useOrgStats } from "../hooks/queries";
+import { translationJobsApi, documentsApi } from "../services/api";
 import type { GroupedDocument, GroupedDocJob, GroupedDocumentsResponse } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge, toJobStatus } from "../components/StatusBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { NewTranslationModal } from "../dashboard/NewTranslationModal";
+import { getLanguageCode } from "../utils/language";
 
 function formatRelativeDate(dateStr: string): string {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -33,203 +32,166 @@ function formatRelativeDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
-// Due date badge
-function DueDateBadge({ dueDate }: { dueDate: string | null }) {
-  if (!dueDate) return null;
-  const due = new Date(dueDate);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return <span className="rounded-full bg-status-errorBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-error">Overdue</span>;
-  if (diffDays <= 3) return <span className="rounded-full bg-status-warningBg px-2.5 py-0.5 text-[0.6875rem] font-medium text-status-warning">Due soon</span>;
-  return <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">{due.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</span>;
+// Status-based primary action label
+function primaryActionLabel(status: string): string {
+  if (status === "in_review" || status === "review") return "Open Review →";
+  if (status === "exported") return "Download";
+  return "View";
 }
 
-// Inline due date editor
-function InlineDueDateCell({ jobId, dueDate }: { jobId: number; dueDate: string | null }) {
-  const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  async function handleChange(value: string) {
-    setEditing(false);
-    try {
-      await translationJobsApi.updateDueDate(jobId, value || null);
-      void queryClient.invalidateQueries({ queryKey: ["documents-grouped"] });
-    } catch (err) { console.error("[due-date]", err); }
-  }
-  if (editing) {
-    return <input type="date" defaultValue={dueDate ?? ""} autoFocus onBlur={(e) => handleChange(e.target.value)} onChange={(e) => handleChange(e.target.value)} className="w-28 rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent" />;
-  }
-  return (
-    <button type="button" onClick={() => setEditing(true)} className="cursor-pointer border-none bg-transparent p-0" title="Click to set due date">
-      {dueDate ? <DueDateBadge dueDate={dueDate} /> : <span className="text-xs text-brand-subtle hover:text-brand-muted">Set date</span>}
-    </button>
-  );
+function primaryActionClasses(status: string): string {
+  if (status === "in_review" || status === "review")
+    return "rounded-full bg-brand-accent px-3 py-1 text-xs font-medium text-white hover:bg-brand-accentHov transition-colors";
+  return "rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors";
 }
 
 // Toast
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   useEffect(() => { const t = setTimeout(onDismiss, 2500); return () => clearTimeout(t); }, [onDismiss]);
-  return <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-brand-text px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-opacity">{message}</div>;
+  return <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-brand-text px-5 py-2.5 text-sm font-medium text-white shadow-lg">{message}</div>;
 }
 
-// ── Document group component ────────────────────────────────────────────────
+// ── Document group ──────────────────────────────────────────────────────────
 
 function DocumentGroup({
   doc,
+  expanded,
+  onToggle,
   onToast,
   onRefresh,
 }: {
   doc: GroupedDocument;
+  expanded: boolean;
+  onToggle: () => void;
   onToast: (msg: string) => void;
   onRefresh: () => void;
 }) {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
-  const [expanded, setExpanded] = useState(true);
-  const [confirmAction, setConfirmAction] = useState<"delete_doc" | null>(null);
-  const [confirmJobAction, setConfirmJobAction] = useState<{ type: "delete_translation" | "retranslate"; jobId: number } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "delete_doc" | "delete_job" | "retranslate"; jobId?: number } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleDeleteDoc() {
+  async function handleConfirm() {
+    if (!confirmAction) return;
     setLoading(true);
     try {
-      await documentsApi.delete(doc.id);
-      onToast("Document deleted");
-      onRefresh();
-    } catch (err) { console.error("[delete-doc]", err); }
-    finally { setLoading(false); setConfirmAction(null); }
-  }
-
-  async function handleJobAction() {
-    if (!confirmJobAction) return;
-    setLoading(true);
-    try {
-      if (confirmJobAction.type === "delete_translation") {
-        await translationJobsApi.delete(confirmJobAction.jobId);
+      if (confirmAction.type === "delete_doc") {
+        await documentsApi.delete(doc.id);
+        onToast("Document deleted");
+      } else if (confirmAction.type === "delete_job" && confirmAction.jobId) {
+        await translationJobsApi.delete(confirmAction.jobId);
         onToast("Translation deleted");
-      } else {
-        await translationJobsApi.retranslate(confirmJobAction.jobId);
+      } else if (confirmAction.type === "retranslate" && confirmAction.jobId) {
+        await translationJobsApi.retranslate(confirmAction.jobId);
         onToast("Re-translation queued");
       }
       onRefresh();
-    } catch (err) { console.error("[job-action]", err); }
-    finally { setLoading(false); setConfirmJobAction(null); }
+    } catch (err) { console.error("[action]", err); }
+    finally { setLoading(false); setConfirmAction(null); }
   }
 
   return (
     <>
-      {/* Document header row */}
-      <tr className="border-b border-brand-border bg-brand-bg">
-        <td colSpan={6} className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                className="flex h-6 w-6 items-center justify-center rounded border-none bg-transparent text-brand-muted transition-transform"
-                style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
-              >
-                ▶
-              </button>
-              <span className="text-base">📄</span>
-              <span className="text-sm font-semibold text-brand-text">{doc.filename}</span>
-              <span className="text-xs text-brand-muted">
-                Uploaded {doc.uploaded_at ? formatRelativeDate(doc.uploaded_at) : "—"} · {doc.word_count.toLocaleString()} words · {doc.jobs.length} {doc.jobs.length === 1 ? "translation" : "translations"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => openTranslationModal()}
-                className="rounded-full px-3 py-1 text-xs font-medium text-brand-muted hover:text-brand-text underline"
-              >
-                + Add language
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmAction("delete_doc")}
-                className="text-xs font-medium text-status-error hover:underline"
-              >
-                Delete document
-              </button>
-            </div>
-          </div>
-        </td>
-      </tr>
+      {/* Document parent row — always visible */}
+      <div className="flex items-center gap-3 border-b border-brand-border bg-brand-bg px-4 py-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex h-5 w-5 shrink-0 items-center justify-center border-none bg-transparent text-xs text-brand-muted transition-transform"
+          style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+        >▶</button>
+        <span className="text-base">📄</span>
+        <span className="text-sm font-semibold text-brand-text">{doc.filename}</span>
+        <span className="text-xs text-brand-muted">
+          {doc.word_count.toLocaleString()} words · {doc.uploaded_at ? formatRelativeDate(doc.uploaded_at) : "—"} · {doc.jobs.length} {doc.jobs.length === 1 ? "translation" : "translations"}
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openTranslationModal()}
+            className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs font-medium text-brand-muted hover:bg-brand-bg transition-colors"
+          >+ Add language</button>
+          <button
+            type="button"
+            onClick={() => setConfirmAction({ type: "delete_doc" })}
+            className="rounded-full border border-status-error/30 px-3 py-1 text-xs font-medium text-status-error hover:bg-status-errorBg transition-colors"
+          >Delete</button>
+        </div>
+      </div>
 
-      {/* Translation sub-rows */}
+      {/* Job sub-rows — hidden when collapsed */}
       {expanded && doc.jobs.map((job) => (
-        <tr
+        <div
           key={job.id}
-          className="group/row cursor-pointer border-b border-brand-border transition-colors hover:bg-brand-bg last:border-0"
+          className="group/row flex cursor-pointer items-center gap-2 border-b border-brand-border bg-brand-surface px-4 py-2.5 pl-12 transition-colors hover:bg-brand-bg"
           onClick={() => router.push(`/translation-jobs/${job.id}/overview`)}
         >
-          <td className="py-3 pl-14 pr-4 text-sm font-medium text-brand-text">
-            {(job.source_language ?? "EN").substring(0, 2).toUpperCase()} → {job.target_language.substring(0, 2).toUpperCase()}
-          </td>
-          <td className="px-4 py-3 text-sm text-brand-muted">
-            {job.project_name ?? <span className="italic text-brand-subtle">No project</span>}
-          </td>
-          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-            <InlineDueDateCell jobId={job.id} dueDate={job.due_date} />
-          </td>
-          <td className="px-4 py-3 text-xs text-brand-subtle">
+          {/* Language pill */}
+          <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-xs font-medium text-brand-accent">
+            {getLanguageCode(job.source_language)} → {getLanguageCode(job.target_language)}
+          </span>
+          {/* Status pill */}
+          <StatusBadge status={toJobStatus(job.status)} />
+          {/* Meta */}
+          <span className="text-xs text-brand-subtle">
+            {job.project_name ?? <span className="italic">No project</span>}
+            {" · "}
             {job.created_at ? formatRelativeDate(job.created_at) : "—"}
-          </td>
-          <td className="px-4 py-3">
-            <StatusBadge status={toJobStatus(job.status)} />
-          </td>
-          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover/row:opacity-100">
+          </span>
+          {/* Right-aligned actions */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); router.push(`/translation-jobs/${job.id}/overview`); }}
+              className={primaryActionClasses(job.status)}
+            >
+              {primaryActionLabel(job.status)}
+            </button>
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
               <button
                 type="button"
-                onClick={() => setConfirmJobAction({ type: "retranslate", jobId: job.id })}
-                className="text-xs text-brand-muted hover:text-brand-text"
+                onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: "retranslate", jobId: job.id }); }}
+                className="rounded-full border border-brand-border px-2.5 py-0.5 text-xs text-brand-muted hover:bg-brand-bg"
                 title="Re-translate"
-              >
-                ↻
-              </button>
+              >↻</button>
               <button
                 type="button"
-                onClick={() => setConfirmJobAction({ type: "delete_translation", jobId: job.id })}
-                className="text-xs text-brand-subtle hover:text-status-error"
+                onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: "delete_job", jobId: job.id }); }}
+                className="rounded-full border border-status-error/30 px-2.5 py-0.5 text-xs text-status-error hover:bg-status-errorBg"
                 title="Delete translation"
-              >
-                ✕
-              </button>
+              >✕</button>
             </div>
-          </td>
-        </tr>
+          </div>
+        </div>
       ))}
 
       {/* Confirm dialogs */}
       <ConfirmDialog
-        open={confirmAction === "delete_doc"}
+        open={confirmAction?.type === "delete_doc"}
         title="Delete this document permanently?"
         description="This will remove the uploaded file and all translations. This cannot be undone."
         confirmLabel="Delete"
-        onConfirm={() => { void handleDeleteDoc(); }}
+        onConfirm={() => { void handleConfirm(); }}
         onCancel={() => setConfirmAction(null)}
         loading={loading}
         variant="destructive"
       />
       <ConfirmDialog
-        open={confirmJobAction?.type === "retranslate"}
-        title="Re-translate this document?"
-        description="The existing translation will be replaced. This cannot be undone."
-        confirmLabel="Re-translate"
-        onConfirm={() => { void handleJobAction(); }}
-        onCancel={() => setConfirmJobAction(null)}
-        loading={loading}
-      />
-      <ConfirmDialog
-        open={confirmJobAction?.type === "delete_translation"}
+        open={confirmAction?.type === "delete_job"}
         title="Delete this translation?"
         description="The uploaded document will be kept and can be re-translated."
         confirmLabel="Delete translation"
-        onConfirm={() => { void handleJobAction(); }}
-        onCancel={() => setConfirmJobAction(null)}
+        onConfirm={() => { void handleConfirm(); }}
+        onCancel={() => setConfirmAction(null)}
+        loading={loading}
+      />
+      <ConfirmDialog
+        open={confirmAction?.type === "retranslate"}
+        title="Re-translate this document?"
+        description="The existing translation will be replaced. This cannot be undone."
+        confirmLabel="Re-translate"
+        onConfirm={() => { void handleConfirm(); }}
+        onCancel={() => setConfirmAction(null)}
         loading={loading}
       />
     </>
@@ -249,6 +211,8 @@ export default function DocumentsPage() {
   const [data, setData] = useState<GroupedDocumentsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [allCollapsed, setAllCollapsed] = useState(false);
+  const [collapsedDocs, setCollapsedDocs] = useState<Set<number>>(new Set());
 
   const loadData = useCallback(() => {
     setIsLoading(true);
@@ -269,7 +233,31 @@ export default function DocumentsPage() {
   const totalDocs = data?.total_documents ?? 0;
   const totalJobs = data?.total_jobs ?? 0;
   const totalPages = Math.ceil(totalDocs / 10) || 1;
-  const readyCount = docs.reduce((sum, d) => sum + d.jobs.filter((j) => j.status === "exported" || j.status === "completed" || j.status === "ready_for_export" || j.status === "review_complete").length, 0);
+  const readyCount = docs.reduce((sum, d) => sum + d.jobs.filter((j) =>
+    j.status === "exported" || j.status === "completed" || j.status === "ready_for_export" || j.status === "review_complete"
+  ).length, 0);
+
+  function toggleDoc(docId: number) {
+    setCollapsedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId); else next.add(docId);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allCollapsed) {
+      setCollapsedDocs(new Set());
+      setAllCollapsed(false);
+    } else {
+      setCollapsedDocs(new Set(docs.map((d) => d.id)));
+      setAllCollapsed(true);
+    }
+  }
+
+  function isExpanded(docId: number) {
+    return !collapsedDocs.has(docId);
+  }
 
   return (
     <AppShell>
@@ -303,39 +291,42 @@ export default function DocumentsPage() {
         {isLoading && <p className="text-sm text-brand-muted">Loading…</p>}
 
         {!isLoading && (<>
-          <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-brand-border">
-                  {["Language", "Project", "Due Date", "Uploaded", "Status", ""].map((col) => (
-                    <th key={col || "_actions"} className="px-4 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {docs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center">
-                      <div className="mx-auto max-w-sm">
-                        <div className="mb-3 text-4xl">📄</div>
-                        <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
-                        <p className="mt-1 text-sm text-brand-muted">Upload a document to translate it. Supports DOCX, RTF, and TXT files.</p>
-                        <button type="button" onClick={() => openTranslationModal()} className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors">
-                          + New Translation
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  docs.map((doc) => (
-                    <DocumentGroup key={doc.id} doc={doc} onToast={setToastMessage} onRefresh={loadData} />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {docs.length === 0 ? (
+            <div className="rounded-xl border border-brand-border bg-brand-surface px-8 py-16 text-center">
+              <div className="mb-3 text-4xl">📄</div>
+              <p className="font-display text-lg font-bold text-brand-text">No documents yet</p>
+              <p className="mt-1 text-sm text-brand-muted">Upload a document to translate it. Supports DOCX, RTF, and TXT files.</p>
+              <button type="button" onClick={() => openTranslationModal()} className="mt-4 rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accentHov transition-colors">
+                + New Translation
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-brand-border">
+              {/* Toolbar */}
+              <div className="flex items-center justify-between border-b border-brand-border bg-brand-surface px-4 py-2.5">
+                <span className="text-sm text-brand-muted">{totalDocs} source {totalDocs === 1 ? "document" : "documents"}</span>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-xs font-medium text-brand-muted hover:text-brand-text"
+                >
+                  {allCollapsed ? "Expand all" : "Collapse all"}
+                </button>
+              </div>
+
+              {/* Document groups */}
+              {docs.map((doc) => (
+                <DocumentGroup
+                  key={doc.id}
+                  doc={doc}
+                  expanded={isExpanded(doc.id)}
+                  onToggle={() => toggleDoc(doc.id)}
+                  onToast={setToastMessage}
+                  onRefresh={loadData}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Pagination */}
           {totalDocs > 10 && (
