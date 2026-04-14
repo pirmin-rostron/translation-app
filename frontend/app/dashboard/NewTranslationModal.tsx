@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, queryKeys } from "../services/api";
@@ -91,22 +92,11 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
     }
     return "German";
   });
-  const [reviewMode, setReviewMode] = useState<"autopilot" | "manual">("autopilot");
-  const [projectId, setProjectId] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const navRouter = useRouter();
 
   const sameLanguage = detectedSourceLang !== null && detectedSourceLang === targetLang;
-
-  // Pre-select project when modal opens with a project context
-  const prevPreselected = useRef<number | null>(null);
-  if (open && preselectedProjectId !== null && prevPreselected.current !== preselectedProjectId) {
-    prevPreselected.current = preselectedProjectId;
-    setProjectId(String(preselectedProjectId));
-  }
-  if (!open && prevPreselected.current !== null) {
-    prevPreselected.current = null;
-  }
 
   const runDetection = useCallback(async (f: File) => {
     const detected = await detectSourceLanguage(f);
@@ -146,30 +136,21 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
       const fd = new FormData();
       fd.append("file", file);
       fd.append("target_language", targetLang);
-      // Inherit tone from selected project, fallback to "natural"
-      const selectedProject = projectId && projectId !== "__new__"
-        ? projects.find((p) => String(p.id) === projectId)
-        : null;
-      fd.append("translation_style", selectedProject?.default_tone ?? "natural");
-      fd.append("review_mode", reviewMode);
-      if (selectedProject) {
-        fd.append("project_id", String(selectedProject.id));
+      fd.append("translation_style", "natural");
+      fd.append("review_mode", "autopilot");
+      // Pre-select project if available
+      if (preselectedProjectId) {
+        fd.append("project_id", String(preselectedProjectId));
       }
-      const prevCount = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
       trackEvent("flow.upload_started", { target_language: targetLang });
-      await documentsApi.uploadAndTranslate<{ id: number }>(fd);
-      trackEvent("document_uploaded", { language: targetLang, has_project: !!selectedProject });
+      const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      trackEvent("document_uploaded", { language: targetLang, has_project: !!preselectedProjectId });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
       handleClose();
-      // Poll until the new job appears in the list (Celery creates it async)
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        await queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-        const current = queryClient.getQueryData<unknown[]>(queryKeys.translationJobs.recent())?.length ?? 0;
-        if (current > prevCount || attempts >= 10) {
-          clearInterval(poll);
-        }
-      }, 1000);
+      // Navigate to the document detail page
+      if (result?.id) {
+        navRouter.push(`/documents/${result.id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setSubmitting(false);
@@ -179,7 +160,6 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
   function handleClose() {
     setFile(null);
     setDetectedSourceLang(null);
-    setProjectId("");
     setError("");
     setSubmitting(false);
     closeModal();
@@ -274,8 +254,8 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
 
       {/* Target language — inherited from project or manual selector */}
       {(() => {
-        const selectedProject = projectId && projectId !== "__new__"
-          ? projects.find((p) => String(p.id) === projectId)
+        const selectedProject = preselectedProjectId
+          ? projects.find((p) => p.id === preselectedProjectId)
           : null;
         const inheritedLangs = selectedProject?.target_languages ?? [];
         if (inheritedLangs.length > 0) {
@@ -324,58 +304,6 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
         );
       })()}
 
-      {/* Review mode */}
-      <div className="mb-4">
-        <label className="mb-1.5 block font-sans text-[0.8125rem] font-medium text-brand-muted">
-          Review mode
-        </label>
-        <div className="flex overflow-hidden rounded-full border border-brand-border">
-          <button
-            type="button"
-            onClick={() => setReviewMode("autopilot")}
-            className={`flex-1 px-4 py-2 text-center text-sm font-medium transition-colors ${
-              reviewMode === "autopilot"
-                ? "bg-brand-accent text-white"
-                : "bg-brand-surface text-brand-muted hover:bg-brand-bg"
-            }`}
-          >
-            Autopilot
-          </button>
-          <button
-            type="button"
-            onClick={() => setReviewMode("manual")}
-            className={`flex-1 px-4 py-2 text-center text-sm font-medium transition-colors ${
-              reviewMode === "manual"
-                ? "bg-brand-accent text-white"
-                : "bg-brand-surface text-brand-muted hover:bg-brand-bg"
-            }`}
-          >
-            Manual review
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-brand-subtle">
-          {reviewMode === "autopilot" ? "Download when ready — minimal review" : "Review each block before export"}
-        </p>
-      </div>
-
-      {/* Project selector */}
-      <div className="mb-6">
-        <label className="mb-1 block font-sans text-xs font-medium text-brand-muted">
-          Add to project
-        </label>
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 font-sans text-[0.8125rem] text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
-        >
-          <option value="">No project (standalone)</option>
-          {projects.map((p) => (
-            <option key={p.id} value={String(p.id)}>{p.name}</option>
-          ))}
-          <option value="__new__">Create new project…</option>
-        </select>
-      </div>
-
       {error && (
         <p className="mb-4 font-sans text-[0.8125rem] text-status-error">{error}</p>
       )}
@@ -393,7 +321,7 @@ export function NewTranslationModal({ projects }: { projects: ProjectResponse[] 
           disabled={submitting || !file || sameLanguage}
           className="cursor-pointer rounded-full border-none bg-brand-accent px-5 py-2.5 font-sans text-sm font-medium text-white hover:bg-brand-accentHov disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Uploading…" : "Upload & Translate"}
+          {submitting ? "Uploading…" : "Upload"}
         </button>
       </div>
     </ModalOverlay>

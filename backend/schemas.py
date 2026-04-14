@@ -81,6 +81,12 @@ class SourceEditResponse(BaseModel):
 
 class TranslationJobCreateRequest(BaseModel):
     translation_style: str = Field(default="natural", min_length=1, max_length=20)
+    formality: str = Field(default="neutral", min_length=1, max_length=20)
+    review_mode: str = Field(default="autopilot", min_length=1, max_length=20)
+    industry: str | None = None
+    domain: str | None = None
+    preserve_formatting: bool = True
+    glossary_enabled: bool = True
 
 
 class SegmentAnnotationResponse(BaseModel):
@@ -109,6 +115,10 @@ class TranslationJobResponse(BaseModel):
     industry: str | None
     domain: str | None
     translation_style: str
+    formality: str = "neutral"
+    review_mode: str = "autopilot"
+    preserve_formatting: bool = True
+    glossary_enabled: bool = True
     status: str
     error_message: str | None
     last_saved_at: datetime | None

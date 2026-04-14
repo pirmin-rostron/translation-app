@@ -17,6 +17,7 @@ import { StatusBadge, toJobStatus } from "../../components/StatusBadge";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { getLanguageCode, getLanguageDisplayName, getLanguageFlag } from "../../utils/language";
+import { SegmentedControl } from "../../components/SegmentedControl";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,113 @@ function qualityBadge(score: number): { label: string; sub: string; classes: str
   if (score >= 90) return { label: "Excellent", sub: "Above average for this document type", classes: "bg-status-successBg text-status-success" };
   if (score >= 70) return { label: "Good", sub: "A few blocks may need attention", classes: "bg-status-warningBg text-status-warning" };
   return { label: "Needs review", sub: "Review recommended before exporting", classes: "bg-status-errorBg text-status-error" };
+}
+
+// ── Settings panel ──────────────────────────────────────────────────────────
+
+const STYLE_OPTIONS = [
+  { label: "Natural", value: "natural" },
+  { label: "Formal", value: "formal" },
+  { label: "Literal", value: "literal" },
+];
+const FORMALITY_OPTIONS = [
+  { label: "Neutral", value: "neutral" },
+  { label: "Polite", value: "polite" },
+  { label: "Direct", value: "direct" },
+];
+const REVIEW_OPTIONS = [
+  { label: "Autopilot", value: "autopilot" },
+  { label: "Manual", value: "manual" },
+];
+const INDUSTRY_OPTIONS = ["General", "Legal", "Medical", "Technical", "Marketing", "Financial"];
+const DOMAIN_OPTIONS = ["General", "Contract law", "Consumer goods", "Software", "Healthcare"];
+
+function SettingsPanel({
+  style: initialStyle,
+  reviewMode: initialReviewMode,
+  industry: initialIndustry,
+  domain: initialDomain,
+  formality: initialFormality,
+  glossaryEnabled: initialGlossary,
+  isPostTranslation,
+  jobId,
+  onRefresh,
+}: {
+  style: string;
+  reviewMode: string;
+  industry: string | null;
+  domain: string | null;
+  formality: string;
+  glossaryEnabled: boolean;
+  isPostTranslation: boolean;
+  jobId?: number;
+  onRefresh?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [styleVal, setStyleVal] = useState(initialStyle);
+  const [formalityVal, setFormalityVal] = useState(initialFormality);
+  const [industryVal, setIndustryVal] = useState(initialIndustry ?? "General");
+  const [domainVal, setDomainVal] = useState(initialDomain ?? "General");
+  const [reviewVal, setReviewVal] = useState(initialReviewMode);
+  const [glossaryVal, setGlossaryVal] = useState(initialGlossary);
+
+  const summaryLabel = `${styleVal.charAt(0).toUpperCase() + styleVal.slice(1)} · ${formalityVal.charAt(0).toUpperCase() + formalityVal.slice(1)} · ${industryVal} · ${reviewVal === "autopilot" ? "Autopilot" : "Manual"}`;
+
+  return (
+    <div className="rounded-lg border border-brand-border">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-brand-bg transition-colors"
+      >
+        <p className="text-xs text-brand-muted">{summaryLabel}</p>
+        <span className="text-xs text-brand-subtle transition-transform" style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+      </button>
+      {expanded && (
+        <div className="border-t border-brand-border px-3 py-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Style</label>
+              <SegmentedControl options={STYLE_OPTIONS} value={styleVal} onChange={setStyleVal} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Formality</label>
+              <SegmentedControl options={FORMALITY_OPTIONS} value={formalityVal} onChange={setFormalityVal} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Industry</label>
+              <select value={industryVal} onChange={(e) => setIndustryVal(e.target.value)} className="w-full rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent">
+                {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Domain</label>
+              <select value={domainVal} onChange={(e) => setDomainVal(e.target.value)} className="w-full rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text outline-none focus:border-brand-accent">
+                {DOMAIN_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Review mode</label>
+              <SegmentedControl options={REVIEW_OPTIONS} value={reviewVal} onChange={setReviewVal} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[0.6875rem] font-medium text-brand-subtle">Glossary</label>
+              <button
+                type="button"
+                onClick={() => setGlossaryVal(!glossaryVal)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${glossaryVal ? "bg-brand-accent text-white" : "border border-brand-border bg-brand-surface text-brand-muted"}`}
+              >
+                {glossaryVal ? "✓ Enabled" : "Disabled"}
+              </button>
+            </div>
+          </div>
+          <p className="text-[0.6875rem] text-brand-subtle">
+            {isPostTranslation ? "Any change queues a new translation run." : "Changes apply to this translation only. Other languages inherit these as defaults."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Translation card ────────────────────────────────────────────────────────
@@ -124,9 +232,17 @@ function TranslationCard({ overview, onRefresh }: { overview: JobOverview; onRef
               </div>
             </div>
             <p className="text-xs text-brand-subtle">{s.word_count.toLocaleString()} words · {s.total_blocks} blocks</p>
-            <div className="rounded-lg border border-brand-border px-3 py-2">
-              <p className="text-xs text-brand-muted">{styleLabel} · General · {reviewMode === "autopilot" ? "Autopilot" : "Manual review"}</p>
-            </div>
+            <SettingsPanel
+              style={style}
+              reviewMode={reviewMode}
+              industry={null}
+              domain={null}
+              formality="neutral"
+              glossaryEnabled={true}
+              isPostTranslation={true}
+              jobId={overview.job_id}
+              onRefresh={onRefresh}
+            />
           </div>
 
           {/* Right panel */}
