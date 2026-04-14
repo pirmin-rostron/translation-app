@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_EXACT = new Set(["/", "/login", "/register", "/coming-soon", "/features", "/privacy", "/terms", "/data-faq"]);
+const PUBLIC_EXACT = new Set(["/", "/login", "/register", "/coming-soon", "/features", "/faq", "/privacy", "/terms", "/data-faq"]);
 const PUBLIC_PREFIXES = ["/api"];
 
 export function middleware(request: NextRequest) {

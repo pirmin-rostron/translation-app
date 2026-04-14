@@ -374,10 +374,14 @@ export default function LandingPage() {
               >
                 How it works
               </a>
-              <span className="cursor-default text-brand-subtle">
-                FAQ{" "}
-                <span className="rounded-full bg-brand-bg px-1.5 py-0.5 text-[0.625rem] font-medium text-brand-muted">Soon</span>
-              </span>
+              <a
+                href="/faq"
+                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
+              >
+                FAQ
+              </a>
             </nav>
 
             {/* Right: Auth links */}
