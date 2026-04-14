@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/register", "/coming-soon", "/api", "/features", "/privacy", "/terms", "/data-faq"];
+const PUBLIC_EXACT = new Set(["/", "/login", "/register", "/coming-soon", "/features", "/privacy", "/terms", "/data-faq"]);
+const PUBLIC_PREFIXES = ["/api"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow the landing page and all public routes
-  if (pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_EXACT.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
