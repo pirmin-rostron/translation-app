@@ -230,11 +230,22 @@ export default function LandingPage() {
   const [message, setMessage] = useState("");
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
 
-  // Redirect logged-in users to the app.
+  // Redirect logged-in users to the app — only if the cookie holds a JWT
+  // that hasn't expired yet. A stale or cleared cookie must never trigger
+  // a redirect loop (/ → /dashboard → 401 → /login).
   useEffect(() => {
-    const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
-    if (match) {
-      router.replace("/dashboard");
+    try {
+      const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
+      if (!match) return;
+      const token = match[1];
+      const parts = token.split(".");
+      if (parts.length !== 3) return;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))) as { exp?: number };
+      if (typeof payload.exp === "number" && payload.exp > Date.now() / 1000) {
+        router.replace("/dashboard");
+      }
+    } catch {
+      // Malformed token — stay on landing page
     }
   }, [router]);
 
