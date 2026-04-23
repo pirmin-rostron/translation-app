@@ -7,7 +7,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, translationJobsApi, queryKeys } from "../services/api";
 import type {
@@ -259,14 +259,20 @@ export default function DocumentsPage() {
   const { data: docsData } = useQuery<GroupedDocumentsResponse>({
     queryKey: [...queryKeys.documents.all(), "grouped"],
     queryFn: () => documentsApi.listGrouped(1, 100),
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
   });
 
   // Fetch jobs (paginated)
   const { data: jobsData } = useQuery<PaginatedJobsResponse>({
     queryKey: [...queryKeys.translationJobs.all(), "paginated"],
     queryFn: () => translationJobsApi.listPaginated(1, 100),
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
   });
 
   const allDocs = docsData?.documents ?? [];

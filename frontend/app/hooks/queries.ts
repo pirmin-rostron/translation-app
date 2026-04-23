@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   documentsApi,
   glossaryTermsApi,
@@ -171,7 +171,10 @@ export function useDocuments() {
   return useQuery({
     queryKey: queryKeys.documents.all(),
     queryFn: () => documentsApi.list<Document[]>(),
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -361,6 +364,9 @@ export function useProjects() {
     queryKey: ["projects"],
     queryFn: () => projectsApi.list(),
     staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
   });
 }
 

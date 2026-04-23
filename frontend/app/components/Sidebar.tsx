@@ -11,11 +11,12 @@ type NavItem = {
   iconKey: keyof typeof Icons;
   match: (p: string) => boolean;
   badge?: string;
+  badgeAccent?: boolean;
 };
 
 const WORKSPACE: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", iconKey: "Dashboard", match: (p) => p === "/dashboard" },
-  { label: "Autopilot", href: "/autopilot", iconKey: "Sparkle", match: (p) => p === "/autopilot" },
+  { label: "Autopilot", href: "/autopilot", iconKey: "Sparkle", match: (p) => p === "/autopilot", badge: "Rumi", badgeAccent: true },
   { label: "Documents", href: "/documents", iconKey: "Documents", match: (p) => p === "/documents" || p.startsWith("/documents/") },
   { label: "Projects",  href: "/projects",  iconKey: "Projects",  match: (p) => p.startsWith("/projects") },
 ];
@@ -41,7 +42,11 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       {item.badge && (
         <span
           className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-medium ${
-            active ? "bg-white/15 text-white/80" : "bg-brand-sunken text-brand-subtle"
+            active
+              ? "bg-white/15 text-white/80"
+              : item.badgeAccent
+                ? "bg-brand-accentSoft text-brand-accent"
+                : "bg-brand-sunken text-brand-subtle"
           }`}
         >
           {item.badge}

@@ -84,6 +84,7 @@ services:
         NEXT_PUBLIC_API_URL: /api
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://eu.i.posthog.com}
+        BACKEND_URL: http://backend:8000
     ports:
       - "3000:3000"
     env_file:

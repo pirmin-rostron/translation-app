@@ -9,7 +9,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { useProjects, useOrgStats, useGlossaryTerms, useDocuments } from "../hooks/queries";
@@ -157,28 +157,12 @@ function AttentionPanel({ reviewJobs }: { reviewJobs: TranslationJobListItem[] }
       />
       <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
         {reviewJobs.length === 0 ? (
-          <>
-            {[
-              { name: "Contract_Draft_v2.docx", project: "Legal Q2", pair: "EN → DE" },
-              { name: "Product_Brochure.docx", project: "Marketing", pair: "EN → FR" },
-              { name: "Terms_of_Service.rtf", project: "Legal Q2", pair: "EN → ES" },
-            ].map((stub) => (
-              <li key={stub.name} className="flex items-center gap-3 px-5 py-3.5 opacity-40">
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 truncate text-sm font-medium text-brand-subtle">{stub.name}</p>
-                  <p className="m-0 mt-0.5 flex items-center gap-2 text-[0.6875rem] text-brand-hint">
-                    <span>{stub.project}</span>
-                    <span className="font-mono">{stub.pair}</span>
-                    <span>—</span>
-                  </p>
-                </div>
-                <Icons.Arrow className="h-4 w-4 shrink-0 text-brand-hint" />
-              </li>
-            ))}
-            <li className="px-5 py-3 text-center text-[0.6875rem] text-brand-subtle">
-              Waiting for Autopilot to flag blocks
-            </li>
-          </>
+          <li className="px-5 py-8 text-center">
+            <p className="m-0 text-sm text-brand-muted">No items need attention right now</p>
+            <p className="m-0 mt-1 text-xs text-brand-subtle">
+              Autopilot will flag blocks here when they need your review.
+            </p>
+          </li>
         ) : (
           reviewJobs.slice(0, 6).map((j) => (
             <li key={j.id}>
@@ -389,25 +373,13 @@ function ActivityPanel() {
   return (
     <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
       <PanelHeader title="Recent activity" subtitle="Last 24 hours" />
-      <ul className="m-0 list-none divide-y divide-brand-borderSoft border-t border-brand-borderSoft p-0">
-        {[
-          { icon: "✓", text: "Translation job completed", detail: "Autopilot" },
-          { icon: "⚡", text: "2 ambiguities flagged for review", detail: "Autopilot" },
-          { icon: "↻", text: "Memory match applied to 3 blocks", detail: "Autopilot" },
-          { icon: "📄", text: "Upload a document to see activity here", detail: "" },
-        ].map((item) => (
-          <li key={item.text} className="flex items-center gap-3 px-5 py-3 opacity-40">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-sunken text-[0.625rem] text-brand-subtle">
-              {item.icon}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="m-0 text-sm text-brand-subtle">{item.text}</p>
-            </div>
-            {item.detail && (
-              <span className="shrink-0 text-[0.6875rem] text-brand-hint">{item.detail}</span>
-            )}
-          </li>
-        ))}
+      <ul className="m-0 list-none border-t border-brand-borderSoft p-0">
+        <li className="px-5 py-8 text-center">
+          <p className="m-0 text-sm text-brand-muted">No recent activity</p>
+          <p className="m-0 mt-1 text-xs text-brand-subtle">
+            Activity from Autopilot and your reviews will appear here.
+          </p>
+        </li>
       </ul>
     </section>
   );
@@ -435,6 +407,8 @@ export default function DashboardPage() {
     queryFn: () => translationJobsApi.listPaginated(1, 200),
     staleTime: 10_000,
     refetchInterval: anyModalOpen ? false : 15_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
   });
 
   const allJobs = jobsData?.jobs ?? [];

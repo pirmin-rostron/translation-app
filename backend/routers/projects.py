@@ -1,5 +1,6 @@
 """Projects router — CRUD for project containers."""
 
+import json
 from datetime import date, datetime
 from typing import Optional
 
@@ -64,13 +65,28 @@ class ProjectDetailResponse(ProjectResponse):
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
+def _coerce_languages(raw: object) -> list[str]:
+    """Handle target_languages stored as either a native list (JSONB) or a
+    JSON-encoded string (can happen after a migration stamp / create_all)."""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return []
+
+
 def _to_response(project: Project, doc_count: int) -> ProjectResponse:
     return ProjectResponse(
         id=project.id,
         org_id=project.org_id,
         name=project.name,
         description=project.description,
-        target_languages=project.target_languages or [],
+        target_languages=_coerce_languages(project.target_languages),
         default_tone=project.default_tone,
         due_date=project.due_date,
         document_count=doc_count,

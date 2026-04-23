@@ -2708,9 +2708,9 @@ def list_document_translation_jobs(
 @router.get("")
 @router.get("/")
 def list_translation_jobs(
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=10, ge=1, le=200),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=10, ge=1, le=50),
+    page_size: int = Query(default=10, ge=1, le=200),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
     project_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
