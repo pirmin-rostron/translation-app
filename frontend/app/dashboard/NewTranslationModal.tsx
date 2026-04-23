@@ -101,6 +101,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [languages, setLanguages] = useState<Set<string>>(new Set());
   const [autopilot, setAutopilot] = useState<AutopilotMode>("autopilot");
+  const [userSelectedMode, setUserSelectedMode] = useState(false);
   const [tone, setTone] = useState("brand");
   const [deadline, setDeadline] = useState("");
   const [error, setError] = useState("");
@@ -113,6 +114,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
     setStage("form");
     setFiles([]);
     setError("");
+    setUserSelectedMode(false);
     setTone("brand");
     setDeadline("");
     setTickerSteps([]);
@@ -133,11 +135,12 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
     if (proj?.target_languages.length) setLanguages(new Set(proj.target_languages));
   }, [selectedProjectId, projects]);
 
-  // ── Rumi auto-recommend on files change ───────────────────────────────
+  // ── Rumi auto-recommend on files change (never override explicit user choice)
   useEffect(() => {
+    if (userSelectedMode) return;
     const rec = rumiRecommend(files);
     setAutopilot(rec.mode);
-  }, [files]);
+  }, [files, userSelectedMode]);
 
   // ── Escape to close ───────────────────────────────────────────────────
   useEffect(() => {
@@ -190,6 +193,12 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  // ── User-initiated mode selection (marks as explicit) ──────────────
+  const handleModeSelect = useCallback((mode: AutopilotMode) => {
+    setUserSelectedMode(true);
+    setAutopilot(mode);
+  }, []);
+
   // ── Language toggle ───────────────────────────────────────────────────
   function toggleLang(code: string) {
     setLanguages((prev) => {
@@ -237,20 +246,29 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
       try {
         const fd = new FormData();
         fd.append("file", first.file);
+        fd.append("source_language", "English");
         const targetLang = Array.from(languages)[0];
         fd.append("target_language", targetLang);
         fd.append("translation_style", "natural");
         fd.append("review_mode", autopilot);
+        if (tone) fd.append("tone", tone);
+        if (deadline) fd.append("due_date", deadline);
         if (selectedProjectId) fd.append("project_id", String(selectedProjectId));
         trackEvent("flow.upload_started", { target_language: targetLang, mode: autopilot });
         const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
         trackEvent("document_uploaded", { language: targetLang, mode: autopilot, has_project: !!selectedProjectId });
         void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.documents.all() });
         void queryClient.invalidateQueries({ queryKey: ["projects"] });
         handleClose();
         const docId = result?.id;
-        if (selectedProjectId) router.push(`/projects/${selectedProjectId}`);
-        else if (docId) router.push(`/documents/${docId}`);
+        if (selectedProjectId) {
+          // Project detail page uses useEffect + direct API calls (not React Query),
+          // so a hard reload is needed to pick up the new document.
+          window.location.href = `/projects/${selectedProjectId}`;
+        } else if (docId) {
+          router.push(`/documents/${docId}`);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed");
         setStage("form");
@@ -330,7 +348,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
               languages={languages}
               toggleLang={toggleLang}
               autopilot={autopilot}
-              setAutopilot={setAutopilot}
+              setAutopilot={handleModeSelect}
               rumiRec={rumiRec}
               tone={tone}
               setTone={setTone}
@@ -406,6 +424,8 @@ function FormStage({
   totalWords: number;
   openProjectModal: () => void;
 }) {
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(true);
+
   return (
     <div className="space-y-6">
       {/* ── DOCUMENTS ── */}
@@ -554,28 +574,49 @@ function FormStage({
       </section>
 
       {/* ── MORE OPTIONS ── */}
-      <details className="group">
-        <summary className="flex cursor-pointer items-center justify-between py-2 text-[0.8125rem] font-medium text-brand-muted">
-          More options
-          <svg viewBox="0 0 12 12" className="h-3 w-3 text-brand-subtle transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 4.5 3 3 3-3" /></svg>
-        </summary>
-        <div className="mt-2 space-y-3">
-          <div>
-            <span className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.15em] text-brand-hint">Tone</span>
-            <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full rounded-xl border border-brand-border bg-brand-surface px-3 py-2.5 text-[0.8125rem] text-brand-text outline-none transition-colors focus:border-brand-accent">
-              <option value="brand">Match brand voice</option>
-              <option value="neutral">Neutral</option>
-              <option value="warm">Warm</option>
-              <option value="formal">Formal</option>
-              <option value="technical">Technical</option>
-            </select>
+      <section>
+        <button
+          type="button"
+          onClick={() => setMoreOptionsOpen((v) => !v)}
+          className="mt-2 flex w-full cursor-pointer items-center justify-between border-t border-brand-borderSoft py-3"
+        >
+          <span className="text-[0.8125rem] font-medium text-brand-muted">More options</span>
+          <svg
+            viewBox="0 0 16 16"
+            className={`h-4 w-4 text-brand-hint transition-transform duration-200 ${moreOptionsOpen ? "rotate-180" : ""}`}
+            fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </button>
+        {moreOptionsOpen && (
+          <div className="mt-3 space-y-4 pb-2">
+            <div>
+              <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-widest text-brand-hint">Tone</span>
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                className="w-full rounded-xl border border-brand-border bg-white px-3 py-2.5 text-[0.8125rem] text-brand-text outline-none transition-colors focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+              >
+                <option value="brand">Brand voice</option>
+                <option value="neutral">Neutral</option>
+                <option value="warm">Warm</option>
+                <option value="formal">Formal</option>
+                <option value="technical">Technical</option>
+              </select>
+            </div>
+            <div>
+              <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-widest text-brand-hint">Deadline</span>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full rounded-xl border border-brand-border bg-white px-3 py-2.5 text-[0.8125rem] text-brand-text outline-none transition-colors focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20"
+              />
+            </div>
           </div>
-          <div>
-            <span className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.15em] text-brand-hint">Deadline</span>
-            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-xl border border-brand-border bg-brand-surface px-3 py-2.5 text-[0.8125rem] text-brand-text outline-none transition-colors focus:border-brand-accent" />
-          </div>
-        </div>
-      </details>
+        )}
+      </section>
 
       {error && <p className="m-0 text-[0.8125rem] text-status-error">{error}</p>}
     </div>
