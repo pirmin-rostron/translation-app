@@ -35,10 +35,10 @@ pip install sqlalchemy alembic
 ### Design System
 Always read DESIGN.md in the project root before writing any frontend component or making any UI change. DESIGN.md is the single source of truth for colours, typography, spacing, buttons, cards, badges, tables, and all UI patterns. Key rules:
 - Buttons: always rounded-full, never rounded-lg
-- Cards: always rounded-xl, never rounded-lg
+- Panels: rounded-2xl, cards: rounded-xl
 - Inputs: always rounded-lg, never rounded-full
 - Never hardcode hex values — always brand.* and status.* tokens
-- Playfair Display for titles only, Inter for all UI chrome
+- Fraunces for display titles/stats only, Inter Tight for all UI chrome, JetBrains Mono for data (lang codes, %)
 - One primary button per screen always
 
 ### Stack Rules — Frontend
@@ -100,6 +100,7 @@ Always read DESIGN.md in the project root before writing any frontend component 
 - `documents` router — handles document ingest and parse only.
 - `glossary_terms` router — manages reference terminology, not job-specific decisions.
 - `translation_jobs` router — owns the full translation/review/export lifecycle.
+- `dashboard` router — aggregated views: upcoming deadlines, agent stats, agent feed, decisions log.
 - Do not cross-call routers in ways that blur these boundaries.
 - Frontend fetches must map to these router boundaries — do not create catch-all API wrappers.
 

@@ -8,3 +8,9 @@ venv
 .next
 .DS_Store
 frontend/.env.local
+helvara-key.pem
+backend/uploads/
+uploads/
+entities.json
+mempalace.yaml
+temp/

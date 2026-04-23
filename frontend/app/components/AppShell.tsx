@@ -7,11 +7,11 @@ import { Sidebar } from "./Sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-screen flex-col bg-brand-bg">
+    <div className="flex min-h-screen flex-col app-bg">
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex flex-1 flex-col overflow-y-auto">
+        <main className="flex-1 overflow-y-auto">
           <div className="flex-1">{children}</div>
           <footer className="border-t border-brand-border px-8 py-4">
             <div className="flex items-center gap-3 text-xs text-brand-subtle">

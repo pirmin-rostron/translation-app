@@ -1,7 +1,7 @@
 /**
  * PageHeader — consistent page header for all AppShell pages.
- * Renders an eyebrow label + serif title + optional subtitle + optional action slot (top right).
- * Dashboard keeps its own welcome message and does NOT use this component.
+ * Renders an eyebrow label + display title + optional subtitle + optional action slot (top right).
+ * Dashboard keeps its own welcome header and does NOT use this component.
  */
 
 interface PageHeaderProps {
@@ -13,19 +13,19 @@ interface PageHeaderProps {
 
 export function PageHeader({ eyebrow, title, subtitle, action }: PageHeaderProps) {
   return (
-    <div className="mb-8 flex items-start justify-between">
+    <div className="mb-6 flex items-end justify-between gap-6">
       <div>
-        <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">
+        <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">
           {eyebrow}
         </p>
-        <h1 className="font-display text-2xl font-bold text-brand-text">
+        <h1 className="m-0 font-display text-[2rem] font-bold leading-tight tracking-heading text-brand-text">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-1 text-sm text-brand-muted">{subtitle}</p>
+          <p className="mt-2 text-sm text-brand-muted">{subtitle}</p>
         )}
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }

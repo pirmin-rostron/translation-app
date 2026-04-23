@@ -111,7 +111,6 @@ export default function RegisterPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         body { margin: 0; }
         .auth-layout { display: flex; min-height: 100vh; }

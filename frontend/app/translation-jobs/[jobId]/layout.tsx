@@ -1,4 +1,4 @@
-// Layout for translation job pages — wraps review + overview in AppShell
+// Layout for translation job pages — wraps review in AppShell
 // so the sidebar and TopBar persist on all job-level routes.
 import { AppShell } from "../../components/AppShell";
 

@@ -134,7 +134,7 @@ export function NewProjectModal() {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Legal Docs Q2"
+          placeholder="e.g. Nova Launch — Spring Campaign"
           className="w-full rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
         />
       </div>
@@ -147,7 +147,7 @@ export function NewProjectModal() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Optional description"
+          placeholder="What's this project for?"
           rows={2}
           className="w-full resize-none rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
         />

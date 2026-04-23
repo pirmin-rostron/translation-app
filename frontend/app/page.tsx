@@ -1,887 +1,424 @@
 "use client";
 
+/**
+ * Homepage — Helvara marketing landing page.
+ * Matches the prototype from Helvara Marketing.html.
+ * Sections: Nav, Hero, Logos, Value Props, Autopilot Showcase,
+ * Product Features (bento), Workflow, Testimonial, Pricing, FAQ, CTA, Footer.
+ */
+
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import posthog from "posthog-js";
-import { useCountUp } from "./hooks/useCountUp";
+import { useAuthStore } from "./stores/authStore";
+import { Icons } from "./components/Icons";
 
-// ─── Carousel data ─────────────────────────────────────────────────────────────
+// ── Nav ─────────────────────────────────────────────────────────────────────
 
-const DOC_TYPES = [
-  "contract", "compliance policy", "legal brief", "privacy policy",
-  "terms of service", "financial report",
-  "technical manual", "board resolution", "investment memo",
-  "insurance policy", "court filing", "patent application",
-  "regulatory filing", "tender document", "annual report",
-  "research paper", "HR policy", "business proposal",
-];
+function Nav() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const h = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", h, { passive: true });
+    return () => window.removeEventListener("scroll", h);
+  }, []);
 
-const LANGUAGES = [
-  "German","French","Dutch","Spanish","Japanese","Korean",
-  "Italian","Portuguese","Mandarin","Arabic","Russian","Polish",
-  "Swedish","Norwegian","Danish","Finnish","Turkish","Hindi",
-  "Thai","Vietnamese",
-];
-
-// ─── Design tokens (aligned with DESIGN.md brand palette) ─────────────────────
-
-const T = {
-  surface:             "#F5F2EC",  // brand-bg
-  surfaceContainerLow: "#F5F2EC",  // brand-bg
-  surfaceContainer:    "#E5E0D8",  // brand-border (used as tinted bg)
-  primaryContainer:    "#082012",  // dark hero/CTA background
-  onSurface:           "#1A110A",  // brand-text
-  onSurfaceVariant:    "#6B6158",  // brand-muted
-  accent:              "#0D7B6E",  // brand-accent
-} as const;
-
-// ─── Static data ───────────────────────────────────────────────────────────────
-
-const painPoints = [
-  {
-    n: "01",
-    title: "Siloed Translation Assets",
-    body: "You paste into ChatGPT and get output that sounds nothing like your brand.",
-  },
-  {
-    n: "02",
-    title: "Fragmented Workflows",
-    body: "Your team reviews in email threads, comments in Word, and loses track of what was actually approved.",
-  },
-  {
-    n: "03",
-    title: "No Consistency",
-    body: "The same term gets translated differently across documents. No one notices until a client does.",
-  },
-];
-
-const steps = [
-  { n: "1", title: "Upload",  body: "Drop your document. Helvara parses and segments it automatically." },
-  { n: "2", title: "Review",  body: "AI translates block by block. You review, edit, and approve." },
-  { n: "3", title: "Export",  body: "Download your translated document in DOCX, RTF, or TXT." },
-];
-
-const features = [
-  {
-    title: "Linguistic Insights",
-    body: "Helvara flags ambiguous phrases, inconsistent terminology, and untranslated words before you export.",
-  },
-  {
-    title: "Glossary Enforcement",
-    body: "Define your key terms once. Every translation applies them automatically.",
-  },
-  {
-    title: "Block-by-block Review",
-    body: "Review and approve translations one paragraph at a time. Full control, no surprises.",
-  },
-  {
-    title: "Project Management",
-    body: "Group documents into projects. Track progress, set due dates, export when ready.",
-  },
-];
-
-// ─── Shared style helpers ──────────────────────────────────────────────────────
-
-const display: React.CSSProperties = {
-  fontFamily: "'Playfair Display', Georgia, serif",
-};
-
-const inter: React.CSSProperties = {
-  fontFamily: "Inter, sans-serif",
-};
-
-const eyebrow: React.CSSProperties = {
-  ...inter,
-  fontSize: "0.7rem",
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: T.accent,
-  marginBottom: "1rem",
-};
-
-// ─── Grain overlay ─────────────────────────────────────────────────────────────
-
-function GrainOverlay() {
   return (
-    <div
-      aria-hidden
-      style={{
-        position: "absolute",
-        inset: 0,
-        backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E\")",
-        backgroundRepeat: "repeat",
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    />
+    <header className={`fixed inset-x-0 top-0 z-50 flex h-[64px] items-center justify-between px-8 transition-all ${
+      scrolled ? "border-b border-brand-border bg-brand-bg/85 backdrop-blur-md" : ""
+    }`}>
+      <Link href="/" className="flex items-center gap-2 no-underline">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-text text-white">
+          <Icons.HLogo className="h-4 w-4" />
+        </span>
+        <span className="font-display text-[1.125rem] font-semibold tracking-display text-brand-text">Helvara</span>
+      </Link>
+      <nav className="flex items-center gap-1">
+        <a href="#features" className="rounded-full px-3 py-1.5 text-[0.875rem] font-medium text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text">Features</a>
+        <a href="#pricing" className="rounded-full px-3 py-1.5 text-[0.875rem] font-medium text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text">Pricing</a>
+        <a href="#faq" className="rounded-full px-3 py-1.5 text-[0.875rem] font-medium text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text">FAQ</a>
+      </nav>
+      <div className="flex items-center gap-2">
+        <Link href="/login" className="rounded-full px-3 py-1.5 text-[0.875rem] font-medium text-brand-muted no-underline transition-colors hover:text-brand-text">Sign in</Link>
+        <Link href="/register" className="rounded-full border border-brand-border bg-brand-surface px-4 py-1.5 text-[0.875rem] font-medium text-brand-text no-underline shadow-card transition-all hover:shadow-raised">Book a demo</Link>
+        <Link href="/register" className="rounded-full bg-brand-text px-4 py-1.5 text-[0.875rem] font-medium text-white no-underline transition-colors hover:bg-brand-accent">Start free</Link>
+      </div>
+    </header>
   );
 }
 
-// ─── Feature card (dark hover) ─────────────────────────────────────────────────
+// ── Hero ─────────────────────────────────────────────────────────────────────
 
-function FeatureCard({ title, body }: { title: string; body: string }) {
-  const [hovered, setHovered] = useState(false);
+function Hero() {
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        backgroundColor: hovered ? T.primaryContainer : "#ffffff",
-        padding: "2rem",
-        borderRadius: "16px",
-        transition: "background-color 0.25s ease",
-        cursor: "default",
-      }}
-    >
-      <h3
-        style={{
-          ...display,
-          fontSize: "1.1rem",
-          fontWeight: 600,
-          letterSpacing: "-0.01em",
-          color: hovered ? "#e8f5e2" : T.onSurface,
-          marginBottom: "0.75rem",
-          transition: "color 0.25s ease",
-        }}
-      >
-        {title}
-      </h3>
-      <p
-        style={{
-          ...inter,
-          fontSize: "0.9rem",
-          lineHeight: 1.7,
-          color: hovered ? "rgba(232,245,226,0.75)" : T.onSurfaceVariant,
-          transition: "color 0.25s ease",
-        }}
-      >
-        {body}
+    <section className="mx-auto max-w-[1200px] px-8 pb-20 pt-32 text-center">
+      <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.8125rem] font-medium text-brand-muted shadow-card">
+        <Icons.Sparkle className="h-3 w-3 text-brand-accent" />
+        New · Autopilot 1.2
+      </div>
+      <h1 className="mx-auto max-w-4xl font-display text-[3.25rem] font-semibold leading-[1.02] tracking-display text-brand-text md:text-[4.25rem]">
+        Translation that reads{" "}
+        <br className="hidden md:block" />
+        like <span className="italic text-brand-accent">you wrote it.</span>
+      </h1>
+      <p className="mx-auto mt-6 max-w-2xl text-[1.0625rem] leading-relaxed text-brand-muted">
+        Helvara translates your documents with the editorial judgment of an in-house linguist — flagging only the genuine ambiguities, and handling the rest. You keep control; you lose the grind.
       </p>
-    </div>
+      <div className="mt-8 flex items-center justify-center gap-3">
+        <Link href="/register" className="rounded-full bg-brand-text px-6 py-3 text-base font-medium text-white no-underline transition-colors hover:bg-brand-accent">Start free — no card</Link>
+        <Link href="/register" className="rounded-full border border-brand-border bg-brand-surface px-6 py-3 text-base font-medium text-brand-text no-underline shadow-card transition-all hover:shadow-raised">Book a demo</Link>
+      </div>
+      <div className="mt-6 flex items-center justify-center gap-6 text-[0.8125rem] text-brand-subtle">
+        <span className="flex items-center gap-1.5"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Free for 10,000 words</span>
+        <span className="flex items-center gap-1.5"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> SOC 2 · GDPR</span>
+        <span className="flex items-center gap-1.5"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> 38 languages</span>
+      </div>
+    </section>
   );
 }
 
-// ─── Pain point row (ghost number hover) ──────────────────────────────────────
+// ── Logos Strip ──────────────────────────────────────────────────────────────
 
-function PainPoint({ n, title, body }: { n: string; title: string; body: string }) {
-  const [hovered, setHovered] = useState(false);
+const LOGOS = ["NOVA", "Atlas&Co", "Kintsugi", "Lumen", "Meridian", "Folio", "Orbital", "Parchment", "Sable", "Tellus"];
+
+function LogosStrip() {
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ position: "relative", paddingLeft: "4.5rem", paddingBottom: "2.5rem", cursor: "default" }}
-    >
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: 0,
-          top: "-0.25rem",
-          ...display,
-          fontSize: "3.5rem",
-          fontWeight: 700,
-          lineHeight: 1,
-          color: hovered ? "rgba(8,32,18,0.18)" : "rgba(8,32,18,0.07)",
-          transition: "color 0.2s ease",
-          userSelect: "none",
-          letterSpacing: "-0.02em",
-        }}
-      >
-        {n}
-      </span>
-      <p
-        style={{
-          ...inter,
-          fontSize: "0.65rem",
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: T.accent,
-          marginBottom: "0.4rem",
-        }}
-      >
-        {title}
-      </p>
-      <p style={{ ...inter, fontSize: "1rem", lineHeight: 1.7, color: T.onSurfaceVariant }}>{body}</p>
-    </div>
+    <section className="border-y border-brand-border py-8">
+      <p className="mb-4 text-center text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-hint">Trusted by localization teams at</p>
+      <div className="flex items-center justify-center gap-12">
+        {LOGOS.map((name) => (
+          <span key={name} className="font-display text-[1.375rem] font-semibold text-brand-hint">{name}</span>
+        ))}
+      </div>
+    </section>
   );
 }
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// ── Value Props ──────────────────────────────────────────────────────────────
 
-type FormState = "idle" | "loading" | "success" | "error";
+const VALUE_PROPS = [
+  { n: "01", title: "Handles the obvious.", body: "Style, glossary, tone, register — applied consistently across every document, every language." },
+  { n: "02", title: "Asks about the rest.", body: "Genuine ambiguities come to you as discrete, answerable questions. Not a diff of the whole file." },
+  { n: "03", title: "Learns your voice.", body: "Decisions roll into your style guide and translation memory. The next document needs less from you." },
+];
 
-type PublicStats = {
-  words_translated: number;
-  documents_processed: number;
-  reviewer_approvals: number;
-  glossary_terms: number;
-};
-
-// ─── Page ──────────────────────────────────────────────────────────────────────
-
-export default function LandingPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [formState, setFormState] = useState<FormState>("idle");
-  const [message, setMessage] = useState("");
-  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
-
-  // Redirect logged-in users to the app — only if the cookie holds a JWT
-  // that hasn't expired yet. A stale or cleared cookie must never trigger
-  // a redirect loop (/ → /dashboard → 401 → /login).
-  useEffect(() => {
-    try {
-      const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
-      if (!match) return;
-      const token = match[1];
-      const parts = token.split(".");
-      if (parts.length !== 3) return;
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))) as { exp?: number };
-      if (typeof payload.exp === "number" && payload.exp > Date.now() / 1000) {
-        router.replace("/dashboard");
-      }
-    } catch {
-      // Malformed token — stay on landing page
-    }
-  }, [router]);
-
-  useEffect(() => {
-    fetch("/api/stats/public")
-      .then((r) => r.ok ? r.json() as Promise<PublicStats> : Promise.reject())
-      .then(setPublicStats)
-      .catch(() => { /* graceful degradation — show static stats only */ });
-  }, []);
-
-  const wordsTarget    = publicStats?.words_translated    ?? 0;
-  const docsTarget     = publicStats?.documents_processed ?? 0;
-  const glossaryTarget = publicStats?.glossary_terms      ?? 0;
-
-  const [docIdx, setDocIdx] = useState(0);
-  const [docVisible, setDocVisible] = useState(true);
-  const [langIdx, setLangIdx] = useState(0);
-  const [langVisible, setLangVisible] = useState(true);
-
-  // Documents cycle every 2s, scroll UP (exit top, enter bottom)
-  useEffect(() => {
-    const t = setInterval(() => {
-      setDocVisible(false);
-      setTimeout(() => {
-        setDocIdx(i => (i + 1) % DOC_TYPES.length);
-        setDocVisible(true);
-      }, 280);
-    }, 2000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Languages cycle every 3s, scroll DOWN (exit bottom, enter top)
-  useEffect(() => {
-    const t = setInterval(() => {
-      setLangVisible(false);
-      setTimeout(() => {
-        setLangIdx(i => (i + 1) % LANGUAGES.length);
-        setLangVisible(true);
-      }, 280);
-    }, 3000);
-    return () => clearInterval(t);
-  }, []);
-
-  const { ref: langsRef,    displayValue: langsValue    } = useCountUp({ target: 10 });
-  const { ref: wordsRef,    displayValue: wordsValue    } = useCountUp({ target: wordsTarget });
-  const { ref: docsRef,     displayValue: docsValue     } = useCountUp({ target: docsTarget });
-  const { ref: glossaryRef, displayValue: glossaryValue } = useCountUp({ target: glossaryTarget });
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setFormState("loading");
-    setMessage("");
-
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "", email: email.trim() }),
-      });
-
-      const data = (await res.json()) as { message?: string };
-
-      if (!res.ok) {
-        throw new Error("request_failed");
-      }
-
-      setFormState("success");
-      setMessage(data.message ?? "You're on the list!");
-      posthog.capture("waitlist_signup", { email: email.trim() });
-      setEmail("");
-    } catch {
-      setFormState("error");
-      setMessage("Something went wrong. Please try again in a moment.");
-    }
-  }
-
+function ValueProps() {
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { margin: 0; background: ${T.surface}; }
-        ::selection { background: ${T.primaryContainer}; color: #fff; }
-      `}</style>
-
-      <div style={{ ...inter, background: T.surface, color: T.onSurface }}>
-
-        {/* ── Nav ── */}
-        <header style={{
-          position: "fixed",
-          inset: "0 0 auto 0",
-          zIndex: 50,
-          background: "rgba(252,249,240,0.8)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}>
-          <div style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "1.25rem 1.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}>
-            {/* Left: Wordmark */}
-            <span style={{ ...display, fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.01em", color: T.onSurface }}>
-              Helvara
-            </span>
-
-            {/* Centre: Nav links */}
-            <nav style={{ display: "flex", alignItems: "center", gap: "1.5rem", ...inter, fontSize: "0.875rem" }}>
-              <a
-                href="/features"
-                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
-              >
-                How it works
-              </a>
-              <a
-                href="/faq"
-                style={{ color: T.onSurfaceVariant, textDecoration: "none", fontWeight: 500, transition: "color 0.15s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
-              >
-                FAQ
-              </a>
-            </nav>
-
-            {/* Right: Auth links */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <a
-                href="/login"
-                style={{
-                  ...inter,
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: T.onSurfaceVariant,
-                  textDecoration: "none",
-                  transition: "color 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurface; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = T.onSurfaceVariant; }}
-              >
-                Log in
-              </a>
-              <a
-                href="/register"
-                style={{
-                  ...inter,
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  textDecoration: "none",
-                  background: T.accent,
-                  padding: "0.375rem 1.125rem",
-                  borderRadius: "9999px",
-                  transition: "opacity 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
-              >
-                Start free
-              </a>
-            </div>
+    <section className="mx-auto max-w-[1200px] px-8 py-20">
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent">The work</p>
+      <h2 className="max-w-2xl font-display text-[2.5rem] font-semibold leading-[1.05] tracking-display text-brand-text">
+        A linguist who handles the <span className="italic">obvious</span> — and asks about the rest.
+      </h2>
+      <div className="mt-12 space-y-0">
+        {VALUE_PROPS.map((p) => (
+          <div key={p.n} className="border-t border-brand-border py-8">
+            <span className="font-mono text-[0.75rem] font-medium tabular-nums text-brand-accent">{p.n}</span>
+            <h3 className="mt-2 font-display text-[1.375rem] font-semibold text-brand-text">{p.title}</h3>
+            <p className="mt-2 max-w-xl text-[1rem] leading-relaxed text-brand-muted">{p.body}</p>
           </div>
-        </header>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-        {/* ── Hero ── */}
-        <section style={{
-          backgroundColor: T.surface,
-          padding: "10rem 1.5rem 8rem",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <GrainOverlay />
-          <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 1 }}>
-            {/* ── Eyebrow + H1 ── */}
-            <p style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "0.6875rem",
-              fontWeight: 600,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "#082012",
-              opacity: 0.55,
-              marginBottom: "1.5rem",
-            }}>
-              Translation Workflow Platform
-            </p>
-            <h1 style={{
-              fontFamily: "'Playfair Display', Georgia, serif",
-              fontSize: "clamp(3.5rem, 8vw, 6rem)",
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              lineHeight: 1.05,
-              color: "#082012",
-              maxWidth: "800px",
-              marginBottom: "0",
-            }}>
-              Manage all your <em style={{ fontStyle: "italic" }}>translations</em> in one place.
-            </h1>
-            <p style={{
-              ...inter,
-              marginLeft: "16.666%",
-              marginTop: "2rem",
-              maxWidth: "520px",
-              fontSize: "1.1rem",
-              lineHeight: 1.65,
-              color: T.onSurfaceVariant,
-            }}>
-              Upload your documents, review AI translations block by block, and export with confidence. Built for legal, compliance, and enterprise teams who need consistency and control.
-            </p>
-            <div style={{ marginLeft: "16.666%", marginTop: "2.5rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
-              <a
-                href="/register"
-                style={{
-                  background: T.primaryContainer,
-                  color: "#ffffff",
-                  ...inter,
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  padding: "0.8rem 2rem",
-                  borderRadius: "9999px",
-                  display: "inline-block",
-                  transition: "opacity 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
-              >
-                Start translating free
-              </a>
-              <p style={{ ...inter, fontSize: "0.75rem", color: T.onSurfaceVariant, margin: 0 }}>
-                Free to start. No credit card required.
-              </p>
-            </div>
+// ── Product Features (Bento Grid) ───────────────────────────────────────────
+
+function ProductFeatures() {
+  return (
+    <section id="features" className="mx-auto max-w-[1200px] px-8 py-20">
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent">Under the hood</p>
+      <h2 className="max-w-2xl font-display text-[2.5rem] font-semibold leading-[1.05] tracking-display text-brand-text">
+        Built for the work, not the demo.
+      </h2>
+      <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-6">
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card md:col-span-4">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold tracking-display text-brand-text">Block-level review</h3>
+          <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-brand-muted">See source and target side-by-side, with every change traceable to a reason. Accept, edit, or reject at the block level — never the whole file.</p>
+        </div>
+        <div className="rounded-2xl border border-brand-accent/20 bg-brand-accentSoft p-6 shadow-card md:col-span-2">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold tracking-display text-brand-text">Translation memory</h3>
+          <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-brand-muted">Every approved segment becomes memory. High-confidence matches auto-fill; fuzzy matches get a second look.</p>
+        </div>
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card md:col-span-2">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold tracking-display text-brand-text">Glossary, enforced</h3>
+          <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-brand-muted">Your term list isn&apos;t a suggestion. Helvara flags every conflict before you read it.</p>
+        </div>
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card md:col-span-2">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold tracking-display text-brand-text">38 languages</h3>
+          <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-brand-muted">From Spanish to Swahili, with native-speaker calibration on every pair.</p>
+        </div>
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card md:col-span-2">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold tracking-display text-brand-text">Exports anywhere</h3>
+          <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-brand-muted">Back to .docx, .rtf, .xliff, or straight into your CMS via API.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Workflow Steps ───────────────────────────────────────────────────────────
+
+const STEPS = [
+  { n: "01", title: "Upload", body: "Drop a .docx, .rtf, or .txt. Pick target languages. Helvara routes it to Autopilot or Manual." },
+  { n: "02", title: "Autopilot translates", body: "Rumi reads your glossary, memory, and style guide. Handles routine blocks; flags ambiguities." },
+  { n: "03", title: "You review ambiguities", body: "Questions arrive as discrete cards with context. Answer, don't edit." },
+  { n: "04", title: "Export anywhere", body: "Back to the original format or into your CMS. Every choice is tracked and reusable." },
+];
+
+function Workflow() {
+  return (
+    <section className="mx-auto max-w-[1200px] px-8 py-20">
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent">How it flows</p>
+      <h2 className="max-w-2xl font-display text-[2.5rem] font-semibold leading-[1.05] tracking-display text-brand-text">
+        From draft to shipped, without the handoffs.
+      </h2>
+      <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-4">
+        {STEPS.map((s) => (
+          <div key={s.n} className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card">
+            <span className="font-mono text-[0.75rem] font-medium tabular-nums text-brand-accent">{s.n}</span>
+            <h3 className="mt-3 font-display text-[1.125rem] font-semibold text-brand-text">{s.title}</h3>
+            <p className="mt-2 text-[0.875rem] leading-relaxed text-brand-muted">{s.body}</p>
           </div>
-        </section>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-        {/* ── Sound Familiar ── */}
-        <section style={{ backgroundColor: T.surfaceContainerLow, padding: "7rem 1.5rem" }}>
-          <div style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "1fr 2fr",
-            gap: "4rem",
-            alignItems: "start",
-          }}>
-            <div>
-              <p style={eyebrow}>Why Helvara</p>
-              <h2 style={{
-                ...display,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                fontWeight: 700,
-                lineHeight: 1.1,
-                letterSpacing: "-0.02em",
-                color: T.onSurface,
-                marginBottom: "1.5rem",
-              }}>
-                Sound familiar?
-              </h2>
-              <div style={{ width: "48px", height: "4px", background: T.accent, borderRadius: "2px" }} />
-            </div>
-            <div>
-              {painPoints.map((p) => (
-                <PainPoint key={p.n} {...p} />
-              ))}
-            </div>
+// ── Testimonial ─────────────────────────────────────────────────────────────
+
+function Testimonial() {
+  return (
+    <section className="mx-auto max-w-[1200px] px-8 py-20">
+      <div className="rounded-2xl border border-brand-border bg-brand-surface p-10 shadow-card">
+        <svg className="mb-4 h-8 w-8 text-brand-accent/60" viewBox="0 0 32 32" fill="currentColor"><path d="M6 18c0-3.3 2.7-6 6-6V8C6.5 8 2 12.5 2 18v8h12v-8H6zm18 0c0-3.3 2.7-6 6-6V8c-5.5 0-10 4.5-10 10v8h12v-8h-8z" /></svg>
+        <blockquote className="m-0 font-display text-[1.75rem] font-semibold leading-snug tracking-display text-brand-text">
+          Helvara did in two hours what our agency quoted as <em className="italic text-brand-accent">two weeks</em>. And the first line of feedback from our Madrid office was that it sounded like us.
+        </blockquote>
+        <div className="mt-6 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent to-brand-accentHov font-display text-sm font-semibold text-white">MR</span>
+          <div>
+            <p className="m-0 text-sm font-medium text-brand-text">Maya Rivera</p>
+            <p className="m-0 text-xs text-brand-subtle">Head of Localization, Nova</p>
           </div>
-        </section>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* ── Carousel ── */}
-        <section style={{ background: "#082012", padding: "6rem 2rem" }}>
-          <div style={{ maxWidth: 1280, margin: "0 auto", textAlign: "center" }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5em",
-              flexWrap: "nowrap",
-              minHeight: "6rem",
-              width: "100%",
-              maxWidth: "100%",
-              overflow: "hidden",
-            }}>
-              {/* Static: "Translate a" */}
-              <span style={{
-                fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-                color: "rgba(252,249,240,0.9)",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}>Translate a</span>
+// ── Pricing ─────────────────────────────────────────────────────────────────
 
-              {/* Cycling doc type — fixed width, no wrap */}
-              <span style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "clamp(12rem, 28vw, 22rem)",
-                flexShrink: 0,
-                overflow: "hidden",
-              }}>
-                <span style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
-                  fontWeight: 400,
-                  fontStyle: "italic",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.1,
-                  color: "rgba(252,249,240,0.9)",
-                  whiteSpace: "nowrap",
-                  transition: "opacity 0.25s ease, transform 0.25s ease",
-                  opacity: docVisible ? 1 : 0,
-                  transform: docVisible ? "translateY(0)" : "translateY(-8px)",
-                }}>
-                  {DOC_TYPES[docIdx]}
-                </span>
-              </span>
-
-              {/* Static: "into" */}
-              <span style={{
-                fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-                color: "rgba(252,249,240,0.9)",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}>into</span>
-
-              {/* Cycling language — fixed width, no wrap */}
-              <span style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "clamp(8rem, 16vw, 14rem)",
-                flexShrink: 0,
-                overflow: "hidden",
-              }}>
-                <span style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  fontSize: "clamp(1.5rem, 2.8vw, 2.75rem)",
-                  fontWeight: 400,
-                  fontStyle: "italic",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.1,
-                  color: "rgba(252,249,240,0.9)",
-                  whiteSpace: "nowrap",
-                  transition: "opacity 0.25s ease, transform 0.25s ease",
-                  opacity: langVisible ? 1 : 0,
-                  transform: langVisible ? "translateY(0)" : "translateY(8px)",
-                }}>
-                  {LANGUAGES[langIdx]}
-                </span>
-              </span>
-            </div>
-
-            <p style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "0.875rem",
-              color: "rgba(252,249,240,0.3)",
-              marginTop: "2rem",
-              letterSpacing: "0.05em",
-            }}>
-              Every document type. Every major language. One workflow.
-            </p>
+function Pricing() {
+  return (
+    <section id="pricing" className="mx-auto max-w-[1200px] px-8 py-20">
+      <div className="mb-10 text-center">
+        <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent">Pricing</p>
+        <h2 className="font-display text-[2.5rem] font-semibold tracking-display text-brand-text">Pay per word, not per seat.</h2>
+        <p className="mt-3 text-[1.0625rem] text-brand-muted">Translate your first 10,000 words free. No card. No tedium.</p>
+      </div>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        {/* Starter */}
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold text-brand-text">Starter</h3>
+          <p className="m-0 mt-3 font-display text-[2.5rem] font-semibold leading-none tracking-display text-brand-text">Free</p>
+          <p className="m-0 mt-1 text-xs text-brand-subtle">up to 10,000 words/mo</p>
+          <ul className="m-0 mt-5 list-none space-y-2 p-0 text-sm text-brand-muted">
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> 1 user</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> 3 languages</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Email support</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Community glossary</li>
+          </ul>
+          <Link href="/register" className="mt-6 block rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-center text-sm font-medium text-brand-text no-underline shadow-card transition-all hover:shadow-raised">Start free</Link>
+        </div>
+        {/* Team — highlighted */}
+        <div className="rounded-2xl bg-brand-text p-6 shadow-card">
+          <div className="flex items-center justify-between">
+            <h3 className="m-0 font-display text-[1.25rem] font-semibold text-white">Team</h3>
+            <span className="rounded-full bg-brand-accent px-2.5 py-0.5 text-[0.6875rem] font-medium text-white">Popular</span>
           </div>
-        </section>
+          <p className="m-0 mt-3 font-display text-[2.5rem] font-semibold leading-none tracking-display text-white">$49</p>
+          <p className="m-0 mt-1 text-xs text-white/60">per user / month</p>
+          <ul className="m-0 mt-5 list-none space-y-2 p-0 text-sm text-white/80">
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Unlimited words</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> 38 languages</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Glossary + memory</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Priority support</li>
+          </ul>
+          <Link href="/register" className="mt-6 block rounded-full bg-white px-5 py-2.5 text-center text-sm font-medium text-brand-text no-underline transition-colors hover:bg-brand-accentSoft">Start 14-day trial</Link>
+        </div>
+        {/* Enterprise */}
+        <div className="rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card">
+          <h3 className="m-0 font-display text-[1.25rem] font-semibold text-brand-text">Enterprise</h3>
+          <p className="m-0 mt-3 font-display text-[2.5rem] font-semibold leading-none tracking-display text-brand-text">Talk to us</p>
+          <p className="m-0 mt-1 text-xs text-brand-subtle">custom</p>
+          <ul className="m-0 mt-5 list-none space-y-2 p-0 text-sm text-brand-muted">
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> SSO / SCIM</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Dedicated instance</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> Custom MT routing</li>
+            <li className="flex items-center gap-2"><Icons.Check className="h-3.5 w-3.5 text-brand-accent" /> SLA</li>
+          </ul>
+          <Link href="/register" className="mt-6 block rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-center text-sm font-medium text-brand-text no-underline shadow-card transition-all hover:shadow-raised">Book a demo</Link>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* ── How it works ── */}
-        <section id="how-it-works" style={{ backgroundColor: T.surface, padding: "7rem 1.5rem" }}>
-          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: "4rem" }}>
-              <p style={eyebrow}>The Helvara Workflow</p>
-              <h2 style={{
-                ...display,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                fontWeight: 700,
-                lineHeight: 1.1,
-                letterSpacing: "-0.02em",
-                color: T.onSurface,
-              }}>
-                From document to delivery in three steps.
-              </h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
-              {steps.map((step) => (
-                <div
-                  key={step.n}
-                  style={{
-                    background: "#ffffff",
-                    borderTop: `3px solid ${T.accent}`,
-                    padding: "2rem",
-                    borderRadius: "16px",
-                  }}
-                >
-                  <div style={{
-                    width: "2.25rem",
-                    height: "2.25rem",
-                    borderRadius: "9999px",
-                    background: "rgba(13,123,110,0.1)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    ...inter,
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    color: T.accent,
-                    marginBottom: "1.25rem",
-                  }}>
-                    {step.n}
-                  </div>
-                  <h3 style={{
-                    ...display,
-                    fontSize: "1.1rem",
-                    fontWeight: 600,
-                    letterSpacing: "-0.01em",
-                    color: T.onSurface,
-                    marginBottom: "0.6rem",
-                  }}>
-                    {step.title}
-                  </h3>
-                  <p style={{ ...inter, fontSize: "0.9rem", lineHeight: 1.7, color: T.onSurfaceVariant }}>{step.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+// ── FAQ ──────────────────────────────────────────────────────────────────────
 
-        {/* ── Features ── */}
-        <section style={{ backgroundColor: T.surfaceContainer, padding: "7rem 1.5rem" }}>
-          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: "4rem" }}>
-              <h2 style={{
-                ...display,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                fontWeight: 700,
-                lineHeight: 1.1,
-                letterSpacing: "-0.02em",
-                color: T.onSurface,
-              }}>
-                Built for the way teams actually work.
-              </h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
-              {features.map((f) => (
-                <FeatureCard key={f.title} {...f} />
-              ))}
-            </div>
-          </div>
-        </section>
+const FAQS = [
+  { q: "Does Helvara replace my translators?", a: "No. Helvara handles the routine work — applying your glossary, leveraging translation memory, maintaining tone and register. Your linguists focus on the genuinely difficult decisions." },
+  { q: "Which languages are supported?", a: "38 languages with native-speaker calibration on every pair. We add two new languages every quarter based on customer demand." },
+  { q: "How does pricing work?", a: "Free for your first 10,000 words per month. After that, pay per word on the Team plan ($49/user/month for unlimited). Enterprise pricing is custom." },
+  { q: "Is my data secure?", a: "SOC 2 Type II and GDPR compliant. Your documents are encrypted at rest and in transit, never used for model training, and you can choose data residency." },
+];
 
-        {/* ── Stats ── */}
-        <section style={{ backgroundColor: T.surfaceContainerLow, padding: "5rem 1.5rem" }}>
-          <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-            <div style={{ marginBottom: "3rem", textAlign: "center" }}>
-              <p style={eyebrow}>Built for accuracy</p>
-              <h2 style={{
-                ...display,
-                fontSize: "1.6rem",
-                fontWeight: 600,
-                color: T.onSurface,
-                letterSpacing: "-0.01em",
-              }}>
-                Trusted by teams who can&apos;t afford mistranslations.
-              </h2>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3rem", textAlign: "center" }}>
-              {/* Languages — static, always shown */}
-              <div ref={langsRef} style={{ minWidth: "120px" }}>
-                <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{langsValue}</p>
-                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Languages</p>
-                <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Supported</p>
-              </div>
-
-              {/* Words translated — dynamic, hidden if zero */}
-              {wordsTarget > 0 && (
-                <div ref={wordsRef} style={{ minWidth: "120px" }}>
-                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{wordsValue.toLocaleString()}+</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Words</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Translated</p>
-                </div>
-              )}
-
-              {/* Documents — dynamic, hidden if zero */}
-              {docsTarget > 0 && (
-                <div ref={docsRef} style={{ minWidth: "120px" }}>
-                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{docsValue}+</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Documents</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Processed</p>
-                </div>
-              )}
-
-              {/* Glossary terms — dynamic, hidden if zero */}
-              {glossaryTarget > 0 && (
-                <div ref={glossaryRef} style={{ minWidth: "120px" }}>
-                  <p style={{ ...display, fontSize: "2.5rem", fontWeight: 700, color: T.onSurface, margin: 0 }}>{glossaryValue}+</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.accent }}>Glossary terms</p>
-                  <p style={{ ...inter, marginTop: "0.25rem", fontSize: "0.85rem", color: T.onSurfaceVariant }}>Enforced consistently</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ── CTA ── */}
-        <section
-          id="waitlist"
-          style={{
-            backgroundColor: T.primaryContainer,
-            padding: "7rem 1.5rem",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <GrainOverlay />
-          <div style={{ maxWidth: "700px", margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
-            <h2 style={{
-              ...display,
-              fontSize: "clamp(2rem, 5vw, 3rem)",
-              fontWeight: 700,
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
-              color: "#e8f5e2",
-              marginBottom: "1rem",
-            }}>
-              Translation your legal team will{" "}
-              <em style={{ fontStyle: "italic" }}>actually sign off on.</em>
-            </h2>
-            <p style={{ ...inter, fontSize: "1.05rem", lineHeight: 1.7, color: "rgba(232,245,226,0.7)", marginBottom: "2.5rem" }}>
-              Built for teams who can&apos;t afford mistranslations. Request early access.
-            </p>
-
-            {formState === "success" ? (
-              <div style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                background: "rgba(13,123,110,0.15)",
-                border: "1px solid rgba(13,123,110,0.3)",
-                borderRadius: "9999px",
-                padding: "0.75rem 1.5rem",
-                color: "#7ecfc7",
-                ...inter,
-                fontSize: "0.9rem",
-                fontWeight: 500,
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                {message}
-              </div>
-            ) : (
-              <form onSubmit={(e) => { void handleSubmit(e); }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: "480px" }}>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@company.com"
-                    disabled={formState === "loading"}
-                    style={{
-                      flex: 1,
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      borderRadius: "9999px",
-                      padding: "0.75rem 1.25rem",
-                      color: "#fff",
-                      ...inter,
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={formState === "loading" || !email.trim()}
-                    className="rounded-full border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-50"
-                    style={{
-                      ...inter,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      transition: "background 0.15s",
-                    }}
-                  >
-                    {formState === "loading" ? "Joining…" : "Request access"}
-                  </button>
-                </div>
-                {formState === "error" && (
-                  <p style={{ ...inter, fontSize: "0.8rem", color: "#f87171", margin: 0 }}>{message}</p>
-                )}
-              </form>
+function Faq() {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  return (
+    <section id="faq" className="mx-auto max-w-[1200px] px-8 py-20">
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent">Common questions</p>
+      <h2 className="font-display text-[2.5rem] font-semibold tracking-display text-brand-text">Fair asks.</h2>
+      <p className="mt-3 max-w-xl text-[1.0625rem] text-brand-muted">A few more below. If you don&apos;t see yours, we&apos;d love to hear it.</p>
+      <div className="mt-10 space-y-0">
+        {FAQS.map((f, i) => (
+          <div key={i} className="border-t border-brand-border">
+            <button
+              type="button"
+              onClick={() => setOpenIdx(openIdx === i ? null : i)}
+              className="flex w-full items-center justify-between py-5 text-left"
+            >
+              <span className="text-[1.0625rem] font-medium text-brand-text">{f.q}</span>
+              <Icons.Plus className={`h-4 w-4 shrink-0 text-brand-subtle transition-transform ${openIdx === i ? "rotate-45" : ""}`} />
+            </button>
+            {openIdx === i && (
+              <p className="m-0 pb-5 text-[0.9375rem] leading-relaxed text-brand-muted animate-fadein">{f.a}</p>
             )}
           </div>
-        </section>
-
-        {/* ── Footer ── */}
-        <footer style={{ background: "#051d0f", padding: "2rem 1.5rem" }}>
-          <div style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            paddingTop: "2rem",
-          }}>
-            <span style={{ ...display, fontSize: "1.1rem", fontWeight: 600, color: "rgba(232,245,226,0.6)", letterSpacing: "-0.01em" }}>
-              Helvara
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", ...inter, fontSize: "0.75rem", color: "rgba(232,245,226,0.35)" }}>
-              <a href="/privacy" style={{ color: "inherit", textDecoration: "none" }}>Privacy</a>
-              <a href="/terms" style={{ color: "inherit", textDecoration: "none" }}>Terms</a>
-              <a href="/data-faq" style={{ color: "inherit", textDecoration: "none" }}>Data &amp; Security</a>
-              <span>© 2026 Helvara</span>
-            </div>
-          </div>
-        </footer>
-
+        ))}
       </div>
-    </>
+    </section>
+  );
+}
+
+// ── CTA Banner ──────────────────────────────────────────────────────────────
+
+function CtaBanner() {
+  return (
+    <section className="mx-auto max-w-[1200px] px-8 py-10">
+      <div className="relative overflow-hidden rounded-[32px] bg-brand-text p-14 text-center md:p-20">
+        {/* Accent glow */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-accent/20 blur-3xl" />
+        <p className="mb-4 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-white/50">Ready?</p>
+        <h2 className="mx-auto max-w-3xl font-display text-[2.5rem] font-semibold leading-[1.05] tracking-display text-white md:text-[3.5rem]">
+          Ship in a language you don&apos;t speak <em className="italic text-brand-accent">— confidently.</em>
+        </h2>
+        <p className="mx-auto mt-4 max-w-lg text-[1.0625rem] text-white/70">Start with 10,000 free words. No card. No 90-day procurement dance.</p>
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <Link href="/register" className="rounded-full bg-white px-6 py-3 text-base font-medium text-brand-text no-underline transition-colors hover:bg-brand-accentSoft">Start free</Link>
+          <Link href="/register" className="rounded-full border border-white/30 px-6 py-3 text-base font-medium text-white no-underline transition-colors hover:border-white/60">Book a demo</Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Footer ──────────────────────────────────────────────────────────────────
+
+const FOOTER_COLS = [
+  { title: "Product", links: ["Features", "Pricing", "Changelog", "Roadmap"] },
+  { title: "Solutions", links: ["Marketing teams", "Localization managers", "Agencies", "Developers"] },
+  { title: "Resources", links: ["FAQ", "Help center", "API docs", "Style guides"] },
+  { title: "Company", links: ["About", "Customers", "Careers", "Press kit"] },
+];
+
+function Footer() {
+  return (
+    <footer className="bg-brand-text">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-12 px-8 py-16 md:grid-cols-[1.4fr_2fr_1fr]">
+        {/* Brand */}
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white">
+              <Icons.HLogo className="h-4 w-4" />
+            </span>
+            <span className="font-display text-[1.125rem] font-semibold tracking-display text-white">Helvara</span>
+          </div>
+          <p className="mt-4 text-[0.875rem] leading-relaxed text-white/60">Translation that reads like you wrote it. For teams shipping in more than one language.</p>
+          <div className="mt-6 flex items-center gap-2">
+            <Link href="/register" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-brand-text no-underline transition-colors hover:bg-brand-accentSoft">Start free</Link>
+            <Link href="/register" className="rounded-full border border-white/30 px-4 py-2 text-sm font-medium text-white no-underline transition-colors hover:border-white/60">Book a demo</Link>
+          </div>
+        </div>
+
+        {/* Link columns */}
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          {FOOTER_COLS.map((col) => (
+            <div key={col.title}>
+              <p className="m-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-white/50">{col.title}</p>
+              <ul className="m-0 mt-3 list-none space-y-2 p-0">
+                {col.links.map((link) => (
+                  <li key={link}><a href="#" className="text-[0.875rem] text-white/75 no-underline transition-colors hover:text-white">{link}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Newsletter */}
+        <div>
+          <p className="m-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-white/50">On the record</p>
+          <p className="m-0 mt-3 text-[0.875rem] leading-relaxed text-white/60">We&apos;ll send a monthly dispatch on the craft of translation — no marketing fluff. Unsubscribe anytime.</p>
+          <div className="mt-4 flex items-center rounded-full border border-white/20 bg-white/5 p-1">
+            <input type="email" placeholder="you@company.com" className="flex-1 bg-transparent px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/40" />
+            <button type="button" className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-brand-text transition-colors hover:bg-brand-accentSoft">Subscribe</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-8 py-4 text-xs text-white/40">
+          <span>&copy; 2026 Helvara Inc. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/terms" className="text-white/40 no-underline hover:text-white/70">Terms</Link>
+            <Link href="/privacy" className="text-white/40 no-underline hover:text-white/70">Privacy</Link>
+            <a href="#" className="text-white/40 no-underline hover:text-white/70">Security</a>
+            <a href="#" className="text-white/40 no-underline hover:text-white/70">Status</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export default function HomePage() {
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (hasHydrated && token) router.replace("/dashboard");
+  }, [hasHydrated, token, router]);
+
+  return (
+    <div className="min-h-screen app-bg">
+      <Nav />
+      <Hero />
+      <LogosStrip />
+      <ValueProps />
+      <ProductFeatures />
+      <Workflow />
+      <Testimonial />
+      <Pricing />
+      <Faq />
+      <CtaBanner />
+      <Footer />
+    </div>
   );
 }

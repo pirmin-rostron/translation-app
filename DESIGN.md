@@ -1,24 +1,24 @@
 # Helvara Design System
 
-Professional AI translation workspace. Warm editorial surfaces, deep teal accent, Playfair Display headlines, precise Inter UI text.
+Professional AI translation workspace. Neutral editorial surfaces, deep teal accent, Fraunces display headings, Inter Tight UI text, JetBrains Mono for data.
 
 ---
 
 ## 1. Visual Theme & Atmosphere
 
-Helvara's interface is a study in warm editorial professionalism — a product handling sensitive business documents that must feel trustworthy, calm, and premium. The page opens with a warm parchment background (#F5F2EC), near-black warm text (#1A110A), and a deep teal accent (#0D7B6E) that signals intelligence and precision without feeling cold.
+Helvara's interface is a study in editorial professionalism — a product handling sensitive business documents that must feel trustworthy, calm, and premium. The page opens with a neutral background (#FAFAF7) with layered radial accent gradients, near-black text (#121210), and a deep teal accent (#0D7B6E) that signals intelligence and precision without feeling cold.
 
-The typographic system pairs Playfair Display (for moments of meaning — page titles, completion states, value statements) with Inter (for all UI chrome — buttons, labels, navigation, tables). This editorial/UI split is strict and intentional: Playfair Display communicates "something important is happening here," while Inter communicates "here is how to act on it."
+The typographic system pairs Fraunces (for moments of meaning — page titles, stat numbers, panel titles) with Inter Tight (for all UI chrome — buttons, labels, navigation, tables) and JetBrains Mono (for language codes, progress %, file sizes). This editorial/UI/data split is strict and intentional.
 
-Cards and surfaces use rounded-xl (16px) corners with warm parchment backgrounds and subtle warm borders (#E5E0D8). Buttons are always full-pill (rounded-full, 9999px) — this is a Helvara signature. The surface colour is pure white (#FFFFFF) for cards against the warm parchment page, creating depth without shadows.
+Cards and surfaces use rounded-2xl (22px) corners for panels, rounded-xl (18px) for cards. Buttons are always full-pill (rounded-full, 9999px) — this is a Helvara signature. The surface colour is pure white (#FFFFFF) for cards against the neutral page background, creating depth with card shadows.
 
 Key Characteristics:
-- Warm parchment page background (#F5F2EC) — never cool grey, never pure white
+- Neutral page background (#FAFAF7) with subtle teal radial gradients
 - Deep teal (#0D7B6E) used sparingly — primary buttons, active states, accent text only
-- Playfair Display for headlines and key moments; Inter for all UI text
+- Fraunces for headlines and key moments; Inter Tight for all UI text; JetBrains Mono for data
 - Full-pill buttons (9999px radius) — non-negotiable signature shape
-- rounded-xl (16px) for all cards and containers
-- Warm border colour (#E5E0D8) — never cool grey borders
+- rounded-2xl (22px) for panels, rounded-xl (18px) for cards
+- Neutral border colour (#ECEAE3) — never cool grey borders
 - One primary action per screen — always. Everything else is secondary or ghost.
 
 ---
@@ -26,21 +26,25 @@ Key Characteristics:
 ## 2. Colour Palette & Roles
 
 ### Backgrounds
-- brand-bg (#F5F2EC): Page background — always, never override
+- brand-bg (#FAFAF7): Page background — always, never override
 - brand-surface (#FFFFFF): Cards, panels, inputs, modals
+- brand-sunken (#F4F3EE): Filter tracks, chips, hover backgrounds
 - brand-accentMid (#E6F4F2): Accent-tinted backgrounds, highlighted items
+- brand-accentSoft (#F0F8F6): Tint for pills, rails, subtle accent surfaces
 
 ### Text
-- brand-text (#1A110A): Primary text — headings, body, labels
-- brand-muted (#6B6158): Secondary text — descriptions, meta, subheadings
-- brand-subtle (#9E9189): Tertiary text — placeholders, captions, timestamps
+- brand-text (#121210): Primary text — headings, body, labels
+- brand-muted (#5A5A55): Secondary text — descriptions, meta, subheadings
+- brand-subtle (#9A9A92): Tertiary text — placeholders, captions, timestamps
+- brand-hint (#BEBEB5): Icon hints, arrows at rest, section headers
 
 ### Accent
-- brand-accent (#0D7B6E): Primary buttons, active nav, accent text links
+- brand-accent (#0D7B6E): Primary buttons, active nav, accent text links (themable)
 - brand-accentHov (#0A6459): Hover state on accent elements
 
 ### Borders
-- brand-border (#E5E0D8): All borders, dividers, table lines
+- brand-border (#ECEAE3): Panel borders, major dividers
+- brand-borderSoft (#F2F0EA): Row dividers inside panels
 
 ### Status (always use as pairs — background + text together)
 - Success: text-status-success (#15803D) + bg-status-successBg (#F0FDF4)
@@ -50,33 +54,36 @@ Key Characteristics:
 
 Rules:
 - Never hardcode hex values — always use the token names above as Tailwind classes
-- Never use cool greys — all neutrals must be warm
+- Never use cool greys — all neutrals must be neutral/warm
 - Never use blue as an accent — teal only
 - Never use bg-green-50, text-red-700 etc — always use status.* tokens
+- App background uses a layered radial gradient (see globals.css .app-bg class)
 
 ---
 
 ## 3. Typography Rules
 
 Font Families:
-- Display: Playfair Display — class font-display
-- UI/Body: Inter — class font-sans (default)
+- Display: Fraunces (500, 600) — class font-display. Feature settings: 'ss01'. Letter-spacing: -0.03em (display), -0.02em (headings)
+- UI/Body: Inter Tight (400, 500, 600, 700) — class font-sans (default). Letter-spacing: -0.005em globally
+- Mono: JetBrains Mono (400, 500) — class font-mono. For language codes, progress %, file sizes
 
 Hierarchy:
-- Page title: font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold text-brand-text
-- Section headline: font-display text-2xl font-semibold text-brand-text
-- Card title: font-display text-lg font-semibold text-brand-text
-- Completion/moment headline: font-display text-[1.0625rem] font-semibold text-brand-text
+- H1 page title: font-display text-[2.5rem] font-semibold tracking-display text-brand-text (Dashboard: 2.75rem)
+- H2 panel title: font-display text-[1.0625rem] font-semibold tracking-display text-brand-text
+- Stat number: font-display text-[1.625rem]–text-[2.25rem] font-semibold tracking-display
+- Body text: text-[0.8125rem]–text-[0.9375rem] text-brand-text (Inter Tight)
+- Metadata: text-[0.6875rem] font-medium uppercase tracking-[0.14em]–tracking-[0.18em] text-brand-subtle
 - UI label: text-[0.8125rem] font-medium text-brand-muted
-- Body text: text-sm text-brand-text
 - Caption/meta: text-xs text-brand-subtle
-- Micro label: text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-subtle
+- Mono data: font-mono text-[0.6875rem] text-brand-muted (language pairs, percentages)
 
 Principles:
-- Use Playfair Display ONLY for: page titles, section headlines, card titles, completion moments, value statements
-- Use Inter for: buttons, labels, nav, tables, form elements, badges, body copy
-- Never Playfair Display in buttons, badges, table cells, or form labels
-- Three weights only: 400 (read), 500 (interact/label), 600/700 (headline/announce)
+- Use Fraunces ONLY for: page titles, panel titles, stat numbers, completion moments, project names in cards
+- Use Inter Tight for: buttons, labels, nav, tables, form elements, badges, body copy
+- Use JetBrains Mono for: language codes (EN → ES), progress percentages, file sizes, word counts
+- Never Fraunces in buttons, badges, table cells, or form labels
+- Use italic Fraunces for accented words in greetings (e.g., "Good afternoon, *Maya*")
 
 ---
 
@@ -131,9 +138,23 @@ Warning card (threshold, caution):
   rounded-xl border border-status-warning/30 bg-status-warningBg p-4
 
 Rules:
-- ALWAYS rounded-xl — never rounded-lg, rounded, or rounded-2xl
-- ALWAYS border border-brand-border — never shadow-only cards
+- Panels use rounded-2xl (22px), cards use rounded-xl (18px)
+- ALWAYS border border-brand-border — cards use shadow-card for depth
 - Padding: p-6 standard, p-8 featured, p-4 compact
+
+### Border Radius Scale
+- sm: 6px — small elements, inner corners
+- DEFAULT: 10px — generic
+- lg: 14px — inputs, inner cards
+- xl: 18px — cards, stat tiles
+- 2xl: 22px — panels, main sections
+- 3xl: 28px — hero cards
+- full: 9999px — buttons, badges, pills
+
+### Box Shadows
+- shadow-card: 0 1px 0 rgba(17,17,14,0.04), 0 1px 2px rgba(17,17,14,0.03) — standard card elevation
+- shadow-raised: 0 2px 6px -1px rgba(17,17,14,0.05), 0 8px 24px -8px rgba(17,17,14,0.08) — hover elevation
+- shadow-ring: 0 0 0 1px rgba(17,17,14,0.05), 0 1px 2px rgba(17,17,14,0.04) — focus ring
 
 ---
 

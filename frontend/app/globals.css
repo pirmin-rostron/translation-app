@@ -1,11 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-inter-tight: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-fraunces: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-jetbrains: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+}
+
 body {
-  background-color: #F5F2EC;
-  color: #1A110A;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(13,123,110,0.05), transparent 60%),
+    radial-gradient(900px 500px at -5% 110%, rgba(13,123,110,0.03), transparent 70%),
+    #FAFAF7;
+  color: #121210;
+  letter-spacing: -0.005em;
+}
+
+/* Slide-over animations */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* App background class for shell wrapper */
+.app-bg {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(13,123,110,0.05), transparent 60%),
+    radial-gradient(900px 500px at -5% 110%, rgba(13,123,110,0.03), transparent 70%),
+    #FAFAF7;
 }

@@ -3,7 +3,6 @@
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DocumentDiffPane } from "./components/DocumentDiffPane";
-import { ReviewDetailsPane } from "./components/ReviewDetailsPane";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { getLanguageDisplayName } from "../../utils/language";
 
@@ -474,6 +473,7 @@ function TranslationReviewPageInner() {
   const [message, setMessage] = useState("");
   const [translatingBannerDismissed, setTranslatingBannerDismissed] = useState(false);
   const [bulkApproving, setBulkApproving] = useState(false);
+  const [density, setDensity] = useState<"alignment" | "cozy" | "balanced" | "compact">("balanced");
   const segmentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<number, HTMLElement | null>>({});
   const reviewGuidanceRef = useRef<HTMLElement>(null);
@@ -1710,34 +1710,54 @@ function TranslationReviewPageInner() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── Job Context Sub-header ── */}
-      <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface px-6 py-2">
-        <div className="flex items-center gap-2">
-          <span className="max-w-[240px] truncate font-display font-semibold text-brand-text">
-            {doc?.filename ?? `Document #${job.document_id}`}
-          </span>
-          <span className="rounded-full bg-brand-accentMid px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">
-            {getLanguageDisplayName(job.source_language)} → {getLanguageDisplayName(job.target_language)}
-          </span>
+      {/* ── Review header (sticky) ── */}
+      <header className="shrink-0 border-b border-brand-border bg-brand-surface/90 backdrop-blur">
+        <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-surface text-brand-muted shadow-card transition-colors hover:bg-brand-sunken hover:text-brand-text"
+            aria-label="Back"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3 5 8l5 5"/></svg>
+          </button>
+          <div className="min-w-0">
+            <p className="m-0 flex items-center gap-1.5 text-[0.6875rem] font-medium text-brand-muted">
+              <span className="font-semibold uppercase tracking-[0.18em] text-brand-accent">Review</span>
+            </p>
+            <h1 className="m-0 mt-0.5 flex items-center gap-2 font-display text-[1.25rem] font-semibold leading-none tracking-display text-brand-text">
+              <span className="max-w-[240px] truncate">{doc?.filename ?? `Document #${job.document_id}`}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-sunken px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-normal text-brand-text">
+                {getLanguageDisplayName(job.source_language)}
+                <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6h8M7 3l3 3-3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {getLanguageDisplayName(job.target_language)}
+              </span>
+            </h1>
+          </div>
         </div>
-        <div>
-          {reviewCompleteState ? (
-            <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Review complete ✓</span>
-          ) : (
-            <span className="text-sm text-brand-muted">
-              {reviewCounts.completed_blocks} of {reviewCounts.total_blocks} blocks reviewed
-            </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Progress meter */}
+          <div className="flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 shadow-card">
+            <span className="font-mono text-[0.75rem] font-medium text-brand-text">{reviewCounts.completed_blocks}/{reviewCounts.total_blocks}</span>
+            <div className="h-1 w-20 overflow-hidden rounded-full bg-brand-sunken">
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-500" style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
+
+          {reviewCompleteState && (
+            <span className="rounded-full bg-status-successBg px-3 py-1 text-xs font-medium text-status-success">Complete</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {!reviewCompleteState && reviewCounts.safe_unresolved_segments > 0 && (
+          {!reviewCompleteState && reviewCounts.remaining_blocks > 0 && (
             <button
               type="button"
               onClick={handleBulkApproveSafe}
               disabled={bulkApproving || actionLoading}
               className="rounded-full border border-brand-accent bg-brand-accentMid px-4 py-1.5 text-sm font-medium text-brand-accent hover:bg-brand-accent hover:text-white disabled:opacity-50"
             >
-              {bulkApproving ? "Approving…" : `Approve ${reviewCounts.safe_unresolved_segments} clean`}
+              {bulkApproving ? "Approving…" : `Approve remaining ${reviewCounts.remaining_blocks}`}
             </button>
           )}
           <button
@@ -1765,7 +1785,43 @@ function TranslationReviewPageInner() {
             </button>
           </div>
         </div>
+        </div>
+        {/* Density toggle pills */}
+        <div className="flex items-center gap-1.5 border-t border-brand-borderSoft px-6 py-1.5">
+          <span className="mr-1 text-[0.6875rem] font-medium text-brand-subtle">Density</span>
+          {(["alignment", "cozy", "balanced", "compact"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setDensity(mode)}
+              className={`rounded-full px-3 py-0.5 text-[0.6875rem] font-medium capitalize transition-colors ${
+                density === mode
+                  ? "bg-brand-accent text-white"
+                  : "bg-brand-sunken text-brand-muted hover:bg-brand-bg hover:text-brand-text"
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
       </header>
+
+      {/* ── Rumi summary bar ── */}
+      <div className="flex items-center gap-3 border-b border-brand-borderSoft bg-brand-sunken/40 px-6 py-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-text text-[0.625rem] font-bold text-white">H</span>
+        <p className="m-0 text-[0.8125rem] leading-snug text-brand-muted">
+          I translated {reviewCounts.total_blocks} block{reviewCounts.total_blocks !== 1 ? "s" : ""}.{" "}
+          {reviewCounts.completed_blocks > 0 && (
+            <>{reviewCounts.completed_blocks} {reviewCounts.completed_blocks === 1 ? "is a solid" : "are solid"} memory match{reviewCounts.completed_blocks !== 1 ? "es" : ""} I&apos;ve already approved. </>
+          )}
+          {reviewCounts.remaining_blocks > 0 && (
+            <>{reviewCounts.remaining_blocks} {reviewCounts.remaining_blocks === 1 ? "is" : "are"} pending your review. </>
+          )}
+          {reviewCounts.ambiguity_count > 0 && (
+            <>{reviewCounts.ambiguity_count} {reviewCounts.ambiguity_count === 1 ? "is" : "are"} genuinely ambiguous — I&apos;ve lined up options for each.</>
+          )}
+        </p>
+      </div>
 
       {/* ── Translating Banner ── */}
       {job.status === "translating" && !translatingBannerDismissed && (
@@ -1835,8 +1891,41 @@ function TranslationReviewPageInner() {
         </div>
       )}
 
-      {/* ── Main Area: Canvas + Sidebar ── */}
+      {/* ── Main Area: Block Rail + Canvas + Sidebar ── */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Block navigator rail — status dots for quick jump */}
+        <aside className="w-[56px] shrink-0 overflow-y-auto border-r border-brand-borderSoft bg-brand-sunken/30 py-4">
+          <div className="flex flex-col items-center gap-1.5">
+            {orderedBlocks.map((block, i) => {
+              const resolved = isBlockResolved(block);
+              const hasAmb = block.segments.some((s: ReviewSegment) => s.ambiguity_detected && !isAcceptableFinalStatus(s.review_status));
+              const dotCls = resolved ? "bg-emerald-500" : hasAmb ? "bg-amber-500" : "bg-brand-hint";
+              const isActive = selectedBlock?.id === block.id;
+              return (
+                <button
+                  key={block.id}
+                  type="button"
+                  onClick={() => {
+                    const segId = block.segments[0]?.id;
+                    if (segId != null) selectBlockById(block.id, segId);
+                  }}
+                  className={`group flex h-8 w-9 items-center justify-center rounded-lg transition-all ${
+                    isActive ? "bg-brand-surface shadow-card ring-1 ring-brand-border" : "hover:bg-brand-surface/60"
+                  }`}
+                  title={`Block ${i + 1} · ${resolved ? "approved" : hasAmb ? "ambiguity" : "pending"}`}
+                >
+                  <span className="flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${dotCls}`} />
+                    <span className={`font-mono text-[0.625rem] font-medium ${isActive ? "text-brand-text" : "text-brand-muted"}`}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
         <DocumentDiffPane
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
@@ -1852,88 +1941,31 @@ function TranslationReviewPageInner() {
           sourceLanguageLabel={sourceLanguageLabel}
           targetLanguageLabel={targetLanguageLabel}
           canvasRef={canvasRef}
+          density={density === "alignment" ? "cozy" : density}
         />
 
-        <ReviewDetailsPane
-          selectedSegment={selectedSegment}
-          selectedBlock={selectedBlock}
-          reviewComplete={reviewComplete}
-          onFocusReviewGuidance={focusReviewGuidance}
-          orderedBlocksLength={reviewCounts.total_blocks}
-          completedBlocks={reviewCounts.completed_blocks}
-          selectedBlockPosition={selectedBlockPosition}
-          onPreviousBlock={handlePreviousBlock}
-          onNextBlock={handleNextBlock}
-          isLastBlock={isLastBlock}
-          unresolvedBlocks={reviewCounts.remaining_blocks}
-          selectedSegmentIsSafe={selectedSegmentIsSafe}
-          isSafeDecisionOnlyMode={isSafeDecisionOnlyMode}
-          cleanPanelText={cleanPanelText}
-          hasAmbiguityChoice={hasAmbiguityChoice}
-          ambiguityExplanation={ambiguityChoiceDetails.explanation}
-          blockAmbiguityIssuesLength={blockAmbiguityIssues.length}
-          activeBlockAmbiguityPosition={activeBlockAmbiguityPosition}
-          ambiguityChoiceIndex={ambiguityChoiceIndex}
-          isAmbiguityChoiceUserSelected={isAmbiguityChoiceUserSelected}
-          ambiguityOptions={ambiguityOptions}
-          currentSuggestionIndex={currentSuggestionIndex}
-          onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
-          onClearAmbiguityChoice={() => {
-            setPrevAmbiguityChoiceIndex(ambiguityChoiceIndex);
-            setAmbiguityChoiceIndex(null);
-            setIsAmbiguityChoiceUserSelected(false);
-          }}
-          previousAmbiguityChoiceIndex={prevAmbiguityChoiceIndex}
-          isReadOnly={isReadOnly}
-          isEditing={isEditing}
-          canEditSelectedSegment={canEditSelectedSegment}
-          draftTranslation={draftTranslation}
-          onDraftTranslationChange={setDraftTranslation}
-          glossaryMatches={glossaryMatches}
-          hasSemanticChoice={hasSemanticChoice}
-          semanticSimilarityScore={semanticSimilarityScore}
-          semanticChoice={semanticChoice}
-          onSemanticChoiceChange={handleSemanticChoiceChange}
-          currentBlockResolved={currentBlockResolved}
-          resolvedAmbiguity={resolvedAmbiguity}
-          onGoToNextUnresolved={() => {
-            const nextId = getNextUnresolvedBlockIdFromCurrent() ?? getNextUnresolvedBlockId();
-            if (nextId != null) moveToBlockById(nextId);
-          }}
-          onApproveCurrentBlock={handleApproveCurrentBlock}
-          primaryActionDisabled={primaryActionDisabled}
-          onToggleEdit={handleToggleEdit}
-          actionLoading={actionLoading}
-          onSkipBlock={handleSkipBlock}
-          hasDraftChanges={hasDraftChanges}
-          onSaveSegmentEdit={handleSaveSegmentEdit}
-          exactMemoryUsed={selectedBlockExactMemory}
-          semanticMemoryUsed={selectedBlockSemanticMemory}
-          memorySimilarityScore={selectedBlockMemorySimilarity}
-          memorySourceText={selectedBlockMemorySourceText}
-          onAddToGlossary={handleAddToGlossary}
-          sourceLanguage={job.source_language}
-          targetLanguage={job.target_language}
-        />
       </div>
 
       {/* ── Fixed Bottom Bar ── */}
-      <div className="flex h-16 shrink-0 items-center border-t border-brand-border bg-brand-surface px-6">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-brand-text">
-            Block {selectedBlockPosition + 1} of {reviewCounts.total_blocks}
+      <div className="flex h-12 shrink-0 items-center justify-between border-t border-brand-borderSoft bg-brand-surface/80 px-6 backdrop-blur">
+        <div className="flex items-center gap-4 text-[0.6875rem] text-brand-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="rounded border border-brand-border bg-brand-surface px-1.5 py-0.5 font-mono text-[0.625rem] font-medium text-brand-text shadow-card">↑↓</span>
+            Move
           </span>
-          <span className="text-xs text-brand-subtle">
-            {reviewCounts.completed_blocks} reviewed
+          <span className="inline-flex items-center gap-1.5">
+            <span className="rounded border border-brand-border bg-brand-surface px-1.5 py-0.5 font-mono text-[0.625rem] font-medium text-brand-text shadow-card">↵</span>
+            Approve
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="rounded border border-brand-border bg-brand-surface px-1.5 py-0.5 font-mono text-[0.625rem] font-medium text-brand-text shadow-card">1-9</span>
+            Pick alt
           </span>
         </div>
-        <div className="mx-6 flex-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-border">
-            <div
-              className="h-full rounded-full bg-brand-accent transition-[width] duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+        <div className="flex items-center gap-2 text-[0.6875rem] text-brand-muted">
+          <span>Block {selectedBlockPosition + 1} of {reviewCounts.total_blocks}</span>
+          <span className="text-brand-hint">·</span>
+          <span>{reviewCounts.completed_blocks} reviewed</span>
         </div>
         <div className="flex items-center gap-3">
           {reviewCounts.issues_count > 0 && (
@@ -1974,7 +2006,7 @@ function TranslationReviewPageInner() {
       </div>
 
       {/* ── Floating Action Buttons ── */}
-      <div className="fixed bottom-24 right-80 z-30 flex flex-col gap-2">
+      <div className="fixed bottom-24 right-10 z-30 flex flex-col gap-2">
         {!isReadOnly && !currentBlockResolved && !reviewCompleteState && (
           <>
             <button

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "../stores/authStore";
 import { API_URL } from "../services/api";
@@ -33,16 +33,29 @@ function LoginPageContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
+    // Fall back to DOM values if React state is empty (browser autofill
+    // can populate inputs without firing onChange)
+    const submitEmail = email || emailRef.current?.value || "";
+    const submitPassword = password || passwordRef.current?.value || "";
+
+    if (!submitEmail.trim() || !submitPassword) {
+      setError("Please enter your email and password.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const body = new URLSearchParams();
-      body.set("username", email.trim().toLowerCase());
-      body.set("password", password);
+      body.set("username", submitEmail.trim().toLowerCase());
+      body.set("password", submitPassword);
 
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
@@ -98,7 +111,6 @@ function LoginPageContent() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         body { margin: 0; }
         .auth-layout { display: flex; min-height: 100vh; }
@@ -248,7 +260,9 @@ function LoginPageContent() {
               <div>
                 <label htmlFor="email" style={labelStyle}>Email</label>
                 <input
+                  ref={emailRef}
                   id="email"
+                  name="username"
                   type="text"
                   inputMode="email"
                   required
@@ -265,7 +279,9 @@ function LoginPageContent() {
               <div>
                 <label htmlFor="password" style={labelStyle}>Password</label>
                 <input
+                  ref={passwordRef}
                   id="password"
+                  name="password"
                   type="password"
                   required
                   autoComplete="current-password"

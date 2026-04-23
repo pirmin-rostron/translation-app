@@ -11,7 +11,7 @@ interface StatusBadgeProps {
 
 const STATUS_STYLES: Record<JobStatus, { bg: string; text: string; label: string }> = {
   pending:    { bg: "bg-brand-bg",         text: "text-brand-muted",    label: "Pending" },
-  processing: { bg: "bg-status-infoBg",    text: "text-status-info",    label: "Processing" },
+  processing: { bg: "bg-status-infoBg",    text: "text-status-info",    label: "Translating" },
   in_review:  { bg: "bg-brand-accentMid",  text: "text-brand-accent",   label: "In Review" },
   completed:  { bg: "bg-status-successBg", text: "text-status-success", label: "Completed" },
   exported:   { bg: "bg-status-successBg", text: "text-status-success", label: "Exported" },

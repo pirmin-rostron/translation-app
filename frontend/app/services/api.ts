@@ -456,8 +456,48 @@ export const orgStatsApi = {
   get: () => apiFetch<OrgStatsResponse>(`${API_URL}/stats`),
 };
 
+// ── Autopilot / Agent types ─────────────────────────────────────────────────
+
+export type AgentStatsResponse = {
+  blocks_translated: number;
+  decisions_auto: number;
+  decisions_asking: number;
+  saved_minutes: number;
+  insights_raised: number;
+};
+
+export type AgentMessageAction = {
+  label: string;
+  primary: boolean;
+  job_id: number | null;
+};
+
+export type AgentMessageResponse = {
+  id: string;
+  when: string;
+  kind: "question" | "decision" | "completed";
+  project: string;
+  document: string;
+  pair: string;
+  job_id: number | null;
+  title: string;
+  body: string;
+  meta: string | null;
+  actions: AgentMessageAction[] | null;
+};
+
+export type DecisionLogEntry = {
+  id: string;
+  when: string;
+  type: "question" | "glossary" | "memory" | "edit" | "completed";
+  text: string;
+};
+
 export const dashboardApi = {
   upcoming: () => apiFetch<UpcomingItem[]>(`${API_URL}/dashboard/upcoming`),
+  agentStats: () => apiFetch<AgentStatsResponse>(`${API_URL}/dashboard/agent-stats`),
+  agentFeed: () => apiFetch<AgentMessageResponse[]>(`${API_URL}/dashboard/agent-feed`),
+  decisionsLog: () => apiFetch<DecisionLogEntry[]>(`${API_URL}/dashboard/decisions-log`),
 };
 
 export type OverviewResponse = {

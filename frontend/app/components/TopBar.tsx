@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../stores/authStore";
 import { useDashboardStore } from "../stores/dashboardStore";
+import { Icons } from "./Icons";
 
 export function TopBar() {
   const router = useRouter();
@@ -25,46 +26,71 @@ export function TopBar() {
   }, []);
 
   const displayName = user?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "User";
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
-    <header className="flex h-[50px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface px-5">
-      <Link href="/dashboard" className="font-display text-lg font-bold text-brand-text no-underline cursor-pointer">Helvara</Link>
+    <header className="flex h-[56px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface/80 px-6 backdrop-blur">
+      {/* Logo */}
+      <Link href="/dashboard" className="group flex items-center gap-2 no-underline">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-text text-white">
+          <Icons.HLogo className="h-4 w-4" />
+        </span>
+        <span className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text">
+          Helvara
+        </span>
+      </Link>
 
-      <div className="flex items-center gap-3">
+      {/* Right cluster */}
+      <div className="flex items-center gap-2">
+        {/* Search */}
+        <button
+          type="button"
+          className="rounded-full p-2 text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text"
+          title="Search"
+        >
+          <Icons.Search className="h-[18px] w-[18px]" />
+        </button>
+
+        {/* New translation CTA */}
         <button
           type="button"
           onClick={() => openTranslationModal()}
-          className="rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov"
+          className="flex items-center gap-1.5 rounded-full bg-brand-text px-3.5 py-1.5 text-[0.8125rem] font-medium text-white transition-colors hover:bg-brand-accent"
         >
-          + New Translation
+          <Icons.Plus className="h-3.5 w-3.5" />
+          New translation
         </button>
 
+        {/* Divider */}
+        <div className="mx-1 h-6 w-px bg-brand-border" />
+
+        {/* Avatar dropdown */}
         <div ref={dropdownRef} className="relative">
           <button
             type="button"
             onClick={() => setDropdownOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-bg"
+            className="flex items-center gap-2 rounded-full px-2 py-1 text-sm text-brand-text transition-colors hover:bg-brand-sunken"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-accentMid text-xs font-bold text-brand-accent">
-              {displayName.charAt(0).toUpperCase()}
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent to-brand-accentHov text-xs font-semibold text-white">
+              {initial}
             </span>
-            <span>{displayName}</span>
-            <span className="text-[0.6rem]">▾</span>
+            <span className="font-medium">{displayName}</span>
+            <Icons.ChevronDown className="h-3 w-3 text-brand-subtle" />
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-xl border border-brand-border bg-brand-surface shadow-lg">
+            <div className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-xl border border-brand-border bg-brand-surface shadow-raised animate-fadein">
               <button
                 type="button"
                 onClick={() => { setDropdownOpen(false); router.push("/settings"); }}
-                className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-bg"
+                className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-sunken"
               >
                 Profile &amp; account
               </button>
               <button
                 type="button"
                 onClick={() => { setDropdownOpen(false); router.push("/settings"); }}
-                className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-bg"
+                className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-sunken"
               >
                 Preferences
               </button>
@@ -72,7 +98,7 @@ export function TopBar() {
               <button
                 type="button"
                 onClick={() => { clearAuth(); router.push("/login"); }}
-                className="block w-full px-4 py-2.5 text-left text-sm text-status-error hover:bg-brand-bg"
+                className="block w-full px-4 py-2.5 text-left text-sm text-status-error hover:bg-brand-sunken"
               >
                 Log out
               </button>

@@ -182,7 +182,7 @@ function TranslationCard({ overview, onRefresh }: { overview: JobOverview; onRef
   const styleLabel = style.charAt(0).toUpperCase() + style.slice(1);
   const reviewMode = overview.review_mode ?? "autopilot";
 
-  const primaryHref = overview.status === "in_review" ? `/translation-jobs/${overview.job_id}` : `/translation-jobs/${overview.job_id}/overview`;
+  const primaryHref = `/translation-jobs/${overview.job_id}`;
   const primaryLabel = overview.status === "in_review" ? "Open Review →" : overview.status === "exported" ? "Download" : "View";
   const isPrimaryCta = overview.status === "in_review";
 
@@ -252,7 +252,7 @@ function TranslationCard({ overview, onRefresh }: { overview: JobOverview; onRef
                 <p className="mb-1 text-2xl">✅</p>
                 <p className="text-sm font-semibold text-brand-text">Translation ready</p>
                 <div className="mt-3 space-y-2">
-                  <Link href={`/translation-jobs/${overview.job_id}/overview`} className="block w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-center text-xs font-medium text-brand-muted no-underline hover:bg-brand-bg transition-colors">Download again</Link>
+                  <Link href={`/translation-jobs/${overview.job_id}`} className="block w-full rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-center text-xs font-medium text-brand-muted no-underline hover:bg-brand-bg transition-colors">Download again</Link>
                   <Link href={`/translation-jobs/${overview.job_id}`} className="block w-full rounded-full bg-brand-accent px-3 py-1.5 text-center text-xs font-medium text-white no-underline hover:bg-brand-accentHov transition-colors">Review →</Link>
                 </div>
               </>)}

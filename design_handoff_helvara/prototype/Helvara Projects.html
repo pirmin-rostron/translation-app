@@ -1,0 +1,3514 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Helvara — Projects</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg:        '#FAFAF7',
+              surface:   '#FFFFFF',
+              sunken:    '#F4F3EE',
+              border:    '#ECEAE3',
+              borderSoft:'#F2F0EA',
+              text:      '#121210',
+              muted:     '#5A5A55',
+              subtle:    '#9A9A92',
+              hint:      '#BEBEB5',
+              accent:    'var(--brand-accent, #0D7B6E)',
+              accentHov: 'var(--brand-accent-hov, #0A6459)',
+              accentMid: 'var(--brand-accent-mid, #E6F4F2)',
+              accentSoft:'var(--brand-accent-soft, #F0F8F6)',
+            },
+            status: {
+              success:   '#15803D',
+              successBg: '#F0FDF4',
+              warning:   '#B45309',
+              warningBg: '#FFFBEB',
+              error:     '#B91C1C',
+              errorBg:   '#FEF2F2',
+              info:      '#1D4ED8',
+              infoBg:    '#EFF6FF',
+            },
+          },
+          fontFamily: {
+            sans:    ['"Inter Tight"', 'Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
+            display: ['Fraunces', 'Georgia', 'serif'],
+            mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          borderRadius: { sm: '6px', DEFAULT: '10px', lg: '14px', xl: '18px', '2xl': '22px', '3xl': '28px', full: '9999px' },
+          boxShadow: {
+            card: '0 1px 0 rgba(17,17,14,0.04), 0 1px 2px rgba(17,17,14,0.03)',
+            raised: '0 2px 6px -1px rgba(17,17,14,0.05), 0 8px 24px -8px rgba(17,17,14,0.08)',
+            ring: '0 0 0 1px rgba(17,17,14,0.05), 0 1px 2px rgba(17,17,14,0.04)',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      --brand-accent: #0D7B6E;
+      --brand-accent-hov: #0A6459;
+      --brand-accent-mid: #E6F4F2;
+      --brand-accent-soft: #F0F8F6;
+    }
+    html, body, #root { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Inter Tight', Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #121210;
+      background: #FAFAF7;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+    }
+    .font-display { font-family: 'Fraunces', Georgia, serif; font-feature-settings: 'ss01'; }
+    .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    h1, h2, h3 { letter-spacing: -0.02em; }
+    .tracking-display { letter-spacing: -0.03em; }
+    .app-bg {
+      background:
+        radial-gradient(1200px 600px at 85% -10%, rgba(13,123,110,0.05), transparent 60%),
+        radial-gradient(900px 500px at -5% 110%, rgba(13,123,110,0.03), transparent 70%),
+        #FAFAF7;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes scalein { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+    @keyframes slideup { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @keyframes slidedown {
+      from { opacity: 0; transform: translateY(-6px); max-height: 0; }
+      to   { opacity: 1; transform: translateY(0); max-height: 3000px; }
+    }
+    .animate-fadein  { animation: fadein 0.15s ease-out; }
+    .animate-scalein { animation: scalein 0.18s ease-out; }
+    .animate-slideup { animation: slideup 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+    .animate-slidedown { animation: slidedown 0.25s ease-out; overflow: hidden; }
+
+    /* Density */
+    html[data-density="compact"] .rounded-xl.p-6 { padding: 1rem; }
+    html[data-density="compact"] .py-3\.5 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    html[data-density="compact"] .py-8 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #E5E0D8; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9E9189; }
+  </style>
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="400" fill="#F5F2EC"/>
+      <g transform="translate(120 120)" fill="#0D7B6E">
+        <rect x="0" y="30" width="160" height="14" rx="7"/>
+        <rect x="0" y="60" width="120" height="14" rx="7"/>
+        <rect x="0" y="90" width="140" height="14" rx="7"/>
+        <circle cx="140" cy="140" r="20"/>
+      </g>
+      <text x="200" y="300" font-family="Georgia" font-size="32" font-weight="700" text-anchor="middle" fill="#1A110A">Helvara</text>
+    </svg>
+  </template>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  
+  <script type="text/babel" data-presets="react">
+// ===== data.jsx =====
+// Data fixtures — projects, documents, jobs, plus cross-cutting review blocks, activity, attention queue.
+
+window.HELVARA_DATA = (function () {
+  const projects = [
+    {
+      id: 1,
+      name: "Nova Launch — Spring Campaign",
+      description: "Hero site copy, press release, and product one-pager for the Nova headphones launch across Spanish-speaking markets.",
+      due_date: "2026-05-04",
+      target_languages: ["es-ES", "es-MX", "fr-FR"],
+      pinned: true,
+      document_count: 4,
+      stats: { total_jobs: 12, completed_count: 7, in_review_count: 3, total_words: 18420 },
+      documents: [
+        {
+          id: 101, name: "nova-hero-copy.docx", words: 612, uploaded: "2026-04-14",
+          jobs: [
+            { id: 1001, source: "en", target: "es-ES", status: "in_review", ambiguities: 2, insights: 14, progress: 100, autopilot: true },
+            { id: 1002, source: "en", target: "es-MX", status: "completed", ambiguities: 0, insights: 16, progress: 100, autopilot: true },
+            { id: 1003, source: "en", target: "fr-FR", status: "processing", ambiguities: 0, insights: 0, progress: 64, autopilot: true },
+          ],
+        },
+        {
+          id: 102, name: "nova-press-release.rtf", words: 921, uploaded: "2026-04-15",
+          jobs: [
+            { id: 1004, source: "en", target: "es-ES", status: "in_review", ambiguities: 4, insights: 22, progress: 100, autopilot: true },
+            { id: 1005, source: "en", target: "es-MX", status: "in_review", ambiguities: 1, insights: 19, progress: 100, autopilot: true },
+            { id: 1006, source: "en", target: "fr-FR", status: "processing", ambiguities: 0, insights: 0, progress: 28, autopilot: true },
+          ],
+        },
+        {
+          id: 103, name: "nova-product-onepager.docx", words: 340, uploaded: "2026-04-16",
+          jobs: [
+            { id: 1007, source: "en", target: "es-ES", status: "completed", ambiguities: 0, insights: 9, progress: 100, autopilot: true },
+            { id: 1008, source: "en", target: "es-MX", status: "exported", ambiguities: 0, insights: 11, progress: 100, autopilot: true },
+            { id: 1009, source: "en", target: "fr-FR", status: "completed", ambiguities: 0, insights: 10, progress: 100, autopilot: true },
+          ],
+        },
+        {
+          id: 104, name: "nova-email-announce.txt", words: 280, uploaded: "2026-04-18",
+          jobs: [
+            { id: 1010, source: "en", target: "es-ES", status: "completed", ambiguities: 0, insights: 6, progress: 100, autopilot: true },
+            { id: 1011, source: "en", target: "es-MX", status: "completed", ambiguities: 0, insights: 7, progress: 100, autopilot: true },
+            { id: 1012, source: "en", target: "fr-FR", status: "pending", ambiguities: 0, insights: 0, progress: 0, autopilot: true },
+          ],
+        },
+      ],
+    },
+    {
+      id: 2, name: "Atlas — Quarterly Newsletter",
+      description: "Customer-facing newsletter; high-stakes brand voice. Glossary-heavy.",
+      due_date: "2026-04-28", target_languages: ["es-ES", "de-DE"], pinned: true,
+      document_count: 2, stats: { total_jobs: 4, completed_count: 1, in_review_count: 2, total_words: 4220 },
+      documents: [
+        {
+          id: 201, name: "atlas-newsletter-q2.docx", words: 2840, uploaded: "2026-04-20",
+          jobs: [
+            { id: 2001, source: "en", target: "es-ES", status: "in_review", ambiguities: 3, insights: 18, progress: 100, autopilot: true },
+            { id: 2002, source: "en", target: "de-DE", status: "in_review", ambiguities: 2, insights: 15, progress: 100, autopilot: true },
+          ],
+        },
+        {
+          id: 202, name: "atlas-footer-copy.txt", words: 1380, uploaded: "2026-04-21",
+          jobs: [
+            { id: 2003, source: "en", target: "es-ES", status: "completed", ambiguities: 0, insights: 6, progress: 100, autopilot: true },
+            { id: 2004, source: "en", target: "de-DE", status: "processing", ambiguities: 0, insights: 0, progress: 42, autopilot: true },
+          ],
+        },
+      ],
+    },
+    {
+      id: 3, name: "Harbor App — Onboarding Strings",
+      description: "Mobile onboarding copy and tooltips. Short-form, high frequency glossary terms.",
+      due_date: "2026-06-12", target_languages: ["es-ES", "es-MX", "fr-FR", "pt-BR"], pinned: false,
+      document_count: 1, stats: { total_jobs: 4, completed_count: 0, in_review_count: 0, total_words: 1180 },
+      documents: [
+        {
+          id: 301, name: "onboarding-strings.docx", words: 1180, uploaded: "2026-04-21",
+          jobs: [
+            { id: 3001, source: "en", target: "es-ES", status: "processing", ambiguities: 0, insights: 0, progress: 72, autopilot: true },
+            { id: 3002, source: "en", target: "es-MX", status: "processing", ambiguities: 0, insights: 0, progress: 68, autopilot: true },
+            { id: 3003, source: "en", target: "fr-FR", status: "processing", ambiguities: 0, insights: 0, progress: 54, autopilot: true },
+            { id: 3004, source: "en", target: "pt-BR", status: "pending",    ambiguities: 0, insights: 0, progress: 0,  autopilot: true },
+          ],
+        },
+      ],
+    },
+    {
+      id: 4, name: "Legal — MSA Templates 2026",
+      description: "Master service agreement base template and three client variants.",
+      due_date: null, target_languages: ["es-ES", "de-DE", "fr-FR"], pinned: false,
+      document_count: 0, stats: { total_jobs: 0, completed_count: 0, in_review_count: 0, total_words: 0 },
+      documents: [],
+    },
+    {
+      id: 5, name: "Meridian — Investor Update Q1",
+      description: "",
+      due_date: "2026-04-24", target_languages: ["es-ES"], pinned: false,
+      document_count: 1, stats: { total_jobs: 1, completed_count: 1, in_review_count: 0, total_words: 2140 },
+      documents: [
+        {
+          id: 501, name: "meridian-q1-update.docx", words: 2140, uploaded: "2026-04-12",
+          jobs: [
+            { id: 5001, source: "en", target: "es-ES", status: "exported", ambiguities: 0, insights: 12, progress: 100, autopilot: true },
+          ],
+        },
+      ],
+    },
+  ];
+
+  // Attention queue — blocks flagged for review across all projects
+  const attention = [
+    { id: "a1", projectId: 1, projectName: "Nova Launch — Spring Campaign", document: "nova-press-release.rtf", job: 1004, pair: "EN → ES", kind: "ambiguity", count: 4, age: "2h ago" },
+    { id: "a2", projectId: 1, projectName: "Nova Launch — Spring Campaign", document: "nova-hero-copy.docx", job: 1001, pair: "EN → ES", kind: "ambiguity", count: 2, age: "4h ago" },
+    { id: "a3", projectId: 2, projectName: "Atlas — Quarterly Newsletter", document: "atlas-newsletter-q2.docx", job: 2001, pair: "EN → ES", kind: "ambiguity", count: 3, age: "today" },
+    { id: "a4", projectId: 2, projectName: "Atlas — Quarterly Newsletter", document: "atlas-newsletter-q2.docx", job: 2002, pair: "EN → DE", kind: "ambiguity", count: 2, age: "today" },
+    { id: "a5", projectId: 1, projectName: "Nova Launch — Spring Campaign", document: "nova-press-release.rtf", job: 1005, pair: "EN → MX", kind: "glossary", count: 1, age: "yesterday" },
+  ];
+
+  // Recent activity — past 24h
+  const activity = [
+    { id: "e1", when: "12 min ago", icon: "✓", tone: "success", text: "nova-email-announce.txt · EN→ES marked Completed", meta: "Autopilot" },
+    { id: "e2", when: "47 min ago", icon: "⚡", tone: "accent",  text: "4 ambiguities flagged in nova-press-release.rtf · EN→ES", meta: "Needs review" },
+    { id: "e3", when: "1h ago",     icon: "◈", tone: "accent",  text: "92% memory match applied to 14 blocks in Atlas newsletter", meta: "Linguistic insight" },
+    { id: "e4", when: "3h ago",     icon: "↑", tone: "muted",   text: "nova-blog-post.docx uploaded to Nova Launch", meta: "Queued for 3 languages" },
+    { id: "e5", when: "5h ago",     icon: "✓", tone: "success", text: "meridian-q1-update.docx exported", meta: "DOCX" },
+    { id: "e6", when: "yesterday",  icon: "+", tone: "muted",   text: "Atlas — Quarterly Newsletter created", meta: "2 target languages" },
+  ];
+
+  // Autopilot live status — jobs currently running
+  const autopilotRunning = [
+    { id: 1003, file: "nova-hero-copy.docx",       pair: "EN → FR", progress: 64, eta: "~2 min" },
+    { id: 1006, file: "nova-press-release.rtf",     pair: "EN → FR", progress: 28, eta: "~5 min" },
+    { id: 2004, file: "atlas-footer-copy.txt",      pair: "EN → DE", progress: 42, eta: "~3 min" },
+    { id: 3001, file: "onboarding-strings.docx",    pair: "EN → ES", progress: 72, eta: "~90s" },
+    { id: 3002, file: "onboarding-strings.docx",    pair: "EN → MX", progress: 68, eta: "~2 min" },
+  ];
+
+  // Autopilot — agent persona + running tasks
+  const autopilot = {
+    agent: {
+      name: "Rumi",
+      role: "Autopilot",
+      tagline: "Your in-house linguist, working around the clock",
+      status: "active", // active | paused | idle
+      avatar_bg: "linear-gradient(135deg, #0D7B6E 0%, #5B2B5F 100%)",
+      initials: "R",
+      stats_today: {
+        blocks_translated: 1284,
+        insights_raised: 42,
+        decisions_auto: 1211,
+        decisions_asking: 11,
+        saved_minutes: 187,
+      },
+    },
+    // Agent messages — stream of decisions, questions, and completions
+    messages: [
+      {
+        id: "m1", when: "3 min ago", kind: "question",
+        project: "Nova Launch", document: "nova-press-release.rtf", pair: "EN → ES", jobId: 1004,
+        title: "2 genuine ambiguities in the press release — your call?",
+        body: "I finished the translation but stopped short on two lines where the register could go editorial or stay closer to the source. I've picked a leading option but want your eyes.",
+        actions: [{ label: "Open review", primary: true, jobId: 1004 }, { label: "Trust my picks", primary: false }],
+      },
+      {
+        id: "m2", when: "8 min ago", kind: "completed",
+        project: "Nova Launch", document: "nova-email-announce.txt", pair: "EN → ES", jobId: 1010,
+        title: "Shipped nova-email-announce.txt — EN→ES",
+        body: "Clean run. 14 blocks, 6 memory matches at 90%+, zero ambiguities flagged. Ready to export.",
+        meta: "124 words · 0:32",
+      },
+      {
+        id: "m3", when: "22 min ago", kind: "decision",
+        project: "Atlas Newsletter", document: "atlas-newsletter-q2.docx", pair: "EN → ES", jobId: 2001,
+        title: "Used 'lanzamiento' (not 'estreno') for 'launch' — 14 places",
+        body: "Your glossary prefers 'lanzamiento' for product launches in Atlas contexts. I'm applying it consistently. Let me know if this campaign should read differently.",
+        meta: "Glossary · applied",
+      },
+      {
+        id: "m4", when: "41 min ago", kind: "question",
+        project: "Atlas Newsletter", document: "atlas-newsletter-q2.docx", pair: "EN → DE", jobId: 2002,
+        title: "\"Partner\" reads ambiguously in German here",
+        body: "In the intro paragraph, 'our partners' could be business (Geschäftspartner) or customers (Kunden) depending on audience. Memory is split 60/40. Mind deciding?",
+        actions: [{ label: "Open review", primary: true, jobId: 2002 }],
+      },
+      {
+        id: "m5", when: "1h ago", kind: "decision",
+        project: "Nova Launch", document: "nova-product-onepager.docx", pair: "EN → MX",
+        title: "Swapped 'carga rápida' to 'carga en diez minutos'",
+        body: "Source says 'charge for ten minutes, run for ten hours' — the literal phrase tests better in MX than the generic marketing term. Went with the specific.",
+        meta: "Decision logged",
+      },
+      {
+        id: "m6", when: "2h ago", kind: "completed",
+        project: "Meridian", document: "meridian-q1-update.docx", pair: "EN → ES",
+        title: "Exported meridian-q1-update.docx — EN→ES",
+        body: "2,140 words cleared. Your glossary caught 3 terms I wouldn't have. Nice.",
+        meta: "DOCX · exported",
+      },
+    ],
+    // Live queue — what's processing right now
+    queue: [
+      {
+        id: 3001, file: "onboarding-strings.docx", project: "Harbor App",
+        pair: "EN → ES", progress: 72, eta: "90s",
+        stage: "insight_check", // analyze | translate | insight_check | finalize
+        blocks_done: 43, blocks_total: 60, confidence: 0.94,
+      },
+      {
+        id: 3002, file: "onboarding-strings.docx", project: "Harbor App",
+        pair: "EN → MX", progress: 68, eta: "2m",
+        stage: "translate",
+        blocks_done: 41, blocks_total: 60, confidence: 0.92,
+      },
+      {
+        id: 1003, file: "nova-hero-copy.docx", project: "Nova Launch",
+        pair: "EN → FR", progress: 64, eta: "2m",
+        stage: "translate",
+        blocks_done: 18, blocks_total: 28, confidence: 0.89,
+      },
+      {
+        id: 2004, file: "atlas-footer-copy.txt", project: "Atlas Newsletter",
+        pair: "EN → DE", progress: 42, eta: "3m",
+        stage: "translate",
+        blocks_done: 29, blocks_total: 68, confidence: 0.91,
+      },
+      {
+        id: 1006, file: "nova-press-release.rtf", project: "Nova Launch",
+        pair: "EN → FR", progress: 28, eta: "5m",
+        stage: "analyze",
+        blocks_done: 12, blocks_total: 42, confidence: 0.88,
+      },
+      {
+        id: 3003, file: "onboarding-strings.docx", project: "Harbor App",
+        pair: "EN → FR", progress: 54, eta: "3m",
+        stage: "translate",
+        blocks_done: 32, blocks_total: 60, confidence: 0.90,
+      },
+    ],
+    // Decisions log — past ~24h
+    decisions_log: [
+      { id: "d1", when: "3m ago", type: "question",   text: "Flagged 2 ambiguities in nova-press-release.rtf · ES" },
+      { id: "d2", when: "8m ago", type: "completed",  text: "nova-email-announce.txt · ES — shipped clean" },
+      { id: "d3", when: "22m",    type: "glossary",   text: "Applied 'lanzamiento' in 14 places (Atlas)" },
+      { id: "d4", when: "35m",    type: "memory",     text: "12 memory matches ≥92% applied (Nova hero)" },
+      { id: "d5", when: "41m",    type: "question",   text: "Flagged 'partner' ambiguity (Atlas · DE)" },
+      { id: "d6", when: "1h",     type: "edit",       text: "Replaced 'carga rápida' → 'carga en diez minutos' (Nova MX)" },
+      { id: "d7", when: "2h",     type: "completed",  text: "meridian-q1-update.docx · ES — exported" },
+      { id: "d8", when: "3h",     type: "glossary",   text: "Added 'Nova' to do-not-translate (from your earlier edit)" },
+    ],
+  };
+
+  // Rich review data for the "Open full review" destination.
+  // Keyed by jobId — blocks with aligned source/target segments, insights attached.
+  const reviewData = {
+    1004: {
+      jobId: 1004,
+      document: "nova-press-release.rtf",
+      project: "Nova Launch — Spring Campaign",
+      projectId: 1,
+      source: "en", target: "es-ES",
+      stats: { blocks: 8, approved: 3, pending: 3, insights: 22, ambiguities: 2 },
+      agent_summary: "I translated 8 blocks. 3 are solid memory matches I've already approved. 3 are pending your read. 2 are genuinely ambiguous — I've lined up options for each.",
+      blocks: [
+        {
+          id: "B01",
+          source: "Today we're unveiling Nova, a wireless headphone built around the simple idea that great sound should disappear into the moment.",
+          target: "Hoy presentamos Nova, unos auriculares inalámbricos diseñados en torno a una idea simple: que el gran sonido debería desaparecer en el momento.",
+          status: "approved",
+          insights: [
+            { kind: "glossary", term: "Nova", note: "Product name — do not translate", confidence: 1.0 },
+            { kind: "memory", note: "Strong match from Autumn Nova campaign", confidence: 0.92 },
+          ],
+          alignment: [
+            { s: "Today", t: "Hoy" },
+            { s: "we're unveiling Nova", t: "presentamos Nova" },
+            { s: "a wireless headphone", t: "unos auriculares inalámbricos" },
+            { s: "great sound", t: "el gran sonido", glossary: true },
+            { s: "disappear into the moment", t: "desaparecer en el momento" },
+          ],
+        },
+        {
+          id: "B02",
+          source: "Built for creators who move between studio and street, Nova pairs studio-grade drivers with adaptive noise cancellation that learns your environment.",
+          target: "Creados para quienes se mueven entre el estudio y la calle, Nova combina controladores de calidad profesional con cancelación de ruido adaptativa que aprende de tu entorno.",
+          status: "approved",
+          insights: [
+            { kind: "memory", note: "92% match — Autumn campaign, reused phrasing", confidence: 0.92 },
+            { kind: "glossary", term: "adaptive noise cancellation", note: "Use 'cancelación de ruido adaptativa'", confidence: 1.0 },
+          ],
+        },
+        {
+          id: "B03",
+          source: "Charge for ten minutes, run for ten hours.",
+          target: "Cárgalos diez minutos, úsalos diez horas.",
+          status: "ambiguity",
+          insights: [
+            { kind: "ambiguity", note: "Tagline structure — parallelism can read imperative (source-faithful) or editorial. I picked imperative." },
+            { kind: "memory", note: "No direct memory match — first time this tagline appears", confidence: 0.0 },
+          ],
+          alternatives: [
+            { text: "Cárgalos diez minutos, úsalos diez horas.", tone: "Imperative — source-faithful", recommended: true },
+            { text: "Diez minutos de carga, diez horas de uso.", tone: "Editorial — brand-forward" },
+            { text: "Diez minutos cargando, diez horas escuchando.", tone: "Active — punchy, rhythmic" },
+          ],
+          agent_reasoning: "I'd keep the imperative — it matches how Nova speaks in your memory of past campaigns. But the editorial option fits better if the press release is more formal than the landing page.",
+        },
+        {
+          id: "B04",
+          source: "Nova ships in three finishes — Ink, Sand, and Moss — each cut from recycled aluminum.",
+          target: "Nova llega en tres acabados —Tinta, Arena y Musgo—, fabricados con aluminio reciclado.",
+          status: "ambiguity",
+          insights: [
+            { kind: "glossary", term: "Ink / Sand / Moss", note: "Color names — approved Spanish set: Tinta / Arena / Musgo", confidence: 1.0 },
+            { kind: "ambiguity", note: "\"Ships in\" is colloquial; I picked 'llega en' over literal 'se envía en'." },
+          ],
+          alternatives: [
+            { text: "Nova llega en tres acabados —Tinta, Arena y Musgo—, fabricados con aluminio reciclado.", tone: "Natural — preferred", recommended: true },
+            { text: "Nova se ofrece en tres acabados —Tinta, Arena y Musgo—, cortados en aluminio reciclado.", tone: "Literal — source-faithful" },
+          ],
+          agent_reasoning: "'Se envía' reads like shipping & handling. 'Llega' reads like a launch announcement, which is the register of the surrounding copy.",
+        },
+        {
+          id: "B05",
+          source: "Pre-orders open today at helvara.example.com/nova.",
+          target: "Las reservas abren hoy en helvara.example.com/nova.",
+          status: "pending",
+          insights: [],
+        },
+        {
+          id: "B06",
+          source: "Price starts at $299 USD, with regional pricing in local currencies at checkout.",
+          target: "El precio inicia en 299 USD, con precios regionales en monedas locales al pagar.",
+          status: "pending",
+          insights: [{ kind: "glossary", term: "USD", note: "Keep currency codes as-is" }],
+        },
+        {
+          id: "B07",
+          source: "Nova will be available wherever Helvara ships — North America, the UK, EU, and Mexico at launch.",
+          target: "Nova estará disponible dondequiera que Helvara opere —América del Norte, Reino Unido, UE y México en el lanzamiento—.",
+          status: "pending",
+          insights: [
+            { kind: "glossary", term: "EU", note: "Abbreviate as 'UE' in Spanish", confidence: 1.0 },
+            { kind: "memory", note: "Similar phrasing used in 2025 launch: 'dondequiera que Helvara opere'", confidence: 0.88 },
+          ],
+        },
+        {
+          id: "B08",
+          source: "We can't wait for you to hear it.",
+          target: "Estamos deseando que lo escuches.",
+          status: "pending",
+          insights: [{ kind: "memory", note: "Consistent with past brand voice closing lines", confidence: 0.85 }],
+        },
+      ],
+    },
+  };
+
+
+  const insightsSummary = {
+    glossary_terms: 184,
+    new_this_week: 6,
+    conflicts: 2,
+    memory_matches_week: 312,
+    ambiguity_rate: 4.2, // percent of blocks flagged
+  };
+
+  // Rich block-level data for one job — review peek drill-in
+  const reviewBlocks = {
+    1004: [
+      {
+        id: "b1",
+        source: "Today we're unveiling Nova, a wireless headphone built around the simple idea that great sound should disappear into the moment.",
+        target: "Hoy presentamos Nova, unos auriculares inalámbricos creados en torno a la idea de que un gran sonido debería disiparse en el momento.",
+        status: "approved",
+        insights: [{ kind: "glossary", term: "Nova", note: "Product name — do not translate" }],
+      },
+      {
+        id: "b2",
+        source: "Built for creators who move between studio and street, Nova pairs studio-grade drivers with adaptive noise cancellation that learns your environment.",
+        target: "Diseñados para creadores que se mueven entre el estudio y la calle, Nova combina controladores de calidad profesional con cancelación de ruido adaptativa que aprende de tu entorno.",
+        status: "approved",
+        insights: [{ kind: "memory", note: "92% match — Autumn campaign" }],
+      },
+      {
+        id: "b3",
+        source: "Charge for ten minutes, run for ten hours.",
+        target: "Cárgalos diez minutos, úsalos diez horas.",
+        status: "ambiguity",
+        alternatives: [
+          "Cárgalos diez minutos, úsalos diez horas.",
+          "Diez minutos de carga, diez horas de uso.",
+          "Diez minutos cargando, diez horas escuchando.",
+        ],
+        ambiguityReason: "Tagline structure — parallelism can be preserved with different verb forms. Option 2 reads more editorial; Option 1 preserves the imperative voice of the source.",
+        insights: [{ kind: "ambiguity", note: "Marketing tagline — brand voice" }],
+      },
+      {
+        id: "b4",
+        source: "Nova ships in three finishes — Ink, Sand, and Moss — each cut from recycled aluminum.",
+        target: "Nova se ofrece en tres acabados —Tinta, Arena y Musgo— cortados en aluminio reciclado.",
+        status: "ambiguity",
+        alternatives: [
+          "Nova se ofrece en tres acabados —Tinta, Arena y Musgo— cortados en aluminio reciclado.",
+          "Nova llega en tres acabados —Tinta, Arena y Musgo—, fabricados con aluminio reciclado.",
+        ],
+        ambiguityReason: "\u201CShips in\u201D is colloquial \u2014 literal (\u201Cse env\u00EDa\u201D) reads stiff. Both options adapt naturally; Option 2 is slightly more modern.",
+        insights: [{ kind: "glossary", term: "Ink / Sand / Moss", note: "Color names — approved Spanish set" }],
+      },
+      {
+        id: "b5", source: "Pre-orders open today at helvara.example.com/nova.",
+        target: "Las reservas abren hoy en helvara.example.com/nova.",
+        status: "pending", insights: [],
+      },
+      {
+        id: "b6", source: "We can't wait for you to hear it.",
+        target: "Estamos deseando que lo escuches.",
+        status: "pending", insights: [{ kind: "memory", note: "Consistent with past brand voice" }],
+      },
+    ],
+  };
+
+  return { projects, reviewBlocks, attention, activity, autopilotRunning, insightsSummary, autopilot, reviewData };
+})();
+
+
+// ===== shell.jsx =====
+// Shared UI bits for the Helvara prototype
+
+const { useState, useEffect, useRef, useMemo, createContext, useContext } = React;
+
+// ── Icons (proper SVG, not glyphs) ─────────────────────────────────────────
+const Icon = {
+  Dashboard: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <rect x="2.5" y="2.5" width="6.5" height="8" rx="1.5" />
+      <rect x="11" y="2.5" width="6.5" height="5" rx="1.5" />
+      <rect x="11" y="9.5" width="6.5" height="8" rx="1.5" />
+      <rect x="2.5" y="12.5" width="6.5" height="5" rx="1.5" />
+    </svg>
+  ),
+  Documents: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M5 2.5h6l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z" />
+      <path d="M11 2.5V6.5h4" />
+      <path d="M7 10h6M7 13h6M7 16h4" />
+    </svg>
+  ),
+  Projects: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M2.5 6a2 2 0 0 1 2-2h3.5l2 2h5.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V6Z" />
+    </svg>
+  ),
+  Autopilot: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M10 2.5v2M10 15.5v2M4.4 4.4l1.4 1.4M14.2 14.2l1.4 1.4M2.5 10h2M15.5 10h2M4.4 15.6l1.4-1.4M14.2 5.8l1.4-1.4" />
+      <circle cx="10" cy="10" r="3" />
+    </svg>
+  ),
+  Glossary: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M4 3.5h9a3 3 0 0 1 3 3v10.5" />
+      <path d="M4 3.5v12a1.5 1.5 0 0 0 1.5 1.5h10.5" />
+      <path d="M7 7h6M7 10h4" />
+    </svg>
+  ),
+  Certified: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M10 2.5l1.8 3.7 4.1.6-3 2.9.7 4.1-3.6-1.9-3.6 1.9.7-4.1-3-2.9 4.1-.6L10 2.5Z" />
+    </svg>
+  ),
+  Settings: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <circle cx="10" cy="10" r="2.5" />
+      <path d="M16.5 10a6.5 6.5 0 0 0-.1-1.1l1.7-1.3-1.6-2.8-2 .7a6.5 6.5 0 0 0-1.9-1.1l-.3-2.1h-3.2l-.3 2.1a6.5 6.5 0 0 0-1.9 1.1l-2-.7-1.6 2.8 1.7 1.3a6.5 6.5 0 0 0 0 2.2l-1.7 1.3 1.6 2.8 2-.7a6.5 6.5 0 0 0 1.9 1.1l.3 2.1h3.2l.3-2.1a6.5 6.5 0 0 0 1.9-1.1l2 .7 1.6-2.8-1.7-1.3c.07-.36.1-.73.1-1.1Z" />
+    </svg>
+  ),
+  Plus: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}>
+      <path d="M10 4.5v11M4.5 10h11" />
+    </svg>
+  ),
+  Search: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" {...p}>
+      <circle cx="9" cy="9" r="5.5" />
+      <path d="m13.5 13.5 3 3" />
+    </svg>
+  ),
+  Arrow: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M5 10h10M11 6l4 4-4 4" />
+    </svg>
+  ),
+  Sparkle: (p) => (
+    <svg viewBox="0 0 20 20" fill="currentColor" {...p}>
+      <path d="M10 1.5l1.6 4.8a3 3 0 0 0 1.9 1.9l4.8 1.6-4.8 1.6a3 3 0 0 0-1.9 1.9L10 16.4l-1.6-4.7a3 3 0 0 0-1.9-1.9L1.7 8.2l4.8-1.6a3 3 0 0 0 1.9-1.9L10 1.5Z" />
+    </svg>
+  ),
+  Check: (p) => (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+    </svg>
+  ),
+};
+
+// ── Language helpers ────────────────────────────────────────────────────────
+const LANGS = {
+  "en":     { flag: "🇺🇸", name: "English",            code: "EN" },
+  "en-US":  { flag: "🇺🇸", name: "English",            code: "EN" },
+  "es-ES":  { flag: "🇪🇸", name: "Spanish (Spain)",    code: "ES" },
+  "es-MX":  { flag: "🇲🇽", name: "Spanish (Mexico)",   code: "MX" },
+  "fr-FR":  { flag: "🇫🇷", name: "French",             code: "FR" },
+  "de-DE":  { flag: "🇩🇪", name: "German",             code: "DE" },
+  "pt-BR":  { flag: "🇧🇷", name: "Portuguese (Brazil)", code: "BR" },
+  "it-IT":  { flag: "🇮🇹", name: "Italian",            code: "IT" },
+  "ja-JP":  { flag: "🇯🇵", name: "Japanese",           code: "JP" },
+};
+const lang = (c) => LANGS[c] || { flag: "🏳", name: c, code: c.toUpperCase() };
+
+// ── Status badge ────────────────────────────────────────────────────────────
+const STATUS = {
+  pending:    { bg: "bg-brand-bg",         text: "text-brand-muted",    label: "Pending" },
+  processing: { bg: "bg-status-infoBg",    text: "text-status-info",    label: "Translating" },
+  in_review:  { bg: "bg-brand-accentMid",  text: "text-brand-accent",   label: "In Review" },
+  completed:  { bg: "bg-status-successBg", text: "text-status-success", label: "Completed" },
+  exported:   { bg: "bg-status-successBg", text: "text-status-success", label: "Exported" },
+  failed:     { bg: "bg-status-errorBg",   text: "text-status-error",   label: "Failed" },
+};
+
+function StatusBadge({ status }) {
+  const s = STATUS[status] || STATUS.pending;
+  const isProc = status === "processing";
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium ${s.bg} ${s.text}`}>
+      {isProc && (
+        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
+      {s.label}
+    </span>
+  );
+}
+
+// ── Derived project badge ───────────────────────────────────────────────────
+function deriveProjectBadge(p) {
+  const s = p.stats;
+  if (p.document_count === 0) return { label: "No documents", classes: "bg-brand-bg text-brand-subtle" };
+  if (s.total_jobs > 0 && s.completed_count >= s.total_jobs) return { label: "✓ Completed", classes: "bg-status-successBg text-status-success" };
+  if (p.due_date) {
+    const due = new Date(p.due_date);
+    const now = new Date("2026-04-22");
+    const diff = Math.ceil((due - now) / 86400000);
+    if (diff < 0) return { label: "Overdue", classes: "bg-status-errorBg text-status-error" };
+    if (diff <= 7) return { label: "⚠ Due soon", classes: "bg-status-warningBg text-status-warning" };
+  }
+  return { label: "In progress", classes: "bg-status-infoBg text-status-info" };
+}
+
+// ── App shell (sidebar + topbar) ────────────────────────────────────────────
+const NAV_WORKSPACE = [
+  { key: "dashboard", label: "Dashboard", icon: "Dashboard" },
+  { key: "autopilot", label: "Autopilot", icon: "Autopilot" },
+  { key: "documents", label: "Documents", icon: "Documents" },
+  { key: "projects",  label: "Projects",  icon: "Projects" },
+];
+const NAV_TOOLS = [
+  { key: "glossary",  label: "Glossary",  icon: "Glossary" },
+  { key: "certified", label: "Certified", icon: "Certified", badge: "Soon" },
+];
+
+function Sidebar({ active, onNavigate }) {
+  const link = (item, isActive) => {
+    const IconCmp = Icon[item.icon] || (() => null);
+    return (
+      <a
+        key={item.key}
+        href="#"
+        onClick={(e) => { e.preventDefault(); onNavigate && onNavigate(item.key); }}
+        className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[0.8125rem] no-underline transition-all ${
+          isActive
+            ? "bg-brand-text font-medium text-white shadow-card"
+            : "text-brand-muted hover:bg-brand-sunken hover:text-brand-text"
+        }`}
+      >
+        <IconCmp className="h-[18px] w-[18px] shrink-0" />
+        <span className="flex-1 tracking-tight">{item.label}</span>
+        {item.badge && (
+          <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-medium ${isActive ? "bg-white/15 text-white/80" : "bg-brand-sunken text-brand-subtle"}`}>
+            {item.badge}
+          </span>
+        )}
+      </a>
+    );
+  };
+  return (
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-brand-border bg-brand-surface/60 backdrop-blur-sm">
+      <div className="flex-1 overflow-y-auto px-3 py-5">
+        <p className="mb-2.5 px-3 text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-brand-hint">Workspace</p>
+        <nav className="space-y-0.5">{NAV_WORKSPACE.map((i) => link(i, active === i.key))}</nav>
+        <p className="mb-2.5 mt-7 px-3 text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-brand-hint">Tools</p>
+        <nav className="space-y-0.5">{NAV_TOOLS.map((i) => link(i, active === i.key))}</nav>
+      </div>
+      <div className="border-t border-brand-border px-3 py-3">
+        {link({ key: "settings", label: "Settings", icon: "Settings" }, active === "settings")}
+      </div>
+    </aside>
+  );
+}
+
+function TopBar({ onNewTranslation, onGoHome }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <header className="flex h-[56px] shrink-0 items-center justify-between border-b border-brand-border bg-brand-surface/80 px-6 backdrop-blur">
+      <button onClick={onGoHome} className="group flex items-center gap-2 bg-transparent border-0 p-0 cursor-pointer">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-text text-white">
+          <svg viewBox="0 0 20 20" className="h-4 w-4"><path d="M4 3h3v14H4zM13 3h3v14h-3zM7 9h6v2H7z" fill="currentColor"/></svg>
+        </span>
+        <span className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text">Helvara</span>
+      </button>
+      <div className="flex items-center gap-2">
+        <button type="button" className="rounded-full p-2 text-brand-muted hover:bg-brand-sunken hover:text-brand-text transition-colors" title="Search">
+          <Icon.Search className="h-[18px] w-[18px]" />
+        </button>
+        <button
+          type="button"
+          onClick={onNewTranslation}
+          className="flex items-center gap-1.5 rounded-full bg-brand-text px-3.5 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-brand-accent transition-colors"
+        >
+          <Icon.Plus className="h-3.5 w-3.5" /> New translation
+        </button>
+        <div className="mx-1 h-6 w-px bg-brand-border" />
+        <div ref={ref} className="relative">
+          <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 rounded-full px-2 py-1 text-sm text-brand-text hover:bg-brand-sunken transition-colors">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent to-brand-accentHov text-xs font-semibold text-white">P</span>
+            <span className="font-medium">Pirmin</span>
+            <svg viewBox="0 0 12 12" className="h-3 w-3 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          {open && (
+            <div className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-xl border border-brand-border bg-brand-surface shadow-raised">
+              <div className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-sunken cursor-pointer">Profile & account</div>
+              <div className="block w-full px-4 py-2.5 text-left text-sm text-brand-text hover:bg-brand-sunken cursor-pointer">Preferences</div>
+              <div className="border-t border-brand-border" />
+              <div className="block w-full px-4 py-2.5 text-left text-sm text-status-error hover:bg-brand-sunken cursor-pointer">Log out</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function AppShell({ active, onNewTranslation, onGoHome, onNavigate, children }) {
+  return (
+    <div className="flex min-h-screen flex-col app-bg">
+      <TopBar onNewTranslation={onNewTranslation} onGoHome={onGoHome} />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar active={active} onNavigate={onNavigate} />
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+// ── Page header ─────────────────────────────────────────────────────────────
+function PageHeader({ eyebrow, title, subtitle, action }) {
+  return (
+    <div className="mb-6 flex items-end justify-between gap-6">
+      <div>
+        {eyebrow && <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-widest text-brand-accent">{eyebrow}</p>}
+        <h1 className="font-display text-[2rem] font-bold leading-tight text-brand-text m-0">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-brand-muted">{subtitle}</p>}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+// ── Modal overlay ───────────────────────────────────────────────────────────
+function Modal({ open, onClose, children, maxWidth = "max-w-md" }) {
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-text/30 backdrop-blur-sm p-6 animate-fadein" onClick={onClose}>
+      <div
+        className={`w-full ${maxWidth} rounded-[22px] border border-brand-border bg-brand-surface p-7 shadow-raised animate-scalein`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+function Toast({ message }) {
+  if (!message) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface/95 backdrop-blur-md px-4 py-2.5 text-[0.8125rem] font-medium text-brand-text shadow-raised animate-slideup">
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-accentSoft text-brand-accent">
+        <Icon.Check className="h-3 w-3" />
+      </span>
+      {message}
+    </div>
+  );
+}
+
+Object.assign(window, {
+  Icon, lang, LANGS, STATUS, StatusBadge, deriveProjectBadge,
+  Sidebar, TopBar, AppShell, PageHeader, Modal, Toast,
+});
+
+
+// ===== projects_view.jsx =====
+// Projects list view
+
+function ProjectsView({ state, dispatch }) {
+  const projects = state.projects;
+  const totalProjects = projects.length;
+  const totalDocs = projects.reduce((a, p) => a + p.document_count, 0);
+  const totalInReview = projects.reduce((a, p) => a + p.stats.in_review_count, 0);
+  const totalJobs = projects.reduce((a, p) => a + p.stats.total_jobs, 0);
+  const totalCompleted = projects.reduce((a, p) => a + p.stats.completed_count, 0);
+  const overall = totalJobs > 0 ? Math.round((totalCompleted / totalJobs) * 100) : 0;
+
+  const [filter, setFilter] = useState("all"); // all | active | completed | empty
+
+  const filtered = projects.filter((p) => {
+    if (filter === "active") return p.stats.total_jobs > 0 && p.stats.completed_count < p.stats.total_jobs;
+    if (filter === "completed") return p.stats.total_jobs > 0 && p.stats.completed_count >= p.stats.total_jobs;
+    if (filter === "empty") return p.document_count === 0;
+    return true;
+  });
+
+  return (
+    <div className="mx-auto max-w-[1320px] px-10 py-10">
+      <header className="mb-8 flex items-end justify-between gap-6">
+        <div>
+          <p className="mb-2 text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-brand-subtle m-0">Workspace</p>
+          <h1 className="font-display text-[2.5rem] font-semibold tracking-display leading-[1.05] text-brand-text m-0">
+            Projects
+          </h1>
+          <p className="mt-2.5 max-w-xl text-[0.9375rem] text-brand-muted m-0">
+            Containers for documents, target languages, and translation jobs.
+          </p>
+        </div>
+        <button
+          onClick={() => dispatch({ type: "OPEN_NEW_PROJECT" })}
+          className="flex items-center gap-1.5 rounded-full bg-brand-text px-4 py-2 text-[0.8125rem] font-medium text-white shadow-card transition-all hover:bg-brand-accent"
+        >
+          <Icon.Plus className="h-3.5 w-3.5" /> New project
+        </button>
+      </header>
+
+      {/* Stat strip */}
+      <section className="mb-8 grid grid-cols-4 gap-0 overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        <StatTile label="Total projects" value={totalProjects} meta={`${totalProjects} active`} />
+        <StatTile label="Documents" value={totalDocs} meta={`across ${totalProjects} projects`} divider />
+        <StatTile label="In review" value={totalInReview} valueClass="text-brand-accent" meta="awaiting approval" divider />
+        <StatTile label="Overall progress" value={`${overall}%`} meta={null} progress={overall} divider />
+      </section>
+
+      {/* Filter bar */}
+      <div className="mb-5 flex items-center justify-between">
+        <div className="inline-flex rounded-full border border-brand-border bg-brand-surface p-0.5 shadow-card">
+          {[
+            { k: "all", label: `All ${projects.length}` },
+            { k: "active", label: "Active" },
+            { k: "completed", label: "Completed" },
+            { k: "empty", label: "Empty" },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setFilter(t.k)}
+              className={`rounded-full px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors ${
+                filter === t.k ? "bg-brand-text text-white" : "text-brand-muted hover:text-brand-text"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-brand-subtle">{filtered.length} shown</span>
+      </div>
+
+      {/* Cards grid */}
+      <div className="grid grid-cols-2 gap-5">
+        {filtered.map((p) => (
+          <ProjectCard key={p.id} project={p} onOpen={() => dispatch({ type: "OPEN_PROJECT", id: p.id })} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, valueClass = "text-brand-text", meta, progress, divider }) {
+  const isZero = value === 0 || value === "0%" || value === "—";
+  return (
+    <div className={`px-6 py-5 ${divider ? "border-l border-brand-borderSoft" : ""}`}>
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`mt-2.5 font-display text-[2rem] font-semibold leading-none tracking-display m-0 ${isZero ? "text-brand-subtle" : valueClass}`}>{value}</p>
+      {meta && <p className="mt-2 text-xs text-brand-subtle m-0">{meta}</p>}
+      {typeof progress === "number" && (
+        <div className="mt-2.5 h-1 w-full rounded-full bg-brand-sunken overflow-hidden">
+          <div className="h-full rounded-full bg-brand-text transition-all duration-700" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectCard({ project, onOpen }) {
+  const badge = deriveProjectBadge(project);
+  const pct = project.stats.total_jobs > 0 ? Math.round((project.stats.completed_count / project.stats.total_jobs) * 100) : 0;
+  return (
+    <button
+      onClick={onOpen}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-brand-border bg-brand-surface p-6 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-raised"
+    >
+      {/* accent rail on hover */}
+      <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-brand-accent opacity-0 transition-opacity group-hover:opacity-100" />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-[1.25rem] font-semibold leading-tight tracking-display text-brand-text m-0 line-clamp-1">{project.name}</p>
+          {project.pinned && <span className="mt-1.5 inline-flex items-center gap-1 text-[0.6875rem] font-medium text-brand-accent"><Icon.Sparkle className="h-2.5 w-2.5" /> Pinned</span>}
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.6875rem] font-medium ${badge.classes}`}>{badge.label}</span>
+      </div>
+
+      <div className="mt-2 h-10">
+        {project.description ? (
+          <p className="line-clamp-2 text-[0.8125rem] leading-relaxed text-brand-muted m-0">{project.description}</p>
+        ) : (
+          <p className="text-[0.8125rem] italic text-brand-subtle m-0">No description added</p>
+        )}
+      </div>
+
+      <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+        {project.target_languages.map((l) => (
+          <span key={l} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-brand-sunken/60 px-2 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
+            <span className="font-mono text-brand-text">{lang(l).code}</span>
+            <span>{lang(l).name.replace(/\s*\(.+\)$/, '')}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-4 gap-2 rounded-xl bg-brand-sunken/50 p-3">
+        <StatMicro value={project.document_count} label="Docs" />
+        <StatMicro value={project.stats.total_words.toLocaleString()} label="Words" />
+        <StatMicro value={project.stats.completed_count} label="Done" tone="success" />
+        <StatMicro value={project.stats.in_review_count} label="Review" tone="accent" />
+      </div>
+
+      <div className="mt-4">
+        {project.document_count === 0 ? (
+          <p className="text-[0.6875rem] text-brand-subtle m-0">No documents yet — upload to get started</p>
+        ) : (
+          <>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[0.6875rem] text-brand-subtle">Progress</span>
+              <span className="font-mono text-[0.6875rem] font-medium text-brand-text tabular-nums">{pct}%</span>
+            </div>
+            <div className="h-1 w-full rounded-full bg-brand-sunken overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-all duration-700" style={{ width: `${pct}%` }} />
+            </div>
+          </>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function StatMicro({ value, label, tone = "default" }) {
+  const zero = value === 0 || value === "0";
+  const cls =
+    zero ? "text-brand-subtle" :
+    tone === "success" ? "text-emerald-700" :
+    tone === "accent" ? "text-brand-accent" :
+    "text-brand-text";
+  return (
+    <div className="text-center">
+      <p className={`font-display text-[1.125rem] font-semibold leading-none m-0 ${cls}`}>{value}</p>
+      <p className="mt-1 text-[0.625rem] uppercase tracking-wider text-brand-subtle m-0">{label}</p>
+    </div>
+  );
+}
+
+Object.assign(window, { ProjectsView });
+
+
+// ===== project_detail.jsx =====
+// Project detail view — documents + jobs + inline block review peek
+// Restyled to match Dashboard / Documents / Projects system.
+
+function ProjectDetailView({ state, dispatch }) {
+  const project = state.projects.find((p) => p.id === state.projectId);
+  const [collapsed, setCollapsed] = useState(new Set());
+  const [openReviewJobId, setOpenReviewJobId] = useState(null);
+
+  if (!project) return null;
+
+  const toggle = (name) => {
+    const next = new Set(collapsed);
+    next.has(name) ? next.delete(name) : next.add(name);
+    setCollapsed(next);
+  };
+
+  const totalDocs = project.documents.length;
+  const totalJobs = project.stats.total_jobs;
+  const completedCount = project.stats.completed_count;
+  const inReviewCount = project.stats.in_review_count;
+  const progressPct = totalJobs > 0 ? Math.round((completedCount / totalJobs) * 100) : 0;
+
+  return (
+    <div className="mx-auto max-w-[1240px] px-10 py-10">
+      {/* Breadcrumb */}
+      <nav className="mb-5 flex items-center gap-1.5 text-[0.75rem]">
+        <button
+          onClick={() => dispatch({ type: "GO_PROJECTS" })}
+          className="text-brand-muted hover:text-brand-text bg-transparent border-0 p-0 cursor-pointer transition-colors"
+        >
+          Projects
+        </button>
+        <svg viewBox="0 0 12 12" className="h-3 w-3 text-brand-hint" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m4.5 3 3 3-3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <span className="text-brand-text">{project.name}</span>
+      </nav>
+
+      {/* Header */}
+      <div className="mb-7 flex items-end justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-subtle">Project</p>
+          <h1 className="font-display text-[2.25rem] font-semibold leading-[1.05] tracking-display text-brand-text m-0">
+            {project.name}
+            {project.pinned && (
+              <span className="ml-3 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand-accentSoft px-2.5 py-1 text-[0.6875rem] font-medium text-brand-accent tracking-normal">
+                <Icon.Sparkle className="h-3 w-3" /> Pinned
+              </span>
+            )}
+          </h1>
+          {project.description && (
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-brand-muted m-0">{project.description}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button className="rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-[0.8125rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors">
+            Edit project
+          </button>
+          <button
+            onClick={() => dispatch({ type: "OPEN_NEW_TRANSLATION", projectId: project.id })}
+            className="flex items-center gap-1.5 rounded-full bg-brand-text px-4 py-2 text-[0.8125rem] font-medium text-white hover:bg-brand-accent transition-colors"
+          >
+            <Icon.Plus className="h-3.5 w-3.5" /> Upload document
+          </button>
+        </div>
+      </div>
+
+      {/* Autopilot banner — cleaner, no left-border-accent */}
+      <div className="relative mb-5 overflow-hidden rounded-2xl border border-brand-border bg-gradient-to-br from-brand-accentSoft to-brand-surface p-5 shadow-card">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-accent/10 blur-3xl" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-surface text-brand-accent ring-1 ring-brand-accent/20 shadow-card">
+            <Icon.Sparkle className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text m-0">Autopilot is handling this project</p>
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent/60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-accent" />
+              </span>
+            </div>
+            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-brand-muted m-0">
+              Files translate and check automatically. You're pulled in only when Linguistic Insights flag a material ambiguity
+              {inReviewCount > 0 ? (
+                <> — <span className="font-medium text-brand-text">{inReviewCount} block{inReviewCount === 1 ? "" : "s"}</span> waiting now.</>
+              ) : <>.</>}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Meta row — language chips + due date */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {project.target_languages.map((l) => (
+          <span
+            key={l}
+            className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-brand-sunken/60 px-3 py-1 text-[0.75rem] text-brand-text"
+          >
+            <span className="font-mono text-[0.6875rem] font-medium text-brand-muted">{lang(l).code}</span>
+            <span className="text-brand-subtle">·</span>
+            <span>{lang(l).name}</span>
+          </span>
+        ))}
+        {project.due_date && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] text-brand-muted">
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/>
+            </svg>
+            Due {new Date(project.due_date).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+          </span>
+        )}
+      </div>
+
+      {/* Stats strip — single card, 4 cells (matches Dashboard/Projects pattern) */}
+      <div className="mb-7 grid grid-cols-4 overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        <ProjectStatCell label="Total jobs" value={totalJobs} meta={`${totalDocs} doc${totalDocs === 1 ? "" : "s"} · ${project.target_languages.length} lang${project.target_languages.length === 1 ? "" : "s"}`} />
+        <ProjectStatCell label="Completed" value={completedCount} meta="Ready to export" valueClass="text-status-success" bordered />
+        <ProjectStatCell label="Needs review" value={inReviewCount} meta={inReviewCount > 0 ? "Awaiting you" : "All clear"} valueClass={inReviewCount > 0 ? "text-brand-accent" : "text-brand-text"} bordered />
+        <ProjectStatCell label="Progress" value={`${progressPct}%`} progress={progressPct} bordered />
+      </div>
+
+      {/* Documents panel */}
+      <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        <header className="flex items-center justify-between border-b border-brand-borderSoft px-5 py-3.5">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text m-0">Documents</h2>
+            <span className="text-[0.75rem] text-brand-subtle">{totalDocs} file{totalDocs === 1 ? "" : "s"} · {totalJobs} translation job{totalJobs === 1 ? "" : "s"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCollapsed(collapsed.size === project.documents.length ? new Set() : new Set(project.documents.map((d) => d.name)))}
+              className="rounded-full px-3 py-1 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken bg-transparent border-0 cursor-pointer transition-colors"
+            >
+              {collapsed.size === project.documents.length ? "Expand all" : "Collapse all"}
+            </button>
+            <button
+              onClick={() => dispatch({ type: "OPEN_NEW_TRANSLATION", projectId: project.id })}
+              className="flex items-center gap-1 rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken transition-colors"
+            >
+              <Icon.Plus className="h-3 w-3" /> Upload
+            </button>
+          </div>
+        </header>
+
+        {project.documents.map((doc, docIdx) => {
+          const isCol = collapsed.has(doc.name);
+          const ambTotal = doc.jobs.reduce((a, j) => a + (j.ambiguities || 0), 0);
+          const isLast = docIdx === project.documents.length - 1;
+          return (
+            <React.Fragment key={doc.id}>
+              <div className={`flex items-center gap-3 border-t border-brand-borderSoft bg-brand-sunken/40 px-5 py-3`}>
+                <button
+                  onClick={() => toggle(doc.name)}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-brand-subtle hover:text-brand-text hover:bg-brand-sunken border-0 bg-transparent cursor-pointer transition-all"
+                  style={{ transform: isCol ? "rotate(-90deg)" : "rotate(0deg)" }}
+                  aria-label={isCol ? "Expand" : "Collapse"}
+                >
+                  <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                <FileExtChip name={doc.name} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[0.875rem] font-medium text-brand-text m-0">{doc.name}</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-brand-subtle m-0">
+                    <span className="font-mono">{doc.words.toLocaleString()}</span> words · {doc.jobs.length} translation{doc.jobs.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                {ambTotal > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-accentSoft px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-accent">
+                    <Icon.Sparkle className="h-2.5 w-2.5" />
+                    {ambTotal} insight{ambTotal === 1 ? "" : "s"}
+                  </span>
+                )}
+                <button className="rounded-full border border-brand-border bg-brand-surface px-2.5 py-1 text-[0.6875rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken transition-colors">
+                  + Add language
+                </button>
+              </div>
+
+              {!isCol && doc.jobs.map((job, jobIdx) => (
+                <JobRow
+                  key={job.id}
+                  job={job}
+                  doc={doc}
+                  isLastOfLastDoc={isLast && jobIdx === doc.jobs.length - 1}
+                  expanded={openReviewJobId === job.id}
+                  onToggle={() => setOpenReviewJobId(openReviewJobId === job.id ? null : job.id)}
+                />
+              ))}
+            </React.Fragment>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+
+// File extension chip (matches Documents page)
+function FileExtChip({ name }) {
+  const ext = (name.split(".").pop() || "").toUpperCase();
+  const palette = {
+    DOCX: "bg-blue-50 text-blue-700 ring-blue-200",
+    RTF:  "bg-violet-50 text-violet-700 ring-violet-200",
+    TXT:  "bg-slate-100 text-slate-700 ring-slate-200",
+    PDF:  "bg-red-50 text-red-700 ring-red-200",
+  }[ext] || "bg-brand-sunken text-brand-muted ring-brand-border";
+  return (
+    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[0.5625rem] font-semibold ring-1 ring-inset ${palette}`}>
+      {ext}
+    </span>
+  );
+}
+
+// Stat cell used inside the stats-strip card (project-scoped to avoid collision with dashboard's StatCell)
+function ProjectStatCell({ label, value, meta, valueClass, progress, bordered }) {
+  return (
+    <div className={`px-5 py-4 ${bordered ? "border-l border-brand-borderSoft" : ""}`}>
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`mt-2 font-display text-[1.75rem] font-semibold leading-none tracking-display m-0 ${valueClass || "text-brand-text"}`}>{value}</p>
+      {progress != null ? (
+        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-brand-sunken">
+          <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-700" style={{ width: `${progress}%` }} />
+        </div>
+      ) : meta ? (
+        <p className="mt-1.5 text-[0.75rem] text-brand-muted m-0">{meta}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function JobRow({ job, doc, expanded, onToggle, isLastOfLastDoc }) {
+  const isProc = job.status === "processing";
+  const isReview = job.status === "in_review";
+  const canExpand = isReview || job.status === "completed";
+
+  return (
+    <>
+      <div
+        className={`flex items-center gap-2.5 border-t border-brand-borderSoft bg-brand-surface px-5 py-2.5 pl-14 transition-colors ${
+          isProc ? "opacity-70" : canExpand ? "cursor-pointer hover:bg-brand-sunken/40" : ""
+        } ${expanded ? "bg-brand-accentSoft/40" : ""}`}
+        onClick={() => canExpand && onToggle()}
+      >
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-sunken px-2.5 py-0.5 font-mono text-[0.6875rem] font-medium text-brand-text">
+          {lang(job.source).code}
+          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6h8M7 3l3 3-3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          {lang(job.target).code}
+        </span>
+        <span className="text-[0.75rem] text-brand-muted">{lang(job.target).name}</span>
+        <StatusBadge status={job.status} />
+        {job.ambiguities > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+            {job.ambiguities} amb
+          </span>
+        )}
+        {job.insights > 0 && (
+          <span className="rounded-full bg-brand-sunken px-2 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
+            {job.insights} ins
+          </span>
+        )}
+        {isProc && (
+          <div className="ml-1 flex items-center gap-2">
+            <div className="h-[3px] w-32 overflow-hidden rounded-full bg-brand-sunken ring-1 ring-inset ring-black/[0.02]">
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-700" style={{ width: `${job.progress}%` }} />
+            </div>
+            <span className="font-mono text-[0.6875rem] text-brand-muted">{job.progress}%</span>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          {canExpand && (
+            <span className="text-[0.6875rem] text-brand-subtle">
+              {expanded ? "Hide peek" : "Peek"}
+            </span>
+          )}
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className={
+              isReview
+                ? "flex items-center gap-1 rounded-full bg-brand-text px-3 py-1 text-[0.6875rem] font-medium text-white hover:bg-brand-accent transition-colors"
+                : "rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.6875rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken transition-colors"
+            }
+          >
+            {isReview ? <>Open review <Icon.Arrow className="h-3 w-3" /></> : job.status === "exported" ? "Download" : job.status === "processing" ? "Monitor" : "View"}
+          </button>
+        </div>
+      </div>
+
+      {expanded && canExpand && <ReviewPeek job={job} doc={doc} />}
+    </>
+  );
+}
+
+Object.assign(window, { ProjectDetailView, FileExtChip });
+
+
+// ===== review_peek.jsx =====
+// Inline block review peek + modals (New Project, New Translation)
+// Restyled to match Dashboard / Documents / Projects system.
+
+function ReviewPeek({ job, doc }) {
+  const blocks = (window.HELVARA_DATA.reviewBlocks[job.id]) || null;
+  const [decisions, setDecisions] = useState({});
+  const [activeBlock, setActiveBlock] = useState(null);
+
+  if (!blocks) {
+    return (
+      <div className="border-t border-brand-borderSoft bg-brand-sunken/40 px-5 py-5 pl-14">
+        <p className="text-[0.8125rem] text-brand-muted m-0">Block-level review will appear here when Autopilot finishes this job.</p>
+      </div>
+    );
+  }
+
+  const approveAll = () => {
+    const next = { ...decisions };
+    blocks.forEach((b) => {
+      if (b.status === "ambiguity") next[b.id] = next[b.id] || { status: "approved", pick: 0 };
+      else next[b.id] = { status: "approved" };
+    });
+    setDecisions(next);
+  };
+
+  const decidedCount = blocks.filter((b) => decisions[b.id]?.status === "approved" || b.status === "approved").length;
+
+  return (
+    <div className="border-t border-brand-borderSoft bg-brand-sunken/40 px-5 py-5 pl-14 animate-slidedown">
+      {/* Peek header */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent m-0">Review peek</p>
+          <p className="mt-1 font-display text-[1.0625rem] font-semibold tracking-display text-brand-text m-0">
+            {doc.name} <span className="font-sans font-normal text-brand-subtle">·</span> <span className="font-mono text-[0.875rem] font-medium text-brand-muted">{lang(job.source).code} → {lang(job.target).code}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[0.75rem] text-brand-muted">
+            <span className="font-mono font-medium text-brand-text">{decidedCount}</span>
+            <span className="text-brand-subtle"> / </span>
+            <span className="font-mono">{blocks.length}</span> approved
+          </span>
+          <button
+            onClick={approveAll}
+            className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors"
+          >
+            Approve remaining
+          </button>
+          <button
+            onClick={() => window.__helvaraDispatch && window.__helvaraDispatch({ type: "OPEN_REVIEW", jobId: job.id })}
+            className="flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1.5 text-[0.75rem] font-medium text-white hover:bg-brand-accent transition-colors"
+          >
+            Open full review <Icon.Arrow className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Block list */}
+      <div className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        {blocks.map((b, i) => {
+          const decision = decisions[b.id];
+          const isActive = activeBlock === b.id;
+          const effectiveStatus = decision?.status || b.status;
+          return (
+            <BlockRow
+              key={b.id}
+              block={b}
+              index={i}
+              active={isActive}
+              effectiveStatus={effectiveStatus}
+              decision={decision}
+              onActivate={() => setActiveBlock(isActive ? null : b.id)}
+              onDecide={(update) => setDecisions({ ...decisions, [b.id]: update })}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BlockRow({ block, index, active, effectiveStatus, decision, onActivate, onDecide }) {
+  const isAmb = block.status === "ambiguity";
+  const rowBg = active ? "bg-brand-accentSoft/60" : "bg-brand-surface hover:bg-brand-sunken/40";
+
+  const statusDot =
+    effectiveStatus === "approved" ? "bg-status-success" :
+    effectiveStatus === "ambiguity" && !decision ? "bg-amber-500" :
+    "bg-brand-hint";
+
+  return (
+    <div className={`border-b border-brand-borderSoft last:border-0 ${rowBg} transition-colors`}>
+      <button onClick={onActivate} className="w-full text-left px-5 py-3.5 bg-transparent border-0 cursor-pointer">
+        <div className="flex items-start gap-4">
+          <div className="flex shrink-0 flex-col items-center gap-1.5 pt-0.5">
+            <span className="font-mono text-[0.625rem] font-medium uppercase tracking-wider text-brand-subtle">B{String(index + 1).padStart(2, "0")}</span>
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
+          </div>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-5">
+            <div className="min-w-0">
+              <p className="mb-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">Source · EN</p>
+              <p className="text-[0.8125rem] leading-relaxed text-brand-text m-0">{block.source}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="mb-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-accent m-0">Target · {lang("es-ES").code}</p>
+              <p className="text-[0.8125rem] leading-relaxed text-brand-text m-0">
+                {decision?.pick !== undefined ? block.alternatives[decision.pick] : block.target}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+            {effectiveStatus === "approved" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[0.6875rem] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                <Icon.Check className="h-2.5 w-2.5" /> Approved
+              </span>
+            )}
+            {effectiveStatus === "ambiguity" && !decision && (
+              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[0.6875rem] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+                Ambiguous
+              </span>
+            )}
+            {effectiveStatus === "pending" && (
+              <span className="rounded-full bg-brand-sunken px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">Pending</span>
+            )}
+            {block.insights?.map((ins, idx) => (
+              <span key={idx} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand-accentSoft px-2 py-0.5 text-[0.625rem] font-medium text-brand-accent">
+                {ins.kind === "glossary" ? "Glossary" : ins.kind === "memory" ? "Memory" : "Ambiguity"}
+              </span>
+            ))}
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      {active && (
+        <div className="border-t border-brand-borderSoft bg-brand-sunken/30 px-5 pb-4 pt-4 pl-[4.25rem] animate-slidedown">
+          {isAmb && (
+            <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-amber-800 m-0">
+                <Icon.Sparkle className="h-3 w-3" /> Linguistic insight — ambiguity
+              </p>
+              <p className="mb-3 text-[0.8125rem] leading-relaxed text-brand-text m-0">{block.ambiguityReason}</p>
+              <div className="space-y-2">
+                {block.alternatives.map((alt, idx) => {
+                  const selected = (decision?.pick ?? 0) === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={(e) => { e.stopPropagation(); onDecide({ status: "approved", pick: idx }); }}
+                      className={`block w-full rounded-xl border px-3.5 py-2.5 text-left text-[0.8125rem] transition-all ${
+                        selected
+                          ? "border-brand-accent bg-brand-surface text-brand-text shadow-card"
+                          : "border-brand-border bg-brand-surface text-brand-text hover:border-brand-accent/40 hover:bg-brand-sunken/40"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className={`mt-[0.1875rem] flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? "border-brand-accent bg-brand-accent text-white" : "border-brand-border bg-brand-surface"}`}>
+                          {selected && <Icon.Check className="h-2.5 w-2.5" />}
+                        </span>
+                        <span className="flex-1">
+                          <span className="mr-2 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">Option {idx + 1}</span>
+                          {alt}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {block.insights?.filter((i) => i.kind !== "ambiguity").map((ins, idx) => (
+            <div key={idx} className="mb-2 rounded-xl border border-brand-border bg-brand-surface p-3.5">
+              <p className="mb-1 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-accent m-0">
+                {ins.kind === "glossary" ? "Glossary match" : "Memory match"}
+                {ins.term && <span className="font-sans font-normal normal-case tracking-normal text-brand-text">· {ins.term}</span>}
+              </p>
+              <p className="text-[0.8125rem] leading-relaxed text-brand-muted m-0">{ins.note}</p>
+            </div>
+          ))}
+
+          {!isAmb && effectiveStatus !== "approved" && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onDecide({ status: "approved" }); }}
+                className="flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1.5 text-[0.75rem] font-medium text-white hover:bg-brand-accent transition-colors"
+              >
+                <Icon.Check className="h-3 w-3" /> Approve
+              </button>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-full border border-brand-border bg-brand-surface px-3.5 py-1.5 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors"
+              >
+                Edit translation
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── New Project Modal ──────────────────────────────────────────────────────
+
+const ALL_LANG_CODES = ["es-ES", "es-MX", "fr-FR", "de-DE", "pt-BR", "it-IT", "ja-JP"];
+
+function NewProjectModal({ open, onClose, onCreate }) {
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [langs, setLangs] = useState(new Set(["es-ES"]));
+  const [due, setDue] = useState("");
+
+  useEffect(() => { if (open) { setName(""); setDesc(""); setLangs(new Set(["es-ES"])); setDue(""); } }, [open]);
+
+  const toggle = (c) => {
+    const n = new Set(langs);
+    n.has(c) ? n.delete(c) : n.add(c);
+    setLangs(n);
+  };
+  const canSubmit = name.trim().length > 0 && langs.size > 0;
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-subtle">New</p>
+          <h2 className="font-display text-[1.5rem] font-semibold leading-none tracking-display text-brand-text m-0">Project</h2>
+          <p className="mt-2 text-[0.8125rem] text-brand-muted m-0">A container for documents and their translations.</p>
+        </div>
+        <CloseButton onClose={onClose} />
+      </div>
+
+      <div className="space-y-5">
+        <Field label="Project name" required>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nova Launch — Summer" />
+        </Field>
+
+        <Field label="Description" hint="Optional">
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={2}
+            placeholder="What this project is for"
+            className="w-full resize-none rounded-xl border border-brand-border bg-brand-surface px-3.5 py-2.5 text-[0.875rem] text-brand-text outline-none placeholder:text-brand-hint focus:border-brand-accent focus:shadow-[0_0_0_3px_rgba(13,123,110,0.12)] transition-all"
+          />
+        </Field>
+
+        <Field label="Translate into" required>
+          <LangPicker codes={ALL_LANG_CODES} selected={langs} onToggle={toggle} />
+        </Field>
+
+        <Field label="Due date" hint="Optional">
+          <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </Field>
+      </div>
+
+      <div className="mt-7 flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded-full px-4 py-2 text-[0.8125rem] font-medium text-brand-muted hover:text-brand-text bg-transparent border-0 cursor-pointer transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => onCreate({ name: name.trim(), description: desc.trim(), target_languages: Array.from(langs), due_date: due || null })}
+          disabled={!canSubmit}
+          className="rounded-full bg-brand-text px-5 py-2 text-[0.8125rem] font-medium text-white hover:bg-brand-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Create project
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── New Translation Modal ──────────────────────────────────────────────────
+
+function NewTranslationModal({ open, onClose, projects, onUpload, projectId }) {
+  const [selectedProject, setSelectedProject] = useState(projectId ?? (projects[0]?.id));
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [languages, setLanguages] = useState(new Set(["es-ES"]));
+  const [mode, setMode] = useState("autopilot");
+
+  useEffect(() => {
+    if (open) {
+      setSelectedProject(projectId ?? projects[0]?.id);
+      setFile(null);
+      setDragging(false);
+      const proj = projects.find((p) => p.id === (projectId ?? projects[0]?.id));
+      setLanguages(new Set(proj?.target_languages || ["es-ES"]));
+      setMode("autopilot");
+    }
+  }, [open, projectId, projects]);
+
+  const toggleLang = (c) => {
+    const n = new Set(languages);
+    n.has(c) ? n.delete(c) : n.add(c);
+    setLanguages(n);
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="max-w-lg">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-subtle">New</p>
+          <h2 className="font-display text-[1.5rem] font-semibold leading-none tracking-display text-brand-text m-0">Translation</h2>
+          <p className="mt-2 text-[0.8125rem] text-brand-muted m-0">Upload a document — Autopilot handles the rest.</p>
+        </div>
+        <CloseButton onClose={onClose} />
+      </div>
+
+      <div className="space-y-5">
+        <Field label="Project">
+          <div className="relative">
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(Number(e.target.value))}
+              className="w-full appearance-none rounded-xl border border-brand-border bg-brand-surface px-3.5 py-2.5 pr-10 text-[0.875rem] text-brand-text outline-none focus:border-brand-accent focus:shadow-[0_0_0_3px_rgba(13,123,110,0.12)] transition-all"
+            >
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <svg viewBox="0 0 12 12" className="pointer-events-none absolute right-3.5 top-1/2 h-3 w-3 -translate-y-1/2 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+        </Field>
+
+        <Field label="Document">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setFile({ name: f.name, size: f.size }); }}
+            className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+              dragging ? "border-brand-accent bg-brand-accentSoft" : "border-brand-border bg-brand-sunken/50 hover:border-brand-accent/40 hover:bg-brand-sunken"
+            }`}
+          >
+            {file ? (
+              <div>
+                <FileExtChip name={file.name} />
+                <p className="mt-3 text-[0.875rem] font-medium text-brand-text m-0">{file.name}</p>
+                <button
+                  onClick={() => setFile(null)}
+                  className="mt-2 text-[0.75rem] text-brand-muted hover:text-brand-text underline bg-transparent border-0 cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-brand-surface text-brand-muted ring-1 ring-brand-border shadow-card">
+                  <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13V4M6.5 7.5 10 4l3.5 3.5"/><path d="M4 13v2.5A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5V13"/>
+                  </svg>
+                </div>
+                <p className="mt-3 text-[0.875rem] text-brand-text m-0">
+                  Drop a file here or{" "}
+                  <button
+                    onClick={() => setFile({ name: "nova-blog-post.docx", size: 14820 })}
+                    className="font-medium text-brand-accent bg-transparent border-0 cursor-pointer underline-offset-2 hover:underline"
+                  >
+                    browse
+                  </button>
+                </p>
+                <p className="mt-1 text-[0.75rem] text-brand-subtle m-0">DOCX, RTF, TXT · up to 10 MB</p>
+              </div>
+            )}
+          </div>
+        </Field>
+
+        <Field label="Target languages">
+          <LangPicker codes={ALL_LANG_CODES} selected={languages} onToggle={toggleLang} />
+        </Field>
+
+        <Field label="Mode">
+          <div className="grid grid-cols-2 gap-2">
+            <ModeCard
+              selected={mode === "autopilot"}
+              onClick={() => setMode("autopilot")}
+              title="Autopilot"
+              desc="Surface only material ambiguities"
+              icon={<Icon.Sparkle className="h-4 w-4" />}
+            />
+            <ModeCard
+              selected={mode === "manual"}
+              onClick={() => setMode("manual")}
+              title="Manual review"
+              desc="Review every block"
+              icon={
+                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 17l4-1 9-9-3-3-9 9-1 4Z"/><path d="m12 5 3 3"/>
+                </svg>
+              }
+            />
+          </div>
+        </Field>
+      </div>
+
+      <div className="mt-7 flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded-full px-4 py-2 text-[0.8125rem] font-medium text-brand-muted hover:text-brand-text bg-transparent border-0 cursor-pointer transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => onUpload({ projectId: selectedProject, file, languages: Array.from(languages), mode })}
+          disabled={!file || languages.size === 0}
+          className="rounded-full bg-brand-text px-5 py-2 text-[0.8125rem] font-medium text-white hover:bg-brand-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Start translation
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Small shared bits for modals ────────────────────────────────────────────
+
+function CloseButton({ onClose }) {
+  return (
+    <button
+      onClick={onClose}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-brand-subtle hover:bg-brand-sunken hover:text-brand-text bg-transparent border-0 cursor-pointer transition-colors"
+      aria-label="Close"
+    >
+      <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m3 3 8 8M11 3l-8 8"/></svg>
+    </button>
+  );
+}
+
+function Field({ label, required, hint, children }) {
+  return (
+    <div>
+      <label className="mb-1.5 flex items-center gap-1.5 text-[0.75rem] font-medium text-brand-muted">
+        {label}
+        {required && <span className="text-brand-accent">*</span>}
+        {hint && <span className="ml-auto text-[0.6875rem] font-normal text-brand-hint">{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function TextInput({ ...props }) {
+  return (
+    <input
+      {...props}
+      className="w-full rounded-xl border border-brand-border bg-brand-surface px-3.5 py-2.5 text-[0.875rem] text-brand-text outline-none placeholder:text-brand-hint focus:border-brand-accent focus:shadow-[0_0_0_3px_rgba(13,123,110,0.12)] transition-all"
+    />
+  );
+}
+
+function LangPicker({ codes, selected, onToggle }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {codes.map((c) => {
+        const s = selected.has(c);
+        return (
+          <button
+            key={c}
+            onClick={() => onToggle(c)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.75rem] font-medium transition-all ${
+              s
+                ? "border-brand-accent bg-brand-accentSoft text-brand-accent shadow-card"
+                : "border-brand-border bg-brand-surface text-brand-muted hover:text-brand-text hover:border-brand-accent/30 hover:bg-brand-sunken/60"
+            }`}
+          >
+            {s && <Icon.Check className="h-2.5 w-2.5" />}
+            <span className="font-mono text-[0.6875rem]">{lang(c).code}</span>
+            <span>{lang(c).name.replace(/\s*\(.*\)$/, "")}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModeCard({ selected, onClick, title, desc, icon }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left rounded-2xl border p-3.5 transition-all ${
+        selected
+          ? "border-brand-accent bg-brand-accentSoft shadow-card"
+          : "border-brand-border bg-brand-surface hover:border-brand-accent/30 hover:bg-brand-sunken/40"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${selected ? "bg-brand-surface text-brand-accent ring-1 ring-brand-accent/20" : "bg-brand-sunken text-brand-muted"}`}>
+          {icon}
+        </span>
+        <p className="font-display text-[0.9375rem] font-semibold tracking-display text-brand-text m-0">{title}</p>
+      </div>
+      <p className="mt-2 text-[0.75rem] leading-relaxed text-brand-muted m-0">{desc}</p>
+    </button>
+  );
+}
+
+Object.assign(window, { ReviewPeek, BlockRow, NewProjectModal, NewTranslationModal });
+
+
+// ===== dashboard_view.jsx =====
+// Dashboard — "What needs me right now"
+
+function DashboardView({ state, dispatch }) {
+  const data = window.HELVARA_DATA;
+  const projects = state.projects;
+  const pinned = projects.filter((p) => p.pinned);
+
+  const totals = projects.reduce(
+    (acc, p) => ({
+      jobs: acc.jobs + (p.stats?.total_jobs || 0),
+      in_review: acc.in_review + (p.stats?.in_review_count || 0),
+      completed: acc.completed + (p.stats?.completed_count || 0),
+      words: acc.words + (p.stats?.total_words || 0),
+    }),
+    { jobs: 0, in_review: 0, completed: 0, words: 0 }
+  );
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  return (
+    <div className="mx-auto max-w-[1320px] px-10 py-10">
+      {/* Header */}
+      <header className="mb-8 flex items-end justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-2.5 py-1 text-[0.6875rem] font-medium text-brand-muted shadow-card">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-accent" />
+            </span>
+            <span>{data.autopilotRunning.length} Autopilot jobs running</span>
+          </div>
+          <h1 className="font-display text-[2.75rem] font-semibold tracking-display leading-[1.05] text-brand-text m-0 whitespace-nowrap">
+            {greeting}, <span className="italic text-brand-accent">Maya</span>
+          </h1>
+          <p className="mt-3 max-w-lg text-[0.9375rem] leading-relaxed text-brand-muted m-0">
+            {data.attention.length} blocks are waiting on you — mostly in <span className="font-medium text-brand-text">Nova Launch</span> and <span className="font-medium text-brand-text">Atlas Newsletter</span>.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => dispatch({ type: "OPEN_NEW_PROJECT" })}
+            className="rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-[0.8125rem] font-medium text-brand-text shadow-card transition-all hover:border-brand-text hover:shadow-raised"
+          >
+            New project
+          </button>
+          <button
+            onClick={() => dispatch({ type: "OPEN_NEW_TRANSLATION", projectId: null })}
+            className="flex items-center gap-1.5 rounded-full bg-brand-text px-4 py-2 text-[0.8125rem] font-medium text-white shadow-card transition-all hover:bg-brand-accent"
+          >
+            <Icon.Plus className="h-3.5 w-3.5" /> New translation
+          </button>
+        </div>
+      </header>
+
+      {/* Stats row */}
+      <section className="mb-8 grid grid-cols-4 gap-0 overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        <StatCell label="Active projects" value={projects.filter(p => p.stats?.total_jobs > 0).length} hint={`of ${projects.length} total`} />
+        <StatCell label="In progress" value={totals.jobs - totals.completed} hint={`${totals.jobs} total jobs`} divider />
+        <StatCell label="Needs review" value={totals.in_review} hint="across all projects" accent divider />
+        <StatCell label="Words this month" value={(totals.words / 1000).toFixed(1) + "k"} hint="via Autopilot" divider />
+      </section>
+
+      {/* Two-column main */}
+      <div className="grid grid-cols-[1.5fr_1fr] gap-6">
+        <div className="flex flex-col gap-6">
+          <AttentionPanel data={data} dispatch={dispatch} />
+          <AutopilotPanel data={data} dispatch={dispatch} />
+        </div>
+        <div className="flex flex-col gap-6">
+          <PinnedPanel pinned={pinned} dispatch={dispatch} />
+          <InsightsPanel summary={data.insightsSummary} />
+          <ActivityPanel items={data.activity} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCell({ label, value, hint, accent, divider }) {
+  return (
+    <div className={`relative px-6 py-5 ${divider ? "border-l border-brand-borderSoft" : ""}`}>
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`mt-2.5 font-display text-[2.25rem] font-semibold leading-none tracking-display m-0 ${accent ? "text-brand-accent" : "text-brand-text"}`}>
+        {value}
+      </p>
+      <p className="mt-2 text-xs text-brand-subtle m-0">{hint}</p>
+    </div>
+  );
+}
+
+function PanelHeader({ title, subtitle, meta, right }) {
+  return (
+    <header className="flex items-start justify-between gap-4 px-5 pt-4 pb-3">
+      <div>
+        <h2 className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text m-0">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-xs text-brand-subtle m-0">{subtitle}</p>}
+      </div>
+      {right || (meta && <span className="text-xs text-brand-subtle">{meta}</span>)}
+    </header>
+  );
+}
+
+function AttentionPanel({ data, dispatch }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <PanelHeader
+        title="Needs your attention"
+        subtitle="Blocks flagged by Autopilot across all projects"
+        right={<span className="inline-flex items-center gap-1.5 rounded-full bg-brand-accentSoft px-2.5 py-1 text-xs font-semibold text-brand-accent"><Icon.Sparkle className="h-3 w-3" />{data.attention.length}</span>}
+      />
+      <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+        {data.attention.map((item) => (
+          <li key={item.id}>
+            <button
+              onClick={() => item.job
+                ? dispatch({ type: "OPEN_REVIEW", jobId: item.job })
+                : dispatch({ type: "OPEN_PROJECT", id: item.projectId })}
+              className="group grid w-full grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-brand-sunken/60"
+            >
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[0.8125rem] font-semibold tabular-nums ${
+                item.kind === "ambiguity" ? "bg-brand-accentSoft text-brand-accent ring-1 ring-inset ring-brand-accent/15" : "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/60"
+              }`}>
+                {item.count}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-brand-text m-0">{item.document}</p>
+                <p className="mt-0.5 truncate text-xs text-brand-subtle m-0">{item.projectName}</p>
+              </div>
+              <span className="font-mono text-[0.6875rem] text-brand-muted whitespace-nowrap">{item.pair}</span>
+              <span className="text-[0.6875rem] text-brand-subtle w-20 text-right">{item.age}</span>
+              <Icon.Arrow className="h-4 w-4 text-brand-hint transition-all group-hover:translate-x-0.5 group-hover:text-brand-text" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AutopilotPanel({ data, dispatch }) {
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-brand-accent/15 bg-gradient-to-br from-brand-accentSoft via-brand-surface to-brand-surface shadow-card">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-accent/8 blur-3xl" />
+      <PanelHeader
+        title={<><span className="relative mr-2 inline-flex h-2 w-2 align-middle"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-brand-accent" /></span>Autopilot running</>}
+        subtitle={`${data.autopilotRunning.length} jobs · live`}
+        right={dispatch && <button onClick={() => dispatch({ type: "NAVIGATE", view: "autopilot" })} className="flex items-center gap-1 text-xs font-medium text-brand-muted transition-colors hover:text-brand-text bg-transparent border-0 cursor-pointer">Open Autopilot<Icon.Arrow className="h-3 w-3" /></button>}
+      />
+      <ul className="relative m-0 list-none px-5 pb-4 pt-0">
+        {data.autopilotRunning.map((j) => (
+          <li key={j.id} className="grid grid-cols-[1fr_56px_120px_60px] items-center gap-4 border-t border-white/70 py-3 first:border-t-0">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-brand-text m-0">{j.file}</p>
+              <p className="mt-0.5 font-mono text-[0.6875rem] text-brand-subtle m-0">{j.pair}</p>
+            </div>
+            <span className="font-mono text-xs font-medium tabular-nums text-brand-muted text-right">{j.progress}%</span>
+            <div className="h-1.5 rounded-full bg-white/80 overflow-hidden ring-1 ring-inset ring-brand-border/50">
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-700" style={{ width: `${j.progress}%` }} />
+            </div>
+            <span className="text-right text-[0.6875rem] text-brand-subtle">{j.eta}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PinnedPanel({ pinned, dispatch }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <PanelHeader
+        title="Pinned"
+        right={<button onClick={() => dispatch({ type: "NAVIGATE", view: "projects" })} className="flex items-center gap-1 text-xs font-medium text-brand-muted transition-colors hover:text-brand-text">All projects <Icon.Arrow className="h-3.5 w-3.5" /></button>}
+      />
+      <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+        {pinned.map((p) => {
+          const pct = p.stats.total_jobs ? Math.round((p.stats.completed_count / p.stats.total_jobs) * 100) : 0;
+          return (
+            <li key={p.id}>
+              <button
+                onClick={() => dispatch({ type: "OPEN_PROJECT", id: p.id })}
+                className="group flex w-full flex-col gap-2.5 px-5 py-4 text-left transition-colors hover:bg-brand-sunken/60"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-brand-text m-0 line-clamp-1">{p.name}</p>
+                  <Icon.Arrow className="h-4 w-4 shrink-0 text-brand-hint transition-all group-hover:translate-x-0.5 group-hover:text-brand-text" />
+                </div>
+                <div className="flex items-center gap-2 text-[0.6875rem] text-brand-subtle">
+                  <span>{p.document_count} {p.document_count === 1 ? "doc" : "docs"}</span>
+                  <span className="text-brand-hint">·</span>
+                  <span>{p.stats.total_jobs} jobs</span>
+                  {p.stats.in_review_count > 0 && (
+                    <>
+                      <span className="text-brand-hint">·</span>
+                      <span className="font-medium text-brand-accent">{p.stats.in_review_count} review</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-1 flex-1 rounded-full bg-brand-sunken overflow-hidden">
+                    <div className="h-full rounded-full bg-brand-text transition-[width]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="font-mono text-[0.625rem] tabular-nums text-brand-subtle">{pct}%</span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function InsightsPanel({ summary }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <PanelHeader title="Linguistic insights" subtitle="This week" />
+      <div className="grid grid-cols-2 gap-0 divide-x divide-y divide-brand-borderSoft border-t border-brand-borderSoft">
+        <InsightCell label="Glossary terms" value={summary.glossary_terms} hint={`+${summary.new_this_week} new`} />
+        <InsightCell label="Term conflicts" value={summary.conflicts} hint="needs review" warn={summary.conflicts > 0} />
+        <InsightCell label="Memory matches" value={summary.memory_matches_week} hint="blocks reused" />
+        <InsightCell label="Ambiguity rate" value={summary.ambiguity_rate + "%"} hint="of all blocks" />
+      </div>
+    </section>
+  );
+}
+
+function InsightCell({ label, value, hint, warn }) {
+  return (
+    <div className="px-5 py-4">
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`mt-2 font-display text-[1.625rem] font-semibold leading-none tracking-display m-0 ${warn ? "text-amber-700" : "text-brand-text"}`}>{value}</p>
+      <p className="mt-1.5 text-[0.6875rem] text-brand-subtle m-0">{hint}</p>
+    </div>
+  );
+}
+
+function ActivityPanel({ items }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <PanelHeader title="Recent activity" subtitle="Last 24 hours" />
+      <ul className="m-0 list-none border-t border-brand-borderSoft p-0">
+        {items.map((e) => (
+          <li key={e.id} className="flex items-start gap-3 border-t border-brand-borderSoft px-5 py-3 first:border-t-0">
+            <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-semibold ${
+              e.tone === "success" ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/60"
+              : e.tone === "accent" ? "bg-brand-accentSoft text-brand-accent ring-1 ring-inset ring-brand-accent/15"
+              : "bg-brand-sunken text-brand-subtle ring-1 ring-inset ring-brand-border"
+            }`}>{e.icon}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.8125rem] leading-snug text-brand-text m-0">{e.text}</p>
+              <p className="mt-0.5 text-[0.6875rem] text-brand-subtle m-0">{e.meta} · {e.when}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+
+// ===== documents_view.jsx =====
+// Documents view — cross-project view with toggle (Documents | Jobs) + filters
+
+function DocumentsView({ state, dispatch }) {
+  const projects = state.projects;
+
+  const allDocs = [];
+  const allJobs = [];
+  projects.forEach((p) => {
+    (p.documents || []).forEach((d) => {
+      allDocs.push({ ...d, projectId: p.id, projectName: p.name });
+      (d.jobs || []).forEach((j) => {
+        allJobs.push({ ...j, projectId: p.id, projectName: p.name, docId: d.id, docName: d.name });
+      });
+    });
+  });
+
+  const [mode, setMode] = useState("documents");
+  const [q, setQ] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const qlc = q.trim().toLowerCase();
+  const docs = allDocs.filter((d) => {
+    if (projectFilter !== "all" && d.projectId !== +projectFilter) return false;
+    if (qlc && !(d.name.toLowerCase().includes(qlc) || d.projectName.toLowerCase().includes(qlc))) return false;
+    return true;
+  });
+  const jobs = allJobs.filter((j) => {
+    if (projectFilter !== "all" && j.projectId !== +projectFilter) return false;
+    if (statusFilter !== "all" && j.status !== statusFilter) return false;
+    if (qlc && !(j.docName.toLowerCase().includes(qlc) || j.projectName.toLowerCase().includes(qlc) || j.target.toLowerCase().includes(qlc))) return false;
+    return true;
+  });
+
+  return (
+    <div className="mx-auto max-w-[1320px] px-10 py-10">
+      <header className="mb-8 flex items-end justify-between gap-6">
+        <div>
+          <p className="mb-2 text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-brand-subtle m-0">Workspace</p>
+          <h1 className="font-display text-[2.5rem] font-semibold tracking-display leading-[1.05] text-brand-text m-0">
+            Documents
+          </h1>
+          <p className="mt-2.5 text-[0.9375rem] text-brand-muted m-0">
+            <span className="font-medium text-brand-text">{allDocs.length}</span> files · <span className="font-medium text-brand-text">{allJobs.length}</span> translation jobs across {projects.length} projects
+          </p>
+        </div>
+        <button
+          onClick={() => dispatch({ type: "OPEN_NEW_TRANSLATION", projectId: null })}
+          className="flex items-center gap-1.5 rounded-full bg-brand-text px-4 py-2 text-[0.8125rem] font-medium text-white shadow-card transition-all hover:bg-brand-accent"
+        >
+          <Icon.Plus className="h-3.5 w-3.5" /> New translation
+        </button>
+      </header>
+
+      {/* Filter bar */}
+      <div className="mb-5 flex items-center gap-3">
+        <div className="inline-flex rounded-full border border-brand-border bg-brand-surface p-0.5 shadow-card">
+          {[
+            { k: "documents", label: "Documents", count: allDocs.length },
+            { k: "jobs", label: "Jobs", count: allJobs.length },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setMode(t.k)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors ${
+                mode === t.k ? "bg-brand-text text-white" : "text-brand-muted hover:text-brand-text"
+              }`}
+            >
+              {t.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[0.625rem] tabular-nums ${mode === t.k ? "bg-white/20" : "bg-brand-sunken"}`}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-1 items-center gap-2">
+          <div className="relative flex-1">
+            <Icon.Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-hint" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search files, projects, languages…"
+              className="w-full rounded-full border border-brand-border bg-brand-surface py-2 pl-9 pr-3.5 text-[0.8125rem] text-brand-text placeholder:text-brand-subtle shadow-card focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/15"
+            />
+          </div>
+          <FilterSelect value={projectFilter} onChange={setProjectFilter}>
+            <option value="all">All projects</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </FilterSelect>
+          {mode === "jobs" && (
+            <FilterSelect value={statusFilter} onChange={setStatusFilter}>
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="in_review">In review</option>
+              <option value="completed">Completed</option>
+              <option value="exported">Exported</option>
+            </FilterSelect>
+          )}
+        </div>
+      </div>
+
+      {mode === "documents" ? (
+        <DocumentsTable rows={docs} dispatch={dispatch} />
+      ) : (
+        <JobsTable rows={jobs} dispatch={dispatch} />
+      )}
+
+      {((mode === "documents" && docs.length === 0) || (mode === "jobs" && jobs.length === 0)) && (
+        <div className="mt-6 rounded-2xl border border-dashed border-brand-border bg-brand-surface p-10 text-center shadow-card">
+          <p className="font-display text-lg font-semibold text-brand-text m-0">No matches</p>
+          <p className="mt-1.5 text-sm text-brand-muted m-0">Try clearing a filter or changing your search.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterSelect({ value, onChange, children }) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none rounded-full border border-brand-border bg-brand-surface py-2 pl-3.5 pr-8 text-[0.8125rem] text-brand-text shadow-card focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/15"
+      >
+        {children}
+      </select>
+      <svg viewBox="0 0 12 12" className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+function DocumentsTable({ rows, dispatch }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <header className="grid grid-cols-[2.2fr_1.6fr_0.8fr_1.6fr_0.7fr] gap-4 border-b border-brand-borderSoft bg-brand-sunken/50 px-5 py-2.5 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">
+        <span>Document</span>
+        <span>Project</span>
+        <span className="text-right">Words</span>
+        <span>Languages · status</span>
+        <span className="text-right">Uploaded</span>
+      </header>
+      <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+        {rows.map((d) => {
+          const review = d.jobs.filter((j) => j.status === "in_review").length;
+          return (
+            <li key={d.projectId + "-" + d.id}>
+              <button
+                onClick={() => dispatch({ type: "OPEN_PROJECT", id: d.projectId })}
+                className="group grid w-full grid-cols-[2.2fr_1.6fr_0.8fr_1.6fr_0.7fr] items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-brand-sunken/60"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileIcon name={d.name} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-brand-text m-0">{d.name}</p>
+                    <p className="mt-0.5 text-[0.6875rem] text-brand-subtle m-0">{d.jobs.length} {d.jobs.length === 1 ? "translation" : "translations"}</p>
+                  </div>
+                </div>
+                <p className="truncate text-[0.8125rem] text-brand-muted m-0">{d.projectName}</p>
+                <p className="text-right font-mono text-xs tabular-nums text-brand-muted m-0">{d.words.toLocaleString()}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {d.jobs.map((j) => <JobChip key={j.id} j={j} />)}
+                  {review > 0 && (
+                    <span className="ml-1 rounded-full bg-brand-accentSoft px-2 py-0.5 text-[0.6875rem] font-semibold text-brand-accent ring-1 ring-inset ring-brand-accent/15">
+                      {review} review
+                    </span>
+                  )}
+                </div>
+                <p className="text-right text-[0.6875rem] text-brand-subtle m-0">{d.uploaded}</p>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function JobsTable({ rows, dispatch }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <header className="grid grid-cols-[2fr_1.5fr_0.8fr_1fr_0.7fr_0.6fr] gap-4 border-b border-brand-borderSoft bg-brand-sunken/50 px-5 py-2.5 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">
+        <span>Document</span>
+        <span>Project</span>
+        <span>Language</span>
+        <span>Status</span>
+        <span className="text-right">Flags</span>
+        <span className="text-right">Mode</span>
+      </header>
+      <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+        {rows.map((j) => (
+          <li key={j.projectId + "-" + j.id}>
+            <button
+              onClick={() => dispatch({ type: "OPEN_PROJECT", id: j.projectId })}
+              className="group grid w-full grid-cols-[2fr_1.5fr_0.8fr_1fr_0.7fr_0.6fr] items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-brand-sunken/60"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <FileIcon name={j.docName} />
+                <p className="truncate text-sm font-medium text-brand-text m-0">{j.docName}</p>
+              </div>
+              <p className="truncate text-[0.8125rem] text-brand-muted m-0">{j.projectName}</p>
+              <p className="font-mono text-[0.75rem] tabular-nums text-brand-text m-0">{j.source.toUpperCase()} → {j.target.toUpperCase()}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <StatusDot status={j.status} />
+                <span className="text-xs text-brand-muted">{statusLabel(j.status)}</span>
+                {j.status === "processing" && (
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <div className="h-1 w-12 rounded-full bg-brand-sunken overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov" style={{ width: j.progress + "%" }} />
+                    </div>
+                    <span className="font-mono text-[0.625rem] text-brand-subtle">{j.progress}%</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-1.5">
+                {j.ambiguities > 0 && (
+                  <span className="rounded-full bg-brand-accentSoft px-2 py-0.5 text-[0.6875rem] font-semibold text-brand-accent ring-1 ring-inset ring-brand-accent/15">
+                    {j.ambiguities} amb
+                  </span>
+                )}
+                {j.insights > 0 && (
+                  <span className="rounded-full bg-brand-sunken px-2 py-0.5 text-[0.6875rem] text-brand-muted">
+                    {j.insights} ins
+                  </span>
+                )}
+              </div>
+              <p className="text-right text-[0.6875rem] text-brand-subtle m-0">{j.autopilot ? "Autopilot" : "Manual"}</p>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function FileIcon({ name }) {
+  const ext = (name.split(".").pop() || "").toUpperCase();
+  const tone =
+    ext === "DOCX" || ext === "DOC" ? "bg-blue-50 text-blue-700 ring-blue-200/60"
+    : ext === "RTF" ? "bg-violet-50 text-violet-700 ring-violet-200/60"
+    : ext === "TXT" ? "bg-slate-50 text-slate-600 ring-slate-200/60"
+    : "bg-brand-sunken text-brand-muted ring-brand-border";
+  return (
+    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[0.625rem] font-semibold ring-1 ring-inset ${tone}`}>
+      {ext.slice(0, 4)}
+    </span>
+  );
+}
+
+function JobChip({ j }) {
+  const tone =
+    j.status === "in_review" ? "bg-brand-accentSoft text-brand-accent ring-brand-accent/15"
+    : j.status === "completed" || j.status === "exported" ? "bg-emerald-50 text-emerald-700 ring-emerald-200/50"
+    : j.status === "processing" ? "bg-amber-50 text-amber-700 ring-amber-200/50"
+    : "bg-brand-sunken text-brand-subtle ring-brand-border";
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium ring-1 ring-inset ${tone}`}>
+      {j.target.toUpperCase()}
+    </span>
+  );
+}
+
+function StatusDot({ status }) {
+  const color =
+    status === "in_review" ? "bg-brand-accent"
+    : status === "completed" || status === "exported" ? "bg-emerald-500"
+    : status === "processing" ? "bg-amber-500"
+    : "bg-brand-subtle";
+  return <span className={`h-1.5 w-1.5 rounded-full ${color}`} />;
+}
+
+function statusLabel(s) {
+  return { pending: "Pending", processing: "Processing", in_review: "In review", completed: "Completed", exported: "Exported" }[s] || s;
+}
+
+
+// ===== autopilot_view.jsx =====
+// Autopilot page — agent-as-coworker cockpit
+// Left: agent feed (Rumi's decisions, questions, completions).
+// Right: live queue with telemetry + decisions log.
+
+function AutopilotView({ state, dispatch }) {
+  const ap = window.HELVARA_DATA.autopilot;
+  const [filter, setFilter] = useState("all"); // all | questions | decisions | completed
+  const [running, setRunning] = useState(ap.queue);
+
+  // Simulate live progress every 1.5s for the running queue
+  useEffect(() => {
+    const t = setInterval(() => {
+      setRunning((prev) => prev.map((j) => {
+        if (j.progress >= 100) return j;
+        const bump = Math.random() * 2.4 + 0.2;
+        return { ...j, progress: Math.min(100, +(j.progress + bump).toFixed(1)) };
+      }));
+    }, 1500);
+    return () => clearInterval(t);
+  }, []);
+
+  const filteredMessages = filter === "all"
+    ? ap.messages
+    : ap.messages.filter((m) => (filter === "questions" ? m.kind === "question" : filter === "decisions" ? m.kind === "decision" : m.kind === "completed"));
+
+  const questionCount = ap.messages.filter((m) => m.kind === "question").length;
+
+  return (
+    <div className="mx-auto max-w-[1280px] px-10 py-10">
+      {/* Agent header */}
+      <AgentHeader agent={ap.agent} runningCount={running.length} questionCount={questionCount} />
+
+      {/* Stats row — agent's day at a glance */}
+      <div className="mb-7 grid grid-cols-4 overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+        <AgentStat label="Blocks translated" value={ap.agent.stats_today.blocks_translated.toLocaleString()} meta="last 24h" />
+        <AgentStat label="Decisions made" value={ap.agent.stats_today.decisions_auto.toLocaleString()} meta="without asking" bordered />
+        <AgentStat label="Asking your call" value={ap.agent.stats_today.decisions_asking} meta="waiting on you" valueClass="text-brand-accent" bordered />
+        <AgentStat label="Time you saved" value={`${Math.floor(ap.agent.stats_today.saved_minutes / 60)}h ${ap.agent.stats_today.saved_minutes % 60}m`} meta="vs manual review" bordered />
+      </div>
+
+      {/* Body — 2 columns */}
+      <div className="grid grid-cols-[1fr_380px] gap-5">
+        {/* Left: agent feed */}
+        <div>
+          <FeedHeader filter={filter} setFilter={setFilter} counts={{
+            all: ap.messages.length,
+            questions: questionCount,
+            decisions: ap.messages.filter((m) => m.kind === "decision").length,
+            completed: ap.messages.filter((m) => m.kind === "completed").length,
+          }} />
+          <div className="space-y-3">
+            {filteredMessages.map((m) => (
+              <AgentMessage key={m.id} message={m} agent={ap.agent} dispatch={dispatch} />
+            ))}
+          </div>
+        </div>
+
+        {/* Right: live queue + decisions log */}
+        <aside className="space-y-5">
+          <LiveQueuePanel queue={running} />
+          <DecisionsLogPanel log={ap.decisions_log} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// ── Agent header with avatar, status, and controls ─────────────────────────
+function AgentHeader({ agent, runningCount, questionCount }) {
+  return (
+    <div className="mb-7">
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-subtle">Workspace</p>
+      <div className="flex items-end justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <AgentAvatar agent={agent} size={72} pulse />
+          <div>
+            <h1 className="font-display text-[2.25rem] font-semibold leading-none tracking-display text-brand-text m-0">
+              {agent.name}
+              <span className="ml-3 align-middle font-sans text-[1rem] font-normal text-brand-muted tracking-normal">
+                · {agent.role}
+              </span>
+            </h1>
+            <p className="mt-2 max-w-xl text-[0.875rem] leading-relaxed text-brand-muted m-0">{agent.tagline}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-[0.75rem] font-medium text-brand-text shadow-card">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            Working on {runningCount} job{runningCount === 1 ? "" : "s"}
+          </span>
+          {questionCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-accentSoft px-3 py-1.5 text-[0.75rem] font-medium text-brand-accent">
+              <Icon.Sparkle className="h-3 w-3" />
+              {questionCount} question{questionCount === 1 ? "" : "s"} for you
+            </span>
+          )}
+          <button className="rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-[0.8125rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors">
+            Pause Rumi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentAvatar({ agent, size = 36, pulse = false }) {
+  const style = { width: size, height: size, background: agent.avatar_bg };
+  return (
+    <div className="relative shrink-0">
+      <div
+        className="flex items-center justify-center rounded-full font-display text-white shadow-card"
+        style={{ ...style, fontSize: size * 0.42, fontWeight: 600, letterSpacing: "-0.02em" }}
+      >
+        {agent.initials}
+      </div>
+      {pulse && (
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-surface">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-brand-surface" />
+          </span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AgentStat({ label, value, meta, bordered, valueClass }) {
+  return (
+    <div className={`px-5 py-4 ${bordered ? "border-l border-brand-borderSoft" : ""}`}>
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`mt-2 font-display text-[1.75rem] font-semibold leading-none tracking-display m-0 ${valueClass || "text-brand-text"}`}>{value}</p>
+      <p className="mt-1.5 text-[0.75rem] text-brand-muted m-0">{meta}</p>
+    </div>
+  );
+}
+
+// ── Feed filter tabs ────────────────────────────────────────────────────────
+function FeedHeader({ filter, setFilter, counts }) {
+  const tabs = [
+    { key: "all", label: "All" },
+    { key: "questions", label: "Questions", accent: true },
+    { key: "decisions", label: "Decisions" },
+    { key: "completed", label: "Completed" },
+  ];
+  return (
+    <div className="mb-4 flex items-center justify-between">
+      <h2 className="font-display text-[1.125rem] font-semibold tracking-display text-brand-text m-0">Feed</h2>
+      <div className="flex items-center gap-1 rounded-full border border-brand-border bg-brand-surface p-1 shadow-card">
+        {tabs.map((t) => {
+          const active = filter === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.75rem] font-medium transition-all ${
+                active
+                  ? (t.accent ? "bg-brand-accent text-white shadow-card" : "bg-brand-text text-white shadow-card")
+                  : "text-brand-muted hover:text-brand-text"
+              }`}
+            >
+              {t.label}
+              <span className={`font-mono text-[0.625rem] ${active ? "text-white/70" : "text-brand-subtle"}`}>{counts[t.key]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── A single message from the agent ─────────────────────────────────────────
+function AgentMessage({ message, agent, dispatch }) {
+  const kindStyle = {
+    question:  { pill: "bg-brand-accentSoft text-brand-accent", label: "Asking" },
+    decision:  { pill: "bg-brand-sunken text-brand-muted", label: "Decided" },
+    completed: { pill: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200", label: "Shipped" },
+  }[message.kind] || { pill: "bg-brand-sunken text-brand-muted", label: "Note" };
+
+  const isQuestion = message.kind === "question";
+
+  return (
+    <article className={`group rounded-2xl border bg-brand-surface p-5 transition-all hover:shadow-card ${
+      isQuestion ? "border-brand-accent/30 shadow-[0_0_0_3px_rgba(13,123,110,0.05)]" : "border-brand-border"
+    }`}>
+      <header className="mb-3 flex items-start gap-3">
+        <AgentAvatar agent={agent} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[0.9375rem] font-semibold tracking-display text-brand-text">{agent.name}</span>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-medium uppercase tracking-[0.1em] ${kindStyle.pill}`}>
+              {kindStyle.label}
+            </span>
+            <span className="text-[0.75rem] text-brand-subtle">· {message.when}</span>
+          </div>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.75rem] text-brand-muted m-0">
+            <span className="font-medium text-brand-text">{message.project}</span>
+            <span className="text-brand-hint">/</span>
+            <span>{message.document}</span>
+            <span className="font-mono text-[0.6875rem] rounded bg-brand-sunken px-1.5 py-0 text-brand-muted">{message.pair}</span>
+          </p>
+        </div>
+      </header>
+
+      <h3 className="mb-2 font-display text-[1.0625rem] font-semibold leading-snug tracking-display text-brand-text m-0">
+        {message.title}
+      </h3>
+      <p className="mb-0 text-[0.875rem] leading-relaxed text-brand-muted m-0">{message.body}</p>
+
+      {message.meta && !message.actions && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-[0.75rem] text-brand-subtle m-0">
+          <span className="h-1 w-1 rounded-full bg-brand-hint" />
+          {message.meta}
+        </p>
+      )}
+
+      {message.actions && (
+        <div className="mt-4 flex items-center gap-2">
+          {message.actions.map((a, i) => (
+            <button
+              key={i}
+              onClick={() => a.primary && a.jobId && dispatch({ type: "OPEN_REVIEW", jobId: a.jobId })}
+              className={
+                a.primary
+                  ? "flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1.5 text-[0.75rem] font-medium text-white hover:bg-brand-accent transition-colors"
+                  : "rounded-full border border-brand-border bg-brand-surface px-3.5 py-1.5 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors"
+              }
+            >
+              {a.label}
+              {a.primary && <Icon.Arrow className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ── Live queue panel ────────────────────────────────────────────────────────
+function LiveQueuePanel({ queue }) {
+  const stageLabel = {
+    analyze: "Analyzing",
+    translate: "Translating",
+    insight_check: "Checking insights",
+    finalize: "Finalizing",
+  };
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <header className="flex items-center justify-between border-b border-brand-borderSoft px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent/60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-accent" />
+          </span>
+          <h3 className="font-display text-[0.9375rem] font-semibold tracking-display text-brand-text m-0">Live queue</h3>
+          <span className="text-[0.75rem] text-brand-subtle">· {queue.length}</span>
+        </div>
+      </header>
+      <div className="divide-y divide-brand-borderSoft">
+        {queue.map((j) => (
+          <div key={j.id} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[0.8125rem] font-medium text-brand-text m-0">{j.file}</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[0.6875rem] text-brand-muted m-0">
+                  <span className="font-mono rounded bg-brand-sunken px-1 py-0 text-brand-muted">{j.pair}</span>
+                  <span className="text-brand-hint">·</span>
+                  <span>{stageLabel[j.stage] || j.stage}</span>
+                </p>
+              </div>
+              <span className="font-mono text-[0.6875rem] text-brand-subtle whitespace-nowrap">{j.eta}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-brand-sunken ring-1 ring-inset ring-black/[0.02]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-[1200ms]"
+                  style={{ width: `${j.progress}%` }}
+                />
+              </div>
+              <span className="font-mono text-[0.625rem] font-medium text-brand-muted w-9 text-right">{Math.round(j.progress)}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Decisions log panel (recent trail of Autopilot's work) ──────────────────
+function DecisionsLogPanel({ log }) {
+  const iconFor = {
+    question:  <Icon.Sparkle className="h-3 w-3" />,
+    glossary:  <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2.5 2h6a1.5 1.5 0 0 1 1.5 1.5v7"/><path d="M2.5 2v7.5A1 1 0 0 0 3.5 10.5h6.5"/><path d="M4.5 4.5h3M4.5 6.5h2"/></svg>,
+    memory:    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2" y="2" width="8" height="8" rx="1.5"/><path d="M4 5h4M4 7h3"/></svg>,
+    edit:      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 10l3-.8 5-5.2-2-2-5 5.2L2 10Z"/></svg>,
+    completed: <Icon.Check className="h-3 w-3" />,
+  };
+  const toneFor = {
+    question:  "bg-brand-accentSoft text-brand-accent",
+    glossary:  "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200",
+    memory:    "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200",
+    edit:      "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200",
+    completed: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+  };
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
+      <header className="flex items-center justify-between border-b border-brand-borderSoft px-4 py-3">
+        <h3 className="font-display text-[0.9375rem] font-semibold tracking-display text-brand-text m-0">Decisions log</h3>
+        <button className="text-[0.6875rem] font-medium text-brand-muted hover:text-brand-text bg-transparent border-0 cursor-pointer">View all</button>
+      </header>
+      <ul className="divide-y divide-brand-borderSoft">
+        {log.map((d) => (
+          <li key={d.id} className="flex items-start gap-3 px-4 py-2.5">
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${toneFor[d.type] || "bg-brand-sunken text-brand-muted"}`}>
+              {iconFor[d.type] || <span className="h-1 w-1 rounded-full bg-current" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.75rem] leading-snug text-brand-text m-0">{d.text}</p>
+              <p className="mt-0.5 font-mono text-[0.625rem] text-brand-subtle m-0">{d.when}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+Object.assign(window, { AutopilotView, AgentAvatar });
+
+
+// ===== translation_review_view.jsx =====
+// Translation Review — full-page review of a single job.
+// Side-by-side columns, insight-first, with Rumi's reasoning inline.
+// Keyboard: ↑/↓ to move between blocks, Enter to approve, 1-9 to pick alternative.
+
+function TranslationReviewView({ state, dispatch }) {
+  const data = window.HELVARA_DATA.reviewData[state.reviewJobId] || window.HELVARA_DATA.reviewData[1004];
+  const agent = window.HELVARA_DATA.autopilot.agent;
+  const [decisions, setDecisions] = useState({});
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [density, setDensity] = useState("balanced"); // cozy | balanced | compact
+  const [granularity, setGranularity] = useState("sentence"); // sentence | paragraph
+  const [showDiff, setShowDiff] = useState(false);
+  const blockRefs = useRef([]);
+
+  // Keyboard nav
+  useEffect(() => {
+    const h = (e) => {
+      if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+      const b = data.blocks[activeIdx];
+      if (e.key === "ArrowDown" || e.key === "j") {
+        e.preventDefault();
+        const next = Math.min(data.blocks.length - 1, activeIdx + 1);
+        setActiveIdx(next);
+        blockRefs.current[next]?.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else if (e.key === "ArrowUp" || e.key === "k") {
+        e.preventDefault();
+        const prev = Math.max(0, activeIdx - 1);
+        setActiveIdx(prev);
+        blockRefs.current[prev]?.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else if (e.key === "Enter" && b) {
+        e.preventDefault();
+        approveBlock(b.id, decisions[b.id]?.pick ?? 0);
+      } else if (/^[1-9]$/.test(e.key) && b?.alternatives) {
+        const pick = parseInt(e.key, 10) - 1;
+        if (pick < b.alternatives.length) {
+          setDecisions({ ...decisions, [b.id]: { status: "approved", pick } });
+        }
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [activeIdx, decisions, data.blocks]);
+
+  const approveBlock = (id, pick) => {
+    setDecisions({ ...decisions, [id]: { status: "approved", pick: pick ?? 0 } });
+  };
+  const approveAll = () => {
+    const next = { ...decisions };
+    data.blocks.forEach((b) => {
+      if (b.status === "ambiguity" && b.alternatives) next[b.id] = next[b.id] || { status: "approved", pick: 0 };
+      else next[b.id] = { status: "approved" };
+    });
+    setDecisions(next);
+  };
+
+  const getEffective = (b) => decisions[b.id]?.status || b.status;
+  const approved = data.blocks.filter((b) => getEffective(b) === "approved").length;
+  const progressPct = Math.round((approved / data.blocks.length) * 100);
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Sticky review header */}
+      <ReviewHeader
+        data={data}
+        approved={approved}
+        progressPct={progressPct}
+        density={density} setDensity={setDensity}
+        granularity={granularity} setGranularity={setGranularity}
+        showDiff={showDiff} setShowDiff={setShowDiff}
+        onApproveAll={approveAll}
+        onBack={() => dispatch({ type: "OPEN_PROJECT", id: data.projectId })}
+      />
+
+      {/* Agent summary strip */}
+      <AgentSummaryStrip data={data} agent={agent} />
+
+      {/* Main body — block navigator + scrollable review area */}
+      <div className="flex flex-1 overflow-hidden">
+        <BlockNavigator
+          blocks={data.blocks}
+          decisions={decisions}
+          activeIdx={activeIdx}
+          onSelect={(i) => { setActiveIdx(i); blockRefs.current[i]?.scrollIntoView({ block: "center", behavior: "smooth" }); }}
+          getEffective={getEffective}
+        />
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1180px] px-10 py-8">
+            <div className={density === "cozy" ? "space-y-6" : density === "compact" ? "space-y-2" : "space-y-4"}>
+              {data.blocks.map((b, i) => (
+                <div key={b.id} ref={(el) => (blockRefs.current[i] = el)}>
+                  <ReviewBlock
+                    block={b}
+                    index={i}
+                    active={activeIdx === i}
+                    density={density}
+                    showDiff={showDiff}
+                    decision={decisions[b.id]}
+                    effective={getEffective(b)}
+                    onActivate={() => setActiveIdx(i)}
+                    onApprove={(pick) => approveBlock(b.id, pick)}
+                    onPickAlt={(pick) => setDecisions({ ...decisions, [b.id]: { status: "approved", pick } })}
+                    target={data.target}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom CTA */}
+            <div className="mt-10 flex items-center justify-between rounded-2xl border border-brand-border bg-brand-surface p-5 shadow-card">
+              <div>
+                <p className="font-display text-[1.0625rem] font-semibold tracking-display text-brand-text m-0">
+                  {approved === data.blocks.length ? "All blocks approved." : `${data.blocks.length - approved} block${data.blocks.length - approved === 1 ? "" : "s"} remaining`}
+                </p>
+                <p className="mt-1 text-[0.8125rem] text-brand-muted m-0">Exporting locks edits. Rumi keeps the memory updated either way.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-[0.8125rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors">
+                  Save draft
+                </button>
+                <button
+                  disabled={approved !== data.blocks.length}
+                  className="flex items-center gap-1 rounded-full bg-brand-text px-5 py-2 text-[0.8125rem] font-medium text-white hover:bg-brand-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Approve & export <Icon.Arrow className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Keyboard hint footer */}
+      <KeyboardHint />
+    </div>
+  );
+}
+
+// ── Review header (sticky) ─────────────────────────────────────────────────
+function ReviewHeader({ data, approved, progressPct, density, setDensity, granularity, setGranularity, showDiff, setShowDiff, onApproveAll, onBack }) {
+  return (
+    <header className="shrink-0 border-b border-brand-border bg-brand-surface/90 backdrop-blur">
+      <div className="mx-auto max-w-[1600px] px-10 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={onBack}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-surface text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors"
+              aria-label="Back to project"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3 5 8l5 5"/></svg>
+            </button>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[0.6875rem] font-medium text-brand-muted m-0">
+                <span className="font-semibold uppercase tracking-[0.18em] text-brand-accent">Review</span>
+                <span className="text-brand-hint">·</span>
+                <span className="truncate">{data.project}</span>
+              </p>
+              <h1 className="mt-1 flex items-center gap-2 font-display text-[1.25rem] font-semibold leading-none tracking-display text-brand-text m-0">
+                <span className="truncate">{data.document}</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-brand-sunken px-2 py-0.5 font-mono text-[0.6875rem] font-medium text-brand-text tracking-normal">
+                  {lang(data.source).code}
+                  <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-brand-subtle" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6h8M7 3l3 3-3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  {lang(data.target).code}
+                </span>
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Progress */}
+            <div className="hidden items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 shadow-card md:flex">
+              <span className="font-mono text-[0.75rem] font-medium text-brand-text">{approved}/{data.blocks.length}</span>
+              <div className="h-1 w-20 overflow-hidden rounded-full bg-brand-sunken">
+                <div className="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-accentHov transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+              </div>
+            </div>
+
+            {/* Diff toggle */}
+            <button
+              onClick={() => setShowDiff(!showDiff)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.75rem] font-medium shadow-card transition-all ${
+                showDiff
+                  ? "border-brand-accent bg-brand-accentSoft text-brand-accent"
+                  : "border-brand-border bg-brand-surface text-brand-muted hover:text-brand-text hover:bg-brand-sunken"
+              }`}
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v10M13 3v10M3 5h3M3 8h4M3 11h2M13 5h-3M13 8h-4M13 11h-2"/>
+              </svg>
+              Alignment
+            </button>
+
+            {/* Density segmented */}
+            <div className="flex items-center gap-0.5 rounded-full border border-brand-border bg-brand-surface p-0.5 shadow-card">
+              {[["cozy", "Cozy"], ["balanced", "Balanced"], ["compact", "Compact"]].map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => setDensity(k)}
+                  className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-medium transition-all ${
+                    density === k ? "bg-brand-text text-white" : "text-brand-muted hover:text-brand-text"
+                  }`}
+                >{l}</button>
+              ))}
+            </div>
+
+            <button
+              onClick={onApproveAll}
+              className="rounded-full border border-brand-border bg-brand-surface px-3.5 py-1.5 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken shadow-card transition-colors"
+            >
+              Approve remaining
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ── Agent summary strip ─────────────────────────────────────────────────────
+function AgentSummaryStrip({ data, agent }) {
+  return (
+    <div className="shrink-0 border-b border-brand-borderSoft bg-brand-sunken/40">
+      <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-10 py-4">
+        <AgentAvatar agent={agent} size={36} />
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[0.6875rem] font-medium text-brand-muted m-0">
+            <span className="font-semibold text-brand-text">{agent.name}</span>
+            <span className="text-brand-hint">·</span>
+            <span>{agent.role} summary</span>
+          </p>
+          <p className="mt-0.5 text-[0.875rem] leading-relaxed text-brand-text m-0">{data.agent_summary}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-4 text-[0.75rem]">
+          <SummaryStat label="Blocks" value={data.stats.blocks} />
+          <SummaryStat label="Insights" value={data.stats.insights} accent />
+          <SummaryStat label="Ambiguous" value={data.stats.ambiguities} warning={data.stats.ambiguities > 0} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value, accent, warning }) {
+  const cls = warning ? "text-amber-700" : accent ? "text-brand-accent" : "text-brand-text";
+  return (
+    <div className="text-right">
+      <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-brand-subtle m-0">{label}</p>
+      <p className={`font-display text-[1.125rem] font-semibold leading-none tracking-display m-0 ${cls}`}>{value}</p>
+    </div>
+  );
+}
+
+// ── Block navigator (left rail) ─────────────────────────────────────────────
+function BlockNavigator({ blocks, activeIdx, onSelect, getEffective }) {
+  return (
+    <aside className="w-[56px] shrink-0 border-r border-brand-borderSoft bg-brand-sunken/30 py-4 overflow-y-auto">
+      <div className="flex flex-col items-center gap-1.5">
+        {blocks.map((b, i) => {
+          const eff = getEffective(b);
+          const dotCls =
+            eff === "approved" ? "bg-emerald-500" :
+            eff === "ambiguity" ? "bg-amber-500" :
+            "bg-brand-hint";
+          const active = activeIdx === i;
+          return (
+            <button
+              key={b.id}
+              onClick={() => onSelect(i)}
+              className={`group flex h-8 w-9 items-center justify-center rounded-lg transition-all ${
+                active ? "bg-brand-surface shadow-card ring-1 ring-brand-border" : "hover:bg-brand-surface/60"
+              }`}
+              title={`Block ${i + 1} · ${eff}`}
+            >
+              <span className="flex items-center gap-1">
+                <span className={`h-1.5 w-1.5 rounded-full ${dotCls}`} />
+                <span className={`font-mono text-[0.625rem] font-medium ${active ? "text-brand-text" : "text-brand-muted"}`}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+// ── A single review block ───────────────────────────────────────────────────
+function ReviewBlock({ block, index, active, density, showDiff, decision, effective, onActivate, onApprove, onPickAlt, target }) {
+  const isAmb = block.status === "ambiguity";
+  const pick = decision?.pick ?? 0;
+  const targetText = block.alternatives ? block.alternatives[pick].text : block.target;
+
+  const borderCls =
+    active ? "border-brand-accent/50 shadow-[0_0_0_3px_rgba(13,123,110,0.06)]" :
+    effective === "approved" ? "border-emerald-200/60" :
+    effective === "ambiguity" ? "border-amber-200/60" :
+    "border-brand-border";
+
+  const compact = density === "compact";
+  const pad = compact ? "p-3" : density === "cozy" ? "p-6" : "p-5";
+
+  return (
+    <article
+      onClick={onActivate}
+      className={`rounded-2xl border bg-brand-surface transition-all cursor-pointer ${borderCls} ${pad}`}
+    >
+      {/* Header row */}
+      <header className="mb-3 flex items-center gap-3">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">
+          <span className={`h-1.5 w-1.5 rounded-full ${
+            effective === "approved" ? "bg-emerald-500" :
+            effective === "ambiguity" ? "bg-amber-500" :
+            "bg-brand-hint"
+          }`} />
+          B{String(index + 1).padStart(2, "0")}
+        </span>
+        <div className="flex-1" />
+        <BlockStatusPill effective={effective} />
+        {block.insights?.filter((i) => i.kind === "memory").slice(0, 1).map((ins, i) => (
+          <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[0.625rem] font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+            <span className="font-mono">{Math.round((ins.confidence || 0.9) * 100)}%</span> memory
+          </span>
+        ))}
+      </header>
+
+      {/* Body — two columns */}
+      <div className="grid grid-cols-2 gap-5">
+        <div>
+          <p className="mb-1 flex items-center gap-1.5 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-subtle m-0">
+            Source · {lang("en").code}
+          </p>
+          {showDiff && block.alignment ? (
+            <AlignmentText segments={block.alignment} side="source" />
+          ) : (
+            <p className={`leading-relaxed text-brand-text m-0 ${compact ? "text-[0.8125rem]" : "text-[0.9375rem]"}`}>{block.source}</p>
+          )}
+        </div>
+        <div>
+          <p className="mb-1 flex items-center gap-1.5 font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-brand-accent m-0">
+            Target · {lang(target).code}
+          </p>
+          {showDiff && block.alignment ? (
+            <AlignmentText segments={block.alignment} side="target" />
+          ) : (
+            <p className={`leading-relaxed text-brand-text m-0 ${compact ? "text-[0.8125rem]" : "text-[0.9375rem]"}`}>{targetText}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Insights — only show in balanced/cozy */}
+      {!compact && block.insights && block.insights.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {block.insights.map((ins, i) => (
+            <InsightCard key={i} insight={ins} />
+          ))}
+        </div>
+      )}
+
+      {/* Ambiguity picker */}
+      {isAmb && block.alternatives && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+          <div className="mb-3 flex items-start gap-3">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 font-display text-[0.875rem] font-semibold tracking-display text-brand-text m-0">
+                Rumi flagged this one
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-medium uppercase tracking-[0.12em] text-amber-800">Ambiguity</span>
+              </p>
+              {block.agent_reasoning && (
+                <p className="mt-1 text-[0.8125rem] leading-relaxed text-brand-muted m-0">{block.agent_reasoning}</p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {block.alternatives.map((alt, i) => {
+              const selected = pick === i;
+              return (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); onPickAlt(i); }}
+                  className={`block w-full rounded-xl border text-left transition-all ${
+                    selected
+                      ? "border-brand-accent bg-brand-surface shadow-card"
+                      : "border-brand-border bg-brand-surface hover:border-brand-accent/40 hover:bg-brand-sunken/40"
+                  }`}
+                >
+                  <div className="flex items-start gap-3 p-3">
+                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${selected ? "bg-brand-accent text-white" : "bg-brand-sunken text-brand-muted"}`}>
+                      {selected ? <Icon.Check className="h-3 w-3" /> : <span className="font-mono text-[0.625rem]">{i + 1}</span>}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[0.875rem] leading-relaxed text-brand-text m-0">{alt.text}</p>
+                      <p className="mt-1 flex items-center gap-1.5 text-[0.6875rem] text-brand-muted m-0">
+                        {alt.recommended && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-brand-accentSoft px-1.5 py-0 font-mono text-[0.5625rem] font-medium uppercase tracking-[0.1em] text-brand-accent">
+                            Rumi's pick
+                          </span>
+                        )}
+                        <span className="italic">{alt.tone}</span>
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Footer actions */}
+      {effective !== "approved" && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-[0.75rem] text-brand-subtle m-0">
+            <span className="font-mono rounded bg-brand-sunken px-1.5 py-0.5 text-brand-muted">↵</span> approve
+            {block.alternatives && <> · <span className="font-mono rounded bg-brand-sunken px-1.5 py-0.5 text-brand-muted">1–{block.alternatives.length}</span> pick alt</>}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] font-medium text-brand-muted hover:text-brand-text hover:bg-brand-sunken transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onApprove(pick); }}
+              className="flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1 text-[0.75rem] font-medium text-white hover:bg-brand-accent transition-colors"
+            >
+              <Icon.Check className="h-3 w-3" /> Approve
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ── Block status pill ───────────────────────────────────────────────────────
+function BlockStatusPill({ effective }) {
+  if (effective === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[0.6875rem] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+        <Icon.Check className="h-2.5 w-2.5" /> Approved
+      </span>
+    );
+  }
+  if (effective === "ambiguity") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[0.6875rem] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+        Needs your call
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-brand-sunken px-2.5 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
+      Pending
+    </span>
+  );
+}
+
+// ── Insight card ────────────────────────────────────────────────────────────
+function InsightCard({ insight }) {
+  const cfg = {
+    glossary: {
+      icon: (
+        <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 2h7a2 2 0 0 1 2 2v8.5"/><path d="M3 2v9a1 1 0 0 0 1 1h8"/><path d="M5 5h4M5 7h3"/></svg>
+      ),
+      label: "Glossary",
+      chipCls: "bg-violet-50 text-violet-700 ring-violet-200",
+    },
+    memory: {
+      icon: (
+        <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2" y="2" width="10" height="10" rx="1.5"/><path d="M4 6h6M4 8h5"/></svg>
+      ),
+      label: "Memory",
+      chipCls: "bg-blue-50 text-blue-700 ring-blue-200",
+    },
+    ambiguity: {
+      icon: <Icon.Sparkle className="h-3 w-3" />,
+      label: "Ambiguity",
+      chipCls: "bg-amber-50 text-amber-700 ring-amber-200",
+    },
+  }[insight.kind] || { icon: null, label: insight.kind, chipCls: "bg-brand-sunken text-brand-muted ring-brand-border" };
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-brand-borderSoft bg-brand-sunken/30 p-3">
+      <span className={`mt-0.5 inline-flex shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-[0.625rem] font-medium ring-1 ring-inset ${cfg.chipCls}`}>
+        <span className="mr-1">{cfg.icon}</span>
+        {cfg.label}
+      </span>
+      <div className="min-w-0 flex-1">
+        {insight.term && (
+          <p className="font-mono text-[0.75rem] font-medium text-brand-text m-0">{insight.term}</p>
+        )}
+        <p className="text-[0.75rem] leading-relaxed text-brand-muted m-0">{insight.note}</p>
+      </div>
+      {insight.confidence != null && insight.confidence > 0 && (
+        <span className="shrink-0 font-mono text-[0.6875rem] font-medium text-brand-muted">
+          {Math.round(insight.confidence * 100)}%
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Alignment text — tokens rendered as linked chips for EN↔XX diff ─────────
+function AlignmentText({ segments, side }) {
+  const [hovered, setHovered] = useState(null);
+  return (
+    <p className="m-0 text-[0.9375rem] leading-[1.9] text-brand-text">
+      {segments.map((seg, i) => {
+        const word = side === "source" ? seg.s : seg.t;
+        const isGlossary = seg.glossary;
+        const isHovered = hovered === i;
+        return (
+          <React.Fragment key={i}>
+            <span
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+              className={`inline-block rounded px-0.5 transition-all cursor-default ${
+                isHovered ? "bg-brand-accentSoft text-brand-accent" : ""
+              } ${isGlossary ? "underline decoration-violet-400 decoration-2 underline-offset-[3px]" : ""}`}
+            >
+              {word}
+            </span>
+            {i < segments.length - 1 && " "}
+          </React.Fragment>
+        );
+      })}
+    </p>
+  );
+}
+
+// ── Keyboard hint footer ────────────────────────────────────────────────────
+function KeyboardHint() {
+  return (
+    <footer className="shrink-0 border-t border-brand-borderSoft bg-brand-surface/80 backdrop-blur">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-10 py-2 text-[0.6875rem] text-brand-muted">
+        <div className="flex items-center gap-4">
+          <Kbd>↑↓</Kbd> Move
+          <Kbd>↵</Kbd> Approve
+          <Kbd>1-9</Kbd> Pick alternative
+        </div>
+        <p className="m-0">Changes are saved as you go · Rumi learns from your picks</p>
+      </div>
+    </footer>
+  );
+}
+
+function Kbd({ children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 mr-1">
+      <span className="font-mono rounded border border-brand-border bg-brand-surface px-1.5 py-0.5 text-[0.625rem] font-medium text-brand-text shadow-card">{children}</span>
+    </span>
+  );
+}
+
+Object.assign(window, { TranslationReviewView });
+
+
+// ===== app.jsx =====
+// Main app — state + routing + Tweaks panel
+
+function App() {
+  const initialState = {
+    view: "dashboard", // "dashboard" | "documents" | "projects" | "project" | "autopilot" | "review"
+    projectId: null,
+    reviewJobId: null,
+    projects: window.HELVARA_DATA.projects,
+    modal: null, // "new-project" | "new-translation"
+    modalContext: null,
+    toast: null,
+    tweaksOpen: false,
+  };
+  const [state, setState] = useState(initialState);
+  // persist location
+  useEffect(() => {
+    const saved = localStorage.getItem("helvara_nav");
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        setState((s) => ({ ...s, view: p.view || "dashboard", projectId: p.projectId ?? null }));
+      } catch (e) {}
+    }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("helvara_nav", JSON.stringify({ view: state.view, projectId: state.projectId }));
+  }, [state.view, state.projectId]);
+
+  const dispatch = (a) => {
+    setState((s) => {
+      switch (a.type) {
+        case "NAVIGATE":         return { ...s, view: a.view, projectId: null, reviewJobId: null };
+        case "GO_PROJECTS":      return { ...s, view: "projects", projectId: null };
+        case "OPEN_PROJECT":     return { ...s, view: "project", projectId: a.id };
+        case "OPEN_REVIEW":      return { ...s, view: "review", reviewJobId: a.jobId };
+        case "OPEN_NEW_PROJECT": return { ...s, modal: "new-project" };
+        case "OPEN_NEW_TRANSLATION": return { ...s, modal: "new-translation", modalContext: { projectId: a.projectId } };
+        case "CLOSE_MODAL":      return { ...s, modal: null, modalContext: null };
+        case "TOAST":            return { ...s, toast: a.msg };
+        case "CREATE_PROJECT": {
+          const newP = {
+            id: Date.now(),
+            name: a.payload.name,
+            description: a.payload.description,
+            target_languages: a.payload.target_languages,
+            due_date: a.payload.due_date,
+            document_count: 0,
+            stats: { total_jobs: 0, completed_count: 0, in_review_count: 0, total_words: 0 },
+            documents: [],
+          };
+          return { ...s, projects: [newP, ...s.projects], modal: null, toast: `Project "${a.payload.name}" created` };
+        }
+        case "UPLOAD_TRANSLATION": {
+          const { projectId, file, languages } = a.payload;
+          const projects = s.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const newDocId = Date.now();
+            const newJobs = languages.map((target, i) => ({
+              id: newDocId + i, source: "en", target, status: "processing", ambiguities: 0, insights: 0, progress: 5, autopilot: true,
+            }));
+            const newDoc = { id: newDocId, name: file.name, words: 400, uploaded: "2026-04-22", jobs: newJobs };
+            return {
+              ...p,
+              document_count: p.document_count + 1,
+              documents: [newDoc, ...p.documents],
+              stats: { ...p.stats, total_jobs: p.stats.total_jobs + languages.length, total_words: p.stats.total_words + 400 },
+            };
+          });
+          return { ...s, projects, modal: null, toast: `Uploading "${file.name}" — ${languages.length} languages queued` };
+        }
+        case "TOGGLE_TWEAKS":    return { ...s, tweaksOpen: !s.tweaksOpen };
+        default: return s;
+      }
+    });
+  };
+
+  // Expose dispatch globally so leaf components (ReviewPeek) can route without prop-drilling
+  useEffect(() => { window.__helvaraDispatch = dispatch; }, []);
+
+  // Auto-clear toast
+  useEffect(() => {
+    if (!state.toast) return;
+    const t = setTimeout(() => setState((s) => ({ ...s, toast: null })), 3000);
+    return () => clearTimeout(t);
+  }, [state.toast]);
+
+  // Edit-mode protocol
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (e.data?.type === "__activate_edit_mode") setState((s) => ({ ...s, tweaksOpen: true }));
+      if (e.data?.type === "__deactivate_edit_mode") setState((s) => ({ ...s, tweaksOpen: false }));
+    };
+    window.addEventListener("message", onMsg);
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  return (
+    <>
+      <AppShell
+        active={state.view === "project" ? "projects" : state.view === "review" ? "autopilot" : state.view}
+        onGoHome={() => dispatch({ type: "NAVIGATE", view: "dashboard" })}
+        onNavigate={(key) => dispatch({ type: "NAVIGATE", view: key })}
+        onNewTranslation={() => dispatch({ type: "OPEN_NEW_TRANSLATION", projectId: null })}
+      >
+        <div data-screen-label={
+          state.view === "dashboard" ? "01 Dashboard"
+          : state.view === "documents" ? "02 Documents"
+          : state.view === "projects" ? "03 Projects"
+          : state.view === "project" ? "04 Project detail"
+          : state.view === "autopilot" ? "05 Autopilot"
+          : "06 Translation review"
+        } className={state.view === "review" ? "h-full" : ""}>
+          {state.view === "dashboard" && <DashboardView state={state} dispatch={dispatch} />}
+          {state.view === "documents" && <DocumentsView state={state} dispatch={dispatch} />}
+          {state.view === "projects" && <ProjectsView state={state} dispatch={dispatch} />}
+          {state.view === "project" && <ProjectDetailView state={state} dispatch={dispatch} />}
+          {state.view === "autopilot" && <AutopilotView state={state} dispatch={dispatch} />}
+          {state.view === "review" && <TranslationReviewView state={state} dispatch={dispatch} />}
+        </div>
+      </AppShell>
+
+      <NewProjectModal
+        open={state.modal === "new-project"}
+        onClose={() => dispatch({ type: "CLOSE_MODAL" })}
+        onCreate={(payload) => dispatch({ type: "CREATE_PROJECT", payload })}
+      />
+      <NewTranslationModal
+        open={state.modal === "new-translation"}
+        onClose={() => dispatch({ type: "CLOSE_MODAL" })}
+        projects={state.projects}
+        projectId={state.modalContext?.projectId}
+        onUpload={(payload) => dispatch({ type: "UPLOAD_TRANSLATION", payload })}
+      />
+
+      <Toast message={state.toast} />
+      {state.tweaksOpen && <TweaksPanel />}
+    </>
+  );
+}
+
+// ── Tweaks panel ────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#0D7B6E",
+  "density": "comfortable",
+  "insightStyle": "inline",
+  "autopilotBanner": true
+}/*EDITMODE-END*/;
+
+const ACCENTS = [
+  { label: "Helvara Teal", value: "#0D7B6E", hov: "#0A6459", mid: "#E6F4F2" },
+  { label: "Editorial Ink", value: "#1D3557", hov: "#152b47", mid: "#E7ECF2" },
+  { label: "Terracotta",   value: "#B04A2E", hov: "#913B23", mid: "#F6E6DF" },
+  { label: "Aubergine",    value: "#5B2B5F", hov: "#48224b", mid: "#EDE3EE" },
+];
+
+function TweaksPanel() {
+  const [accent, setAccent] = useState(TWEAK_DEFAULTS.accent);
+  const [density, setDensity] = useState(TWEAK_DEFAULTS.density);
+
+  useEffect(() => {
+    const a = ACCENTS.find((x) => x.value === accent) || ACCENTS[0];
+    const root = document.documentElement;
+    root.style.setProperty("--brand-accent", a.value);
+    root.style.setProperty("--brand-accent-hov", a.hov);
+    root.style.setProperty("--brand-accent-mid", a.mid);
+    root.style.setProperty("--brand-accent-soft", a.mid + "80"); // rough soft tint
+  }, [accent]);
+
+  useEffect(() => {
+    document.documentElement.dataset.density = density;
+  }, [density]);
+
+  const set = (key, val) => window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { [key]: val } }, "*");
+
+  return (
+    <div className="fixed bottom-5 right-5 z-[60] w-[280px] rounded-[22px] border border-brand-border bg-brand-surface/95 backdrop-blur-md p-5 shadow-raised animate-scalein">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-subtle m-0">Design</p>
+          <p className="mt-0.5 font-display text-[1rem] font-semibold tracking-display text-brand-text m-0">Tweaks</p>
+        </div>
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-accentSoft text-brand-accent">
+          <Icon.Sparkle className="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      <div className="mb-4">
+        <p className="mb-2 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-muted m-0">Accent</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.value}
+              onClick={() => { setAccent(a.value); set("accent", a.value); }}
+              className={`relative h-11 rounded-xl transition-all ${
+                accent === a.value
+                  ? "ring-2 ring-brand-text ring-offset-2 ring-offset-brand-surface"
+                  : "ring-1 ring-brand-border hover:ring-brand-hint"
+              }`}
+              style={{ background: a.value }}
+              title={a.label}
+              aria-label={a.label}
+            >
+              {accent === a.value && (
+                <span className="absolute inset-0 flex items-center justify-center text-white">
+                  <Icon.Check className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-muted m-0">Density</p>
+        <div className="flex gap-1 rounded-full bg-brand-sunken p-1">
+          {["comfortable", "compact"].map((d) => (
+            <button
+              key={d}
+              onClick={() => { setDensity(d); set("density", d); }}
+              className={`flex-1 rounded-full px-3 py-1.5 text-[0.75rem] font-medium transition-all ${
+                density === d
+                  ? "bg-brand-surface text-brand-text shadow-card"
+                  : "text-brand-muted hover:text-brand-text"
+              }`}
+            >
+              {d[0].toUpperCase() + d.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+
+
+  </script>
+</body>
+</html>
