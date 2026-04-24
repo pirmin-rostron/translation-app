@@ -1142,6 +1142,44 @@ function TranslationReviewPageInner() {
     );
   }
 
+  // Activate a block by segment ID and apply an ambiguity choice in one action.
+  // Used by DocumentDiffPane when clicking an option card on an inactive block.
+  function handleBlockActivateAndChoose(segmentId: number, choiceIdx: number) {
+    // Look up the segment and its options from blocks state
+    let targetSegment: ReviewSegment | null = null;
+    for (const block of blocks) {
+      const seg = block.segments.find((s) => s.id === segmentId);
+      if (seg) { targetSegment = seg; break; }
+    }
+    // Activate the block
+    setSelectedId(segmentId);
+    // Set the choice index
+    setAmbiguityChoiceIndex(choiceIdx);
+    setIsAmbiguityChoiceUserSelected(true);
+    setPrevAmbiguityChoiceIndex(null);
+    setMessage("");
+    setError("");
+    // Apply the translation if possible
+    if (!targetSegment) return;
+    const details = getAmbiguityChoiceDetails(targetSegment);
+    const option = details.options[choiceIdx];
+    if (!option) return;
+    const [updatedTranslation, fallbackTriggered] = applyAmbiguityChoiceToSegment(targetSegment, option.translation);
+    if (fallbackTriggered) {
+      setError("Could not apply this choice automatically — please edit the translation manually.");
+      return;
+    }
+    setDraftTranslation(updatedTranslation);
+    setBlocks((currentBlocks) =>
+      currentBlocks.map((block) => ({
+        ...block,
+        segments: block.segments.map((segment) =>
+          segment.id === segmentId ? { ...segment, final_translation: updatedTranslation } : segment
+        ),
+      }))
+    );
+  }
+
   function handleSemanticChoiceChange(value: SemanticChoiceOption) {
     setSemanticChoice(value);
     if (!selectedSegment) return;
@@ -1944,6 +1982,7 @@ function TranslationReviewPageInner() {
           density={density === "alignment" ? "cozy" : density}
           ambiguityChoiceIndex={ambiguityChoiceIndex}
           onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
+          onBlockActivateAndChoose={handleBlockActivateAndChoose}
           onApproveCurrentBlock={handleApproveCurrentBlock}
           onToggleEdit={handleToggleEdit}
           isReadOnly={isReadOnly}

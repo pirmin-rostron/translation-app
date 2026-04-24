@@ -62,6 +62,7 @@ type DocumentDiffPaneProps = {
   density?: "cozy" | "balanced" | "compact";
   ambiguityChoiceIndex: number | null;
   onAmbiguityChoiceChange: (idx: number) => void;
+  onBlockActivateAndChoose: (segmentId: number, choiceIdx: number) => void;
   onApproveCurrentBlock: () => void;
   onToggleEdit: () => void;
   isReadOnly: boolean;
@@ -153,6 +154,7 @@ export function DocumentDiffPane({
   density = "balanced",
   ambiguityChoiceIndex,
   onAmbiguityChoiceChange,
+  onBlockActivateAndChoose,
   onApproveCurrentBlock,
   onToggleEdit,
   isReadOnly,
@@ -319,8 +321,16 @@ export function DocumentDiffPane({
                             <button
                               key={i}
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); if (isActive && !isReadOnly) onAmbiguityChoiceChange(i); }}
-                              disabled={!isActive || isReadOnly}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isReadOnly) return;
+                                if (!isActive && ambSegment) {
+                                  onBlockActivateAndChoose(ambSegment.id, i);
+                                } else {
+                                  onAmbiguityChoiceChange(i);
+                                }
+                              }}
+                              disabled={isReadOnly}
                               className={`w-full rounded-xl border p-3 text-left transition-colors ${
                                 isSelected
                                   ? "border-brand-accent bg-brand-accentSoft"
