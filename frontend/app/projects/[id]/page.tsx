@@ -9,12 +9,12 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../stores/authStore";
 import { useDashboardStore } from "../../stores/dashboardStore";
-import { projectsApi, translationJobsApi, documentsApi } from "../../services/api";
+import { projectsApi, documentsApi, queryKeys } from "../../services/api";
 import type {
   ProjectDetailResponse,
-  ProjectStatsResponse,
   TranslationJobListItem,
 } from "../../services/api";
 import { AppShell } from "../../components/AppShell";
@@ -28,7 +28,7 @@ import {
   getLanguageDisplayName,
   getLanguageFlag,
 } from "../../utils/language";
-import { useReviewBlocks } from "../../hooks/queries";
+import { useReviewBlocks, useProjectDetail, useProjectStats, useProjectJobs } from "../../hooks/queries";
 import type { ReviewBlock as ApiReviewBlock, ReviewSegment } from "../../hooks/queries";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -400,13 +400,12 @@ function EditProjectModal({
   open,
   onClose,
   project,
-  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   project: ProjectDetailResponse;
-  onSaved: (updated: ProjectDetailResponse) => void;
 }) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [dueDate, setDueDate] = useState(project.due_date ?? "");
@@ -435,8 +434,8 @@ function EditProjectModal({
         description: description.trim() || undefined,
         due_date: dueDate || undefined,
       });
-      const refreshed = await projectsApi.get(project.id);
-      onSaved(refreshed);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(project.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update project");
@@ -512,16 +511,16 @@ function EditProjectModal({
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
   const projectId = Number(params.id);
 
-  const [project, setProject] = useState<ProjectDetailResponse | null>(null);
-  const [jobs, setJobs] = useState<TranslationJobListItem[]>([]);
-  const [stats, setStats] = useState<ProjectStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { data: project, isLoading: projectLoading, error: projectError } = useProjectDetail(projectId);
+  const { data: jobs = [] } = useProjectJobs(projectId);
+  const { data: stats } = useProjectStats(projectId);
+
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -531,15 +530,10 @@ export default function ProjectPage() {
   const [docDeleteTarget, setDocDeleteTarget] = useState<number | null>(null);
   const [docDeleteLoading, setDocDeleteLoading] = useState(false);
 
-  function reloadProjectData() {
-    if (!token || Number.isNaN(projectId)) return;
-    Promise.all([
-      projectsApi.get(projectId),
-      translationJobsApi.listByProject(projectId),
-      projectsApi.stats(projectId),
-    ])
-      .then(([proj, jobList, s]) => { setProject(proj); setJobs(jobList); setStats(s); })
-      .catch(() => {});
+  function invalidateProjectData() {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.projects.jobs(projectId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.projects.stats(projectId) });
   }
 
   function toggleDocCollapse(docName: string) {
@@ -556,7 +550,7 @@ export default function ProjectPage() {
     try {
       await documentsApi.delete(docId);
       setToastMessage("Document deleted");
-      reloadProjectData();
+      invalidateProjectData();
     } catch (err) {
       console.error("[delete-doc]", err);
     } finally {
@@ -587,25 +581,9 @@ export default function ProjectPage() {
     return () => clearTimeout(t);
   }, [toastMessage]);
 
-  useEffect(() => {
-    if (!token || Number.isNaN(projectId)) return;
-    Promise.all([
-      projectsApi.get(projectId),
-      translationJobsApi.listByProject(projectId),
-      projectsApi.stats(projectId),
-    ])
-      .then(([proj, jobList, s]) => {
-        setProject(proj);
-        setJobs(jobList);
-        setStats(s);
-      })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load project"))
-      .finally(() => setLoading(false));
-  }, [projectId, token]);
-
   if (!hasHydrated || !token) return null;
-  if (loading) return <AppShell><div className="px-8 py-10 text-brand-muted">Loading…</div></AppShell>;
-  if (error) return <AppShell><div className="px-8 py-10 text-status-error">{error}</div></AppShell>;
+  if (projectLoading) return <AppShell><div className="px-8 py-10 text-brand-muted">Loading…</div></AppShell>;
+  if (projectError) return <AppShell><div className="px-8 py-10 text-status-error">{projectError instanceof Error ? projectError.message : "Failed to load project"}</div></AppShell>;
   if (!project) return <AppShell><div className="px-8 py-10 text-status-error">Project not found</div></AppShell>;
 
   const docGroups = groupByDocument(jobs);
@@ -805,7 +783,6 @@ export default function ProjectPage() {
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}
         project={project}
-        onSaved={(updated) => setProject(updated)}
       />
       <ConfirmDialog
         open={deleteConfirmOpen}

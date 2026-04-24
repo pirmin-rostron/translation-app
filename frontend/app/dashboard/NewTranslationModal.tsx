@@ -250,13 +250,11 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
         trackEvent("document_uploaded", { language: targetLang, mode: autopilot, has_project: !!selectedProjectId });
         void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
         void queryClient.invalidateQueries({ queryKey: queryKeys.documents.all() });
-        void queryClient.invalidateQueries({ queryKey: ["projects"] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
         handleClose();
         const docId = result?.id;
         if (selectedProjectId) {
-          // Project detail page uses useEffect + direct API calls (not React Query),
-          // so a hard reload is needed to pick up the new document.
-          window.location.href = `/projects/${selectedProjectId}`;
+          router.push(`/projects/${selectedProjectId}`);
         } else if (docId) {
           router.push(`/documents/${docId}`);
         }

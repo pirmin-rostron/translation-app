@@ -79,6 +79,12 @@ export const queryKeys = {
     reviewSummary: (id: number) => ["translation-jobs", id, "review-summary"] as const,
     exports: (id: number) => ["translation-jobs", id, "exports"] as const,
   },
+  projects: {
+    all: () => ["projects"] as const,
+    detail: (id: number) => ["projects", id] as const,
+    stats: (id: number) => ["projects", id, "stats"] as const,
+    jobs: (id: number) => ["projects", id, "jobs"] as const,
+  },
   glossaryTerms: {
     all: () => ["glossary-terms"] as const,
   },
