@@ -94,6 +94,8 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
   const panelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  // Guards against spurious resets when projects refetch while the modal is open
+  const initializedRef = useRef(false);
 
   const [stage, setStage] = useState<Stage>("form");
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -107,9 +109,14 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
   const [error, setError] = useState("");
   const [tickerSteps, setTickerSteps] = useState<string[]>([]);
 
-  // ── Reset on open ─────────────────────────────────────────────────────
+  // ── Reset on open (only on false→true transition) ─────────────────────
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     triggerRef.current = document.activeElement as HTMLElement;
     setStage("form");
     setFiles([]);
