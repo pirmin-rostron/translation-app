@@ -1942,6 +1942,13 @@ function TranslationReviewPageInner() {
           targetLanguageLabel={targetLanguageLabel}
           canvasRef={canvasRef}
           density={density === "alignment" ? "cozy" : density}
+          ambiguityChoiceIndex={ambiguityChoiceIndex}
+          onAmbiguityChoiceChange={handleAmbiguityChoiceChange}
+          onApproveCurrentBlock={handleApproveCurrentBlock}
+          onToggleEdit={handleToggleEdit}
+          isReadOnly={isReadOnly}
+          actionLoading={actionLoading}
+          primaryActionDisabled={primaryActionDisabled}
         />
 
       </div>

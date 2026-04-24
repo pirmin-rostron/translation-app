@@ -60,6 +60,13 @@ type DocumentDiffPaneProps = {
   targetLanguageLabel: string;
   canvasRef?: Ref<HTMLElement>;
   density?: "cozy" | "balanced" | "compact";
+  ambiguityChoiceIndex: number | null;
+  onAmbiguityChoiceChange: (idx: number) => void;
+  onApproveCurrentBlock: () => void;
+  onToggleEdit: () => void;
+  isReadOnly: boolean;
+  actionLoading: boolean;
+  primaryActionDisabled: boolean;
 };
 
 function deriveBlockState(segments: SegmentRef[]): "approved" | "edited" | "ambiguity" | "pending" {
@@ -144,6 +151,13 @@ export function DocumentDiffPane({
   targetLanguageLabel,
   canvasRef,
   density = "balanced",
+  ambiguityChoiceIndex,
+  onAmbiguityChoiceChange,
+  onApproveCurrentBlock,
+  onToggleEdit,
+  isReadOnly,
+  actionLoading,
+  primaryActionDisabled,
 }: DocumentDiffPaneProps) {
   const activeIndex = displayedNodes.findIndex((node) => {
     const segments = node.block?.segments ?? [];
@@ -299,47 +313,67 @@ export function DocumentDiffPane({
                         </div>
                       </div>
                       <div className="space-y-2">
-                        {ambOptions.map((alt, i) => (
-                          <div
-                            key={i}
-                            className="rounded-xl border border-brand-border bg-brand-surface p-3 hover:border-brand-accent/40 hover:bg-brand-sunken/40"
-                          >
-                            <div className="flex items-start gap-3">
-                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-sunken text-brand-muted">
-                                <span className="font-mono text-[0.625rem]">{i + 1}</span>
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="m-0 text-[0.875rem] leading-relaxed text-brand-text">{alt.translation}</p>
-                                <p className="m-0 mt-1 text-[0.6875rem] italic text-brand-muted">{alt.meaning}</p>
+                        {ambOptions.map((alt, i) => {
+                          const isSelected = isActive && ambiguityChoiceIndex === i;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (isActive && !isReadOnly) onAmbiguityChoiceChange(i); }}
+                              disabled={!isActive || isReadOnly}
+                              className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                                isSelected
+                                  ? "border-brand-accent bg-brand-accentSoft"
+                                  : "border-brand-border bg-white hover:border-brand-hint"
+                              } disabled:cursor-default`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {isSelected ? (
+                                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-accent text-white">
+                                    <Icons.Check className="h-2.5 w-2.5" />
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-sunken text-brand-muted">
+                                    <span className="font-mono text-[0.625rem]">{i + 1}</span>
+                                  </span>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="m-0 text-[0.875rem] leading-relaxed text-brand-text">{alt.translation}</p>
+                                  <p className="m-0 mt-1 text-[0.6875rem] italic text-brand-muted">{alt.meaning}</p>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
                   {/* Footer actions — only for non-approved blocks */}
-                  {blockState !== "approved" && (
+                  {blockState !== "approved" && isActive && !isReadOnly && (
                     <div className="mt-4 flex items-center justify-between">
-                      <p className="m-0 text-[0.75rem] text-brand-subtle">
-                        <span className="rounded bg-brand-sunken px-1.5 py-0.5 font-mono text-brand-muted">↵</span> approve
-                        {ambOptions.length > 1 && (
-                          <> · <span className="rounded bg-brand-sunken px-1.5 py-0.5 font-mono text-brand-muted">1–{ambOptions.length}</span> pick alt</>
-                        )}
+                      <p className={`m-0 text-[0.75rem] ${ambOptions.length > 1 && ambiguityChoiceIndex === null ? "text-brand-muted" : "text-brand-text"}`}>
+                        {ambOptions.length > 1
+                          ? ambiguityChoiceIndex !== null
+                            ? `Option ${ambiguityChoiceIndex + 1} selected`
+                            : "Select an option above to approve"
+                          : <><span className="rounded bg-brand-sunken px-1.5 py-0.5 font-mono text-brand-muted">↵</span> approve</>
+                        }
                       </p>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={(e) => e.stopPropagation()}
-                          className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] font-medium text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text"
+                          onClick={(e) => { e.stopPropagation(); onToggleEdit(); }}
+                          disabled={actionLoading}
+                          className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-[0.75rem] font-medium text-brand-muted transition-colors hover:bg-brand-sunken hover:text-brand-text disabled:opacity-50"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1 text-[0.75rem] font-medium text-white transition-colors hover:bg-brand-accent"
+                          onClick={(e) => { e.stopPropagation(); onApproveCurrentBlock(); }}
+                          disabled={primaryActionDisabled || (ambOptions.length > 1 && ambiguityChoiceIndex === null)}
+                          className="flex items-center gap-1 rounded-full bg-brand-text px-3.5 py-1 text-[0.75rem] font-medium text-white transition-colors hover:bg-brand-accent disabled:opacity-40"
                         >
                           <Icons.Check className="h-3 w-3" /> Approve
                         </button>
