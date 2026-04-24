@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * NewProjectModal — create a project with name, description, target languages,
- * optional due date, and optional file upload. Every document uploaded to the
- * project will be translated into all selected languages (fan-out).
+ * NewProjectModal — create a project with name, description,
+ * optional due date, and optional file upload.
+ * Projects are containers only — language selection happens per-job at upload time.
  */
 
 import { useRef, useState } from "react";
@@ -13,7 +13,6 @@ import { useDashboardStore } from "../stores/dashboardStore";
 import { projectsApi } from "../services/api";
 import type { ProjectResponse } from "../services/api";
 import { ModalOverlay } from "./ModalOverlay";
-import { PROJECT_LANGUAGE_OPTIONS } from "../utils/language";
 import { trackEvent } from "../utils/analytics";
 
 const ALLOWED_EXTS = new Set(["docx", "txt", "rtf"]);
@@ -28,21 +27,11 @@ export function NewProjectModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedLangs, setSelectedLangs] = useState<Set<string>>(new Set());
   const [dueDate, setDueDate] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  function toggleLang(code: string) {
-    setSelectedLangs((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  }
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -60,7 +49,7 @@ export function NewProjectModal() {
     setFile(f);
   }
 
-  const canSubmit = name.trim().length > 0 && selectedLangs.size > 0 && !submitting;
+  const canSubmit = name.trim().length > 0 && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -70,11 +59,10 @@ export function NewProjectModal() {
       const created = await projectsApi.create({
         name: name.trim(),
         description: description.trim() || undefined,
-        target_languages: Array.from(selectedLangs),
         due_date: dueDate || undefined,
       }) as ProjectResponse;
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      trackEvent("project_created", { language_count: selectedLangs.size });
+      trackEvent("project_created", {});
       const projectId = created.id;
       const pendingFile = file;
       handleClose();
@@ -96,7 +84,6 @@ export function NewProjectModal() {
   function handleClose() {
     setName("");
     setDescription("");
-    setSelectedLangs(new Set());
     setDueDate("");
     setFile(null);
     setError("");
@@ -113,7 +100,7 @@ export function NewProjectModal() {
             New Project
           </h2>
           <p className="mt-1 text-sm text-brand-muted">
-            Group documents and target languages together
+            Group documents and translation jobs together
           </p>
         </div>
         <button
@@ -151,36 +138,6 @@ export function NewProjectModal() {
           rows={2}
           className="w-full resize-none rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle transition-colors"
         />
-      </div>
-
-      {/* Target languages — multi-select pill grid */}
-      <div className="mb-4">
-        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
-          Translate into <span className="text-status-error">*</span>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {PROJECT_LANGUAGE_OPTIONS.map((lang) => {
-            const selected = selectedLangs.has(lang.code);
-            return (
-              <button
-                key={lang.code}
-                type="button"
-                onClick={() => toggleLang(lang.code)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  selected
-                    ? "border border-brand-accent bg-brand-accentMid font-semibold text-brand-accent"
-                    : "border border-brand-border bg-brand-surface text-brand-muted hover:border-brand-accent/40"
-                }`}
-              >
-                {selected && <span className="mr-1">✓</span>}
-                {lang.flag} {lang.label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-1.5 text-xs text-brand-subtle">
-          Every document uploaded to this project will be translated into all selected languages.
-        </p>
       </div>
 
       {/* Due date */}

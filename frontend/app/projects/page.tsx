@@ -15,7 +15,6 @@ import type { ProjectResponse, ProjectStatsResponse } from "../services/api";
 import { AppShell } from "../components/AppShell";
 import { NewProjectModal } from "../dashboard/NewProjectModal";
 import { Icons } from "../components/Icons";
-import { getLanguageCode, getLanguageDisplayName } from "../utils/language";
 
 // ── Status badge derivation ─────────────────────────────────────────────────
 
@@ -121,15 +120,6 @@ function ProjectCard({ project, stats, onOpen }: {
         )}
       </div>
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
-        {project.target_languages.map((l) => (
-          <span key={l} className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-brand-sunken/60 px-2 py-0.5 text-[0.6875rem] font-medium text-brand-muted">
-            <span className="font-mono text-brand-text">{getLanguageCode(l)}</span>
-            <span>{getLanguageDisplayName(l).replace(/\s*\(.+\)$/, "")}</span>
-          </span>
-        ))}
-      </div>
-
       <div className="mt-5 grid grid-cols-4 gap-2 rounded-xl bg-brand-sunken/50 p-3">
         <StatMicro value={project.document_count} label="Docs" />
         <StatMicro value={totalWords.toLocaleString()} label="Words" />
@@ -229,7 +219,7 @@ export default function ProjectsPage() {
               Projects
             </h1>
             <p className="m-0 mt-2.5 max-w-xl text-[0.9375rem] text-brand-muted">
-              Containers for documents, target languages, and translation jobs.
+              Containers for documents and translation jobs.
             </p>
           </div>
           <button

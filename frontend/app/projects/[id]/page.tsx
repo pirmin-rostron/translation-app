@@ -27,7 +27,6 @@ import {
   getLanguageCode,
   getLanguageDisplayName,
   getLanguageFlag,
-  PROJECT_LANGUAGE_OPTIONS,
 } from "../../utils/language";
 import { useReviewBlocks } from "../../hooks/queries";
 import type { ReviewBlock as ApiReviewBlock, ReviewSegment } from "../../hooks/queries";
@@ -410,7 +409,6 @@ function EditProjectModal({
 }) {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
-  const [selectedLangs, setSelectedLangs] = useState<Set<string>>(new Set(project.target_languages));
   const [dueDate, setDueDate] = useState(project.due_date ?? "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -419,23 +417,13 @@ function EditProjectModal({
     if (open) {
       setName(project.name);
       setDescription(project.description ?? "");
-      setSelectedLangs(new Set(project.target_languages));
       setDueDate(project.due_date ?? "");
       setError("");
       setSubmitting(false);
     }
   }, [open, project]);
 
-  function toggleLang(code: string) {
-    setSelectedLangs((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  }
-
-  const canSubmit = name.trim().length > 0 && selectedLangs.size > 0 && !submitting;
+  const canSubmit = name.trim().length > 0 && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -445,7 +433,6 @@ function EditProjectModal({
       await projectsApi.update(project.id, {
         name: name.trim(),
         description: description.trim() || undefined,
-        target_languages: Array.from(selectedLangs),
         due_date: dueDate || undefined,
       });
       const refreshed = await projectsApi.get(project.id);
@@ -489,32 +476,6 @@ function EditProjectModal({
           className="w-full resize-none rounded-lg border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none transition-colors focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20 placeholder:text-brand-subtle"
           placeholder="Optional"
         />
-      </div>
-
-      <div className="mb-4">
-        <label className="mb-1.5 block text-[0.8125rem] font-medium text-brand-muted">
-          Translate into <span className="text-status-error">*</span>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {PROJECT_LANGUAGE_OPTIONS.map((opt) => {
-            const sel = selectedLangs.has(opt.code);
-            return (
-              <button
-                key={opt.code}
-                type="button"
-                onClick={() => toggleLang(opt.code)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  sel
-                    ? "border-brand-accent bg-brand-accentMid font-semibold text-brand-accent"
-                    : "border-brand-border bg-brand-surface text-brand-muted hover:border-brand-accent/40"
-                }`}
-              >
-                {sel && <span className="mr-1">✓</span>}
-                {opt.flag} {opt.label}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       <div className="mb-4">
@@ -649,7 +610,6 @@ export default function ProjectPage() {
 
   const docGroups = groupByDocument(jobs);
   const totalDocs = project.document_count;
-  const totalLangs = project.target_languages.length;
   const totalJobs = stats?.total_jobs ?? 0;
   const completedCount = stats?.completed_count ?? 0;
   const inReviewCount = stats?.in_review_count ?? 0;
@@ -716,23 +676,18 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Target language pills + due date */}
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          {project.target_languages.map((lang) => (
-            <span key={lang} className="rounded-full bg-brand-accentMid px-3 py-1 text-xs font-medium text-brand-accent">
-              {getLanguageFlag(lang)} {getLanguageDisplayName(lang)}
-            </span>
-          ))}
-          {project.due_date && (
+        {/* Due date */}
+        {project.due_date && (
+          <div className="mb-5">
             <span className="rounded-full bg-status-warningBg px-3 py-1 text-xs font-medium text-status-warning">
               Due {new Date(project.due_date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="mb-6 grid grid-cols-4 gap-3">
-          <StatTile label="Total Jobs" value={totalJobs} meta={`${totalDocs} docs × ${totalLangs} languages`} />
+          <StatTile label="Total Jobs" value={totalJobs} meta={`${totalDocs} docs`} />
           <StatTile label="Completed" value={completedCount} valueClass="text-status-success" meta="Ready to export" />
           <StatTile label="Needs Review" value={inReviewCount} valueClass="text-brand-accent" meta="Awaiting you" />
           <StatTile label="Progress" value={`${progressPct}%`} meta={null} progress={progressPct} />

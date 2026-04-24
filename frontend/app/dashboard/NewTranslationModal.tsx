@@ -54,7 +54,7 @@ function kindStyle(ext: string): { backgroundColor: string; color: string } {
 
 function rumiRecommend(files: FileEntry[]): { mode: AutopilotMode; reason: string } {
   if (files.length === 0) {
-    return { mode: "autopilot", reason: "Based on this project's history (92% of jobs shipped without review)." };
+    return { mode: "autopilot", reason: "Drop a file and I'll recommend the best mode." };
   }
   const first = files[0];
   if (first.kind === "xliff" || first.kind === "md") {
@@ -63,7 +63,7 @@ function rumiRecommend(files: FileEntry[]): { mode: AutopilotMode; reason: strin
   if (first.words > 500) {
     return { mode: "review", reason: "Longer editorial copy. I'll draft everything and you review before export." };
   }
-  return { mode: "autopilot", reason: "Matches the shape of jobs you've autopiloted before." };
+  return { mode: "autopilot", reason: "Small file with straightforward content. Autopilot should handle this cleanly." };
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -118,22 +118,13 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
     setTone("brand");
     setDeadline("");
     setTickerSteps([]);
+    setLanguages(new Set());
     if (preselectedProjectId) {
       setSelectedProjectId(preselectedProjectId);
-      const proj = projects.find((p) => p.id === preselectedProjectId);
-      if (proj?.target_languages.length) setLanguages(new Set(proj.target_languages));
     } else {
       setSelectedProjectId(null);
-      setLanguages(new Set());
     }
   }, [open, preselectedProjectId, projects]);
-
-  // ── Inherit languages when project changes ────────────────────────────
-  useEffect(() => {
-    if (selectedProjectId == null) return;
-    const proj = projects.find((p) => p.id === selectedProjectId);
-    if (proj?.target_languages.length) setLanguages(new Set(proj.target_languages));
-  }, [selectedProjectId, projects]);
 
   // ── Rumi auto-recommend on files change (never override explicit user choice)
   useEffect(() => {
@@ -503,7 +494,7 @@ function FormStage({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="m-0 text-[0.8125rem] font-medium text-brand-text">{p.name}</p>
-                  <p className="m-0 text-[0.7rem] text-brand-muted">{p.document_count} document{p.document_count === 1 ? "" : "s"} · {p.target_languages.length} language{p.target_languages.length === 1 ? "" : "s"}</p>
+                  <p className="m-0 text-[0.7rem] text-brand-muted">{p.document_count} document{p.document_count === 1 ? "" : "s"}</p>
                 </div>
               </button>
             );

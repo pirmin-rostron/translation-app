@@ -21,7 +21,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 class ProjectCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    target_languages: list[str] = Field(default_factory=list)
+    target_languages: Optional[list[str]] = Field(default_factory=list)
     default_tone: str = "neutral"
     due_date: Optional[date] = None
 
@@ -50,7 +50,7 @@ class ProjectResponse(BaseModel):
     org_id: int
     name: str
     description: Optional[str] = None
-    target_languages: list[str]
+    target_languages: list[str] = Field(default_factory=list)
     default_tone: str
     due_date: Optional[date] = None
     document_count: int = 0
