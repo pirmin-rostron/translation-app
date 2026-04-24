@@ -126,6 +126,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
     setTone("brand");
     setDeadline("");
     setTickerSteps([]);
+    setSubmitting(false);
     setLanguages(new Set());
     if (preselectedProjectId) {
       setSelectedProjectId(preselectedProjectId);
@@ -633,7 +634,14 @@ function FormStage({
 
 // ── Starting Stage (ticker) ─────────────────────────────────────────────────
 
-function StartingStage({ files, tickerSteps, autopilot }: { files: FileEntry[]; tickerSteps: string[]; autopilot: AutopilotMode }) {
+function StartingStage({ files, tickerSteps, autopilot, error, submitting, onRetry }: {
+  files: FileEntry[];
+  tickerSteps: string[];
+  autopilot: AutopilotMode;
+  error: string;
+  submitting: boolean;
+  onRetry: () => void;
+}) {
   const totalSteps = 5;
   return (
     <div className="px-0 py-6">
@@ -643,23 +651,29 @@ function StartingStage({ files, tickerSteps, autopilot }: { files: FileEntry[]; 
         <div className="mb-4 flex items-center gap-3">
           <div className="relative">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-accent text-[0.875rem] font-medium text-white">R</span>
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-brand-surface">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent opacity-60" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-accent ring-2 ring-brand-surface" />
+            {!error && (
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-brand-surface">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-accent opacity-60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-accent ring-2 ring-brand-surface" />
+                </span>
               </span>
-            </span>
+            )}
           </div>
           <div>
-            <p className="m-0 font-display text-[1.25rem] font-semibold tracking-heading text-brand-text">Rumi is on it</p>
-            <p className="m-0 text-[0.8125rem] text-brand-muted">Starting your translation…</p>
+            <p className="m-0 font-display text-[1.25rem] font-semibold tracking-heading text-brand-text">
+              {error ? "Something went wrong" : "Rumi is on it"}
+            </p>
+            <p className="m-0 text-[0.8125rem] text-brand-muted">
+              {error ? "The upload couldn\u2019t be completed." : "Starting your translation\u2026"}
+            </p>
           </div>
         </div>
 
         {/* Steps */}
         <div aria-live="polite" className="space-y-2.5">
           {tickerSteps.map((step, i) => {
-            const isLast = i === tickerSteps.length - 1 && tickerSteps.length < totalSteps;
+            const isLast = i === tickerSteps.length - 1 && tickerSteps.length < totalSteps && !error;
             return (
               <div key={i} className="flex items-start gap-2.5" style={{ animation: "fadeIn 300ms ease-out" }}>
                 {isLast ? (
@@ -674,6 +688,21 @@ function StartingStage({ files, tickerSteps, autopilot }: { files: FileEntry[]; 
             );
           })}
         </div>
+
+        {/* Error + retry — shown inline below ticker steps */}
+        {error && (
+          <div className="mt-4 rounded-xl border border-status-error/30 bg-status-error/5 px-4 py-3">
+            <p className="m-0 text-[0.8125rem] text-status-error">{error}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={submitting}
+              className="mt-2 rounded-full bg-brand-accent px-4 py-1.5 text-[0.75rem] font-medium text-white transition-colors hover:bg-brand-accentHov disabled:opacity-50"
+            >
+              {submitting ? "Retrying\u2026" : "Try again"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

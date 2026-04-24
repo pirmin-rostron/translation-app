@@ -3,8 +3,8 @@
 /**
  * Homepage — Helvara marketing landing page.
  * Matches the prototype from Helvara Marketing.html.
- * Sections: Nav, Hero, Logos, Value Props, Autopilot Showcase,
- * Product Features (bento), Workflow, Testimonial, Pricing, FAQ, CTA, Footer.
+ * Sections: Nav, Hero, Value Props,
+ * Product Features (bento), Workflow, Pricing, FAQ, CTA, Footer.
  */
 
 import { useEffect, useState } from "react";
@@ -166,28 +166,6 @@ function Workflow() {
             <p className="mt-2 text-[0.875rem] leading-relaxed text-brand-muted">{s.body}</p>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-// ── Testimonial ─────────────────────────────────────────────────────────────
-
-function Testimonial() {
-  return (
-    <section className="mx-auto max-w-[1200px] px-8 py-20">
-      <div className="rounded-2xl border border-brand-border bg-brand-surface p-10 shadow-card">
-        <svg className="mb-4 h-8 w-8 text-brand-accent/60" viewBox="0 0 32 32" fill="currentColor"><path d="M6 18c0-3.3 2.7-6 6-6V8C6.5 8 2 12.5 2 18v8h12v-8H6zm18 0c0-3.3 2.7-6 6-6V8c-5.5 0-10 4.5-10 10v8h12v-8h-8z" /></svg>
-        <blockquote className="m-0 font-display text-[1.75rem] font-semibold leading-snug tracking-display text-brand-text">
-          Helvara did in two hours what our agency quoted as <em className="italic text-brand-accent">two weeks</em>. And the first line of feedback from our Madrid office was that it sounded like us.
-        </blockquote>
-        <div className="mt-6 flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent to-brand-accentHov font-display text-sm font-semibold text-white">MR</span>
-          <div>
-            <p className="m-0 text-sm font-medium text-brand-text">Maya Rivera</p>
-            <p className="m-0 text-xs text-brand-subtle">Head of Localization, Nova</p>
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -398,7 +376,6 @@ export default function HomePage() {
       <ValueProps />
       <ProductFeatures />
       <Workflow />
-      <Testimonial />
       <Pricing />
       <Faq />
       <CtaBanner />
