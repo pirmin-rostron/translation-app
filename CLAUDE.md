@@ -252,6 +252,18 @@ Do NOT comment obvious things (what a for loop does). DO comment architectural d
 - After any backend parser change, always run the parser against all three test RTF files (`basic_test.rtf`, `legal_test.rtf`, `messy_test.rtf`) and verify block output before finishing.
 - The frontend runs as a production Next.js build (`next build` + `next start`). `NEXT_PUBLIC_*` environment variables are baked into the bundle at build time — they are not available at runtime. Any new `NEXT_PUBLIC_*` var must be added to: (1) `/app/.env` on the server, (2) `docker-compose.yml` build args, (3) `frontend/Dockerfile` ARG and ENV declarations.
 
+### Feature List Check
+
+Before starting any build task, read the Helvara feature list at:
+`~/Documents/Projects/Helvara_obsidian_vault/Helvara/Feature-List.md`
+
+Use it to:
+- Confirm the feature being built is not already shipped (avoid duplicate work)
+- Confirm no "Not Built" features are being referenced or implied in UI copy
+- Flag if a build task would change the status of any listed item so the feature list can be updated after the build
+
+After completing any build task that adds, changes, or removes user-facing functionality, update Feature-List.md accordingly — move items between Shipped / In Progress / Stubbed / Known Issues as appropriate.
+
 ### Commit messages
 Every commit must include a descriptive body (not just a subject line) explaining:
 - What changed and why
@@ -314,6 +326,7 @@ This project uses a MemPalace MCP server as its persistent knowledge graph. Foll
 
 ### On Session End
 - Remind Pirmin to run `mempalace mine` so the palace indexes any new file changes from the session.
+- If any user-facing functionality was added, changed, or removed this session, remind Pirmin to verify Feature-List.md has been updated in Obsidian.
 
 ---
 

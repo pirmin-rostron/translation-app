@@ -372,25 +372,30 @@ export function useProjects() {
   });
 }
 
-export function useProjectDetail(id: number | undefined) {
+const ACTIVE_JOB_STATUSES = new Set([
+  "queued", "parsing", "translating", "translation_queued",
+  "pending", "in_review", "review",
+]);
+
+export function useProjectDetail(id: number | undefined, hasActiveJobs = false) {
   return useQuery<ProjectDetailResponse>({
     queryKey: queryKeys.projects.detail(id ?? 0),
     queryFn: () => projectsApi.get(id!),
     enabled: id != null && !Number.isNaN(id),
-    staleTime: 15_000,
-    refetchInterval: 20_000,
+    staleTime: hasActiveJobs ? 5_000 : 15_000,
+    refetchInterval: hasActiveJobs ? 5_000 : 20_000,
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });
 }
 
-export function useProjectStats(id: number | undefined) {
+export function useProjectStats(id: number | undefined, hasActiveJobs = false) {
   return useQuery<ProjectStatsResponse>({
     queryKey: queryKeys.projects.stats(id ?? 0),
     queryFn: () => projectsApi.stats(id!),
     enabled: id != null && !Number.isNaN(id),
-    staleTime: 15_000,
-    refetchInterval: 20_000,
+    staleTime: hasActiveJobs ? 5_000 : 15_000,
+    refetchInterval: hasActiveJobs ? 5_000 : 20_000,
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });
@@ -401,8 +406,12 @@ export function useProjectJobs(id: number | undefined) {
     queryKey: queryKeys.projects.jobs(id ?? 0),
     queryFn: () => translationJobsApi.listByProject(id!),
     enabled: id != null && !Number.isNaN(id),
-    staleTime: 15_000,
-    refetchInterval: 20_000,
+    staleTime: 5_000,
+    refetchInterval: (query) => {
+      const jobs = query.state.data;
+      if (jobs?.some((j) => ACTIVE_JOB_STATUSES.has(j.status))) return 5_000;
+      return 20_000;
+    },
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });

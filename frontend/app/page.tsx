@@ -79,21 +79,6 @@ function Hero() {
 
 // ── Logos Strip ──────────────────────────────────────────────────────────────
 
-const LOGOS = ["NOVA", "Atlas&Co", "Kintsugi", "Lumen", "Meridian", "Folio", "Orbital", "Parchment", "Sable", "Tellus"];
-
-function LogosStrip() {
-  return (
-    <section className="border-y border-brand-border py-8">
-      <p className="mb-4 text-center text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-brand-hint">Trusted by localization teams at</p>
-      <div className="flex items-center justify-center gap-12">
-        {LOGOS.map((name) => (
-          <span key={name} className="font-display text-[1.375rem] font-semibold text-brand-hint">{name}</span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 // ── Value Props ──────────────────────────────────────────────────────────────
 
 const VALUE_PROPS = [
@@ -410,7 +395,6 @@ export default function HomePage() {
     <div className="min-h-screen app-bg">
       <Nav />
       <Hero />
-      <LogosStrip />
       <ValueProps />
       <ProductFeatures />
       <Workflow />

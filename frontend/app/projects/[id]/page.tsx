@@ -517,9 +517,10 @@ export default function ProjectPage() {
   const openTranslationModal = useDashboardStore((s) => s.openTranslationModal);
   const projectId = Number(params.id);
 
-  const { data: project, isLoading: projectLoading, error: projectError } = useProjectDetail(projectId);
   const { data: jobs = [] } = useProjectJobs(projectId);
-  const { data: stats } = useProjectStats(projectId);
+  const hasActiveJobs = jobs.some((j) => ["queued", "parsing", "translating", "translation_queued", "pending", "in_review", "review"].includes(j.status));
+  const { data: project, isLoading: projectLoading, error: projectError } = useProjectDetail(projectId, hasActiveJobs);
+  const { data: stats } = useProjectStats(projectId, hasActiveJobs);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);

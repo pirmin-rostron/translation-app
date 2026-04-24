@@ -108,6 +108,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
   const [deadline, setDeadline] = useState("");
   const [error, setError] = useState("");
   const [tickerSteps, setTickerSteps] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   // ── Reset on open (only on false→true transition) ─────────────────────
   useEffect(() => {
@@ -210,9 +211,49 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
   const totalWords = files.reduce((s, f) => s + f.words, 0);
   const canSubmit = files.length > 0 && languages.size > 0 && selectedProjectId != null;
 
+  // Extracted so "Try again" can re-run the API call without re-running the ticker
+  async function submitUpload() {
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    const first = files[0];
+    const targetLang = Array.from(languages)[0];
+    try {
+      const fd = new FormData();
+      fd.append("file", first.file);
+      fd.append("source_language", "English");
+      fd.append("target_language", targetLang);
+      fd.append("translation_style", "natural");
+      fd.append("review_mode", autopilot);
+      if (tone) fd.append("tone", tone);
+      if (deadline) fd.append("due_date", deadline);
+      if (selectedProjectId != null) fd.append("project_id", String(selectedProjectId));
+      trackEvent("flow.upload_started", { target_language: targetLang, mode: autopilot });
+      const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
+      trackEvent("document_uploaded", { language: targetLang, mode: autopilot, has_project: !!selectedProjectId });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documents.all() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
+      handleClose();
+      const docId = result?.id;
+      if (selectedProjectId != null) {
+        router.push(`/projects/${selectedProjectId}`);
+      } else if (docId) {
+        router.push(`/documents/${docId}`);
+      }
+    } catch (err) {
+      // Stay on starting stage so error is visible in context (CLAUDE.md: no silent failures)
+      console.error("[NewTranslationModal] upload failed:", err);
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleStart() {
     if (!canSubmit) return;
     setStage("starting");
+    setError("");
 
     const first = files[0];
     const langNames = Array.from(languages).map((l) => getLanguageDisplayName(l)).join(", ");
@@ -239,37 +280,8 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
       }, elapsed);
     }
 
-    // After all steps + extra delay, submit and close
-    setTimeout(async () => {
-      try {
-        const fd = new FormData();
-        fd.append("file", first.file);
-        fd.append("source_language", "English");
-        const targetLang = Array.from(languages)[0];
-        fd.append("target_language", targetLang);
-        fd.append("translation_style", "natural");
-        fd.append("review_mode", autopilot);
-        if (tone) fd.append("tone", tone);
-        if (deadline) fd.append("due_date", deadline);
-        if (selectedProjectId) fd.append("project_id", String(selectedProjectId));
-        trackEvent("flow.upload_started", { target_language: targetLang, mode: autopilot });
-        const result = await documentsApi.uploadAndTranslate<{ id: number }>(fd);
-        trackEvent("document_uploaded", { language: targetLang, mode: autopilot, has_project: !!selectedProjectId });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.translationJobs.recent() });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.documents.all() });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
-        handleClose();
-        const docId = result?.id;
-        if (selectedProjectId) {
-          router.push(`/projects/${selectedProjectId}`);
-        } else if (docId) {
-          router.push(`/documents/${docId}`);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
-        setStage("form");
-      }
-    }, elapsed + 900);
+    // After all ticker steps complete, fire the actual API call
+    setTimeout(() => { void submitUpload(); }, elapsed + 900);
   }
 
   function handleClose() {
@@ -355,7 +367,7 @@ export function NewTranslationModal({ projects: projectsProp }: { projects: Proj
               openProjectModal={openProjectModal}
             />
           ) : (
-            <StartingStage files={files} tickerSteps={tickerSteps} autopilot={autopilot} />
+            <StartingStage files={files} tickerSteps={tickerSteps} autopilot={autopilot} error={error} submitting={submitting} onRetry={submitUpload} />
           )}
         </div>
 
