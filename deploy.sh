@@ -19,16 +19,11 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "=== Deploying Helvara ==="
 
 # ── Step 1: Build images locally (in parallel) ──────────────────────────────
+# Always build both images. Docker layer cache means unchanged code rebuilds in
+# seconds — no meaningful cost, and avoids the HEAD~1 detection bug that missed
+# multi-commit deploys.
 
 PLATFORM="linux/amd64"
-
-# Check if backend files changed since last deploy
-BACKEND_CHANGED=true
-if git diff HEAD~1 --name-only 2>/dev/null | grep -q "^backend/"; then
-  BACKEND_CHANGED=true
-else
-  BACKEND_CHANGED=false
-fi
 
 echo "--- Building frontend image locally (${PLATFORM}) ---"
 docker build --platform "$PLATFORM" \
@@ -38,14 +33,10 @@ docker build --platform "$PLATFORM" \
   --build-arg NEXT_PUBLIC_POSTHOG_HOST="${NEXT_PUBLIC_POSTHOG_HOST:-https://eu.i.posthog.com}" \
   -t app-frontend:latest "$PROJECT_DIR/frontend" &
 
-if [ "$BACKEND_CHANGED" = true ]; then
-  echo "--- Building backend image locally (${PLATFORM}) ---"
-  docker build --platform "$PLATFORM" \
-    --cache-from app-backend:latest \
-    -t app-backend:latest "$PROJECT_DIR/backend" &
-else
-  echo "--- Skipping backend build (no backend files changed) ---"
-fi
+echo "--- Building backend image locally (${PLATFORM}) ---"
+docker build --platform "$PLATFORM" \
+  --cache-from app-backend:latest \
+  -t app-backend:latest "$PROJECT_DIR/backend" &
 
 wait
 
@@ -54,12 +45,8 @@ wait
 echo "--- Transferring frontend image to server ---"
 docker save app-frontend:latest | gzip | $SSH "docker load"
 
-if [ "$BACKEND_CHANGED" = true ]; then
-  echo "--- Transferring backend image to server ---"
-  docker save app-backend:latest | gzip | $SSH "docker load"
-else
-  echo "--- Skipping backend image transfer (no changes) ---"
-fi
+echo "--- Transferring backend image to server ---"
+docker save app-backend:latest | gzip | $SSH "docker load"
 
 # ── Step 3: Pull code and restart on server ───────────────────────────────────
 
