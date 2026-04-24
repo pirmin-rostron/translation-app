@@ -1378,7 +1378,9 @@ function TranslationReviewPageInner() {
   function applyAmbiguityChoiceToSegment(segment: ReviewSegment, choiceTranslation: string): [string, boolean] {
     const selectedChoice = (choiceTranslation || "").trim();
     if (!selectedChoice) return [segment.final_translation || "", false];
-    const currentText = segment.final_translation || "";
+    // Always apply against the original primary_translation to prevent
+    // repeated string accumulation when re-selecting or re-applying choices.
+    const currentText = segment.primary_translation || segment.final_translation || "";
     if (!currentText.trim()) return [selectedChoice, false];
     const ambiguityAnnotation = segment.annotations.find((annotation) => annotation.annotation_type === "ambiguity");
     const hasTargetRange =
