@@ -168,7 +168,7 @@ function LoginPageContent() {
                 color: "rgba(232,245,226,0.9)",
                 marginBottom: "1.25rem",
               }}>
-                Translation your team can trust.
+                Translations your team can trust.
               </h2>
               <p style={{
                 fontFamily: "Inter, sans-serif",

@@ -192,6 +192,11 @@ export type TranslationJobListItem = {
   created_at: string;
   last_saved_at: string | null;
   due_date: string | null;
+  token_count_input: number | null;
+  token_count_output: number | null;
+  estimated_api_cost_usd: number | null;
+  exported_at: string | null;
+  locked: boolean;
   document_name: string | null;
   project_id: number | null;
   project_name: string | null;
@@ -295,6 +300,16 @@ export const translationJobsApi = {
 
   retranslate: <T>(jobId: number) =>
     apiFetch<T>(`${API_URL}/translation-jobs/${jobId}/retranslate`, { method: "POST" }),
+
+  retranslateBlockAmbiguity: (jobId: number, blockId: number, chosenOption: string) =>
+    apiFetch<{ segment_id: number; final_translation: string; primary_translation: string }>(
+      `${API_URL}/translation-jobs/${jobId}/blocks/${blockId}/retranslate-ambiguity`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chosen_option: chosenOption }),
+      },
+    ),
 
   export: <T>(jobId: number, fileType: string, formattingMode: string) =>
     apiFetch<T>(

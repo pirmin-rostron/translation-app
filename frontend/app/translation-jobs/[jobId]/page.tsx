@@ -21,6 +21,7 @@ type TranslationJob = {
   translation_provider: string | null;
   translation_style?: "natural" | "literal" | null;
   created_at: string;
+  locked?: boolean;
 };
 
 type DocumentMeta = {
@@ -469,6 +470,7 @@ function TranslationReviewPageInner() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [retranslating, setRetranslating] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [translatingBannerDismissed, setTranslatingBannerDismissed] = useState(false);
@@ -1119,6 +1121,32 @@ function TranslationReviewPageInner() {
     return "approved";
   }
 
+  // Re-translate a block via the API when auto-apply fails (fallbackTriggered).
+  async function retranslateBlockWithChoice(segmentId: number, blockId: number, chosenOption: string) {
+    setRetranslating(true);
+    setError("");
+    setMessage("Rumi is re-translating this block...");
+    try {
+      const result = await translationJobsApi.retranslateBlockAmbiguity(jobId, blockId, chosenOption);
+      setBlocks((currentBlocks) =>
+        currentBlocks.map((block) => ({
+          ...block,
+          segments: block.segments.map((segment) =>
+            segment.id === result.segment_id
+              ? { ...segment, final_translation: result.final_translation, primary_translation: result.primary_translation, ambiguity_detected: false, ambiguity_details: null }
+              : segment
+          ),
+        }))
+      );
+      setDraftTranslation(result.final_translation);
+      setMessage("Block re-translated successfully.");
+    } catch {
+      setError("Re-translation failed — try again.");
+    } finally {
+      setRetranslating(false);
+    }
+  }
+
   function handleAmbiguityChoiceChange(idx: number) {
     setAmbiguityChoiceIndex(idx);
     setIsAmbiguityChoiceUserSelected(true);
@@ -1127,7 +1155,11 @@ function TranslationReviewPageInner() {
     if (!option) return;
     const [updatedTranslation, fallbackTriggered] = applyAmbiguityChoiceToSegment(selectedSegment, option.translation);
     if (fallbackTriggered) {
-      setError("Could not apply this choice automatically — please edit the translation manually.");
+      // Find the block containing this segment
+      const parentBlock = blocks.find((b) => b.segments.some((s) => s.id === selectedSegment.id));
+      if (parentBlock) {
+        void retranslateBlockWithChoice(selectedSegment.id, parentBlock.id, option.translation);
+      }
       return;
     }
     setError("");
@@ -1147,9 +1179,10 @@ function TranslationReviewPageInner() {
   function handleBlockActivateAndChoose(segmentId: number, choiceIdx: number) {
     // Look up the segment and its options from blocks state
     let targetSegment: ReviewSegment | null = null;
+    let parentBlock: DocumentBlock | null = null;
     for (const block of blocks) {
       const seg = block.segments.find((s) => s.id === segmentId);
-      if (seg) { targetSegment = seg; break; }
+      if (seg) { targetSegment = seg; parentBlock = block; break; }
     }
     // Activate the block
     setSelectedId(segmentId);
@@ -1166,7 +1199,9 @@ function TranslationReviewPageInner() {
     if (!option) return;
     const [updatedTranslation, fallbackTriggered] = applyAmbiguityChoiceToSegment(targetSegment, option.translation);
     if (fallbackTriggered) {
-      setError("Could not apply this choice automatically — please edit the translation manually.");
+      if (parentBlock) {
+        void retranslateBlockWithChoice(segmentId, parentBlock.id, option.translation);
+      }
       return;
     }
     setDraftTranslation(updatedTranslation);
@@ -1598,7 +1633,7 @@ function TranslationReviewPageInner() {
   const glossaryMatches = selectedSegment?.glossary_matches?.matches ?? [];
   const reviewComplete = Boolean(reviewSummary?.review_complete);
   const workflowStatus = reviewSummary?.overall_status ?? job.status;
-  const isReadOnly = workflowStatus === "exported";
+  const isReadOnly = workflowStatus === "exported" || !!job.locked;
   const selectedSegmentIsSafe = Boolean(selectedSegment && isSafeSegment(selectedSegment));
   const canEditSelectedSegment = !isReadOnly;
   const hasDraftChanges =
@@ -1632,7 +1667,7 @@ function TranslationReviewPageInner() {
   const currentBlockResolved = Boolean(selectedBlock && isBlockResolved(selectedBlock));
   const resolvedAmbiguity = Boolean(selectedSegment?.ambiguity_detected && isAcceptableFinalStatus(selectedSegment?.review_status ?? ""));
   const isLastBlock = selectedBlockPosition !== -1 && selectedBlockPosition === orderedBlocks.length - 1;
-  const primaryActionDisabled = actionLoading || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
+  const primaryActionDisabled = actionLoading || retranslating || (hasAmbiguityChoice && !selectedAmbiguityTranslation.trim()) || currentBlockResolved;
   const guidanceStatusLabel = workflowStatus === "exported" ? "Exported" : reviewComplete ? "Review Complete" : "In Review";
   const latestExport = exportHistory.find((entry) => entry.latest) ?? exportHistory[0] ?? null;
   const lastExportTimestamp = latestExport?.generated_at ?? exportResult?.generated_at ?? null;
@@ -2055,6 +2090,13 @@ function TranslationReviewPageInner() {
 
       {/* ── Floating Action Buttons ── */}
       <div className="fixed bottom-24 right-10 z-30 flex flex-col gap-2">
+        {job.locked && !reviewCompleteState && (
+          <>
+            <button type="button" disabled title="This job has been exported and locked" className="rounded-full bg-brand-accent px-5 py-2.5 text-sm font-medium text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40">Approve</button>
+            <button type="button" disabled title="This job has been exported and locked" className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-muted shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Skip</button>
+            <button type="button" disabled title="This job has been exported and locked" className="rounded-full border border-brand-border bg-brand-surface px-5 py-2.5 text-sm font-medium text-brand-subtle shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Flag</button>
+          </>
+        )}
         {!isReadOnly && !currentBlockResolved && !reviewCompleteState && (
           <>
             <button

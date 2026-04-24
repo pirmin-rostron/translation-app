@@ -340,7 +340,7 @@ function JobRow({ job, docName, expanded, onToggle }: {
             </button>
           )}
 
-          {isReview && (
+          {isReview && !job.locked && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); router.push(`/translation-jobs/${job.id}`); }}
@@ -350,7 +350,7 @@ function JobRow({ job, docName, expanded, onToggle }: {
             </button>
           )}
 
-          {isComplete && (
+          {isComplete && !job.locked && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); router.push(`/translation-jobs/${job.id}`); }}
@@ -370,7 +370,13 @@ function JobRow({ job, docName, expanded, onToggle }: {
             </button>
           )}
 
-          {isExported && (
+          {job.locked && (
+            <span className="rounded-full bg-brand-sunken px-3 py-1 text-xs font-medium text-brand-muted">
+              Exported
+            </span>
+          )}
+
+          {isExported && !job.locked && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); router.push(`/translation-jobs/${job.id}`); }}
