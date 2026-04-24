@@ -39,7 +39,7 @@ router = APIRouter(
 )
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf"}
+ALLOWED_EXTENSIONS = {".docx", ".txt", ".rtf", ".md", ".markdown"}
 ALLOWED_EXTENSIONS_WITH_ZIP = ALLOWED_EXTENSIONS | {".zip"}
 ALLOWED_SOURCE_LANGUAGES = {"en", "de", "fr", "es", "it", "nl", "pt", "zh", "ja", "ko", "ar"}
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
@@ -467,7 +467,7 @@ def validate_file(file: UploadFile) -> tuple[str, str]:
             status_code=400,
             detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
         )
-    file_type = "docx" if ext == ".docx" else "rtf" if ext == ".rtf" else "txt"
+    file_type = "docx" if ext == ".docx" else "rtf" if ext == ".rtf" else "txt"  # .md/.markdown → txt
     return file.filename, file_type
 
 
@@ -483,7 +483,7 @@ def upload_document(
     db: Session = Depends(get_db),
     current_org: Organisation = Depends(get_current_org),
 ):
-    """Upload a DOCX, TXT, or RTF document. Source language is auto-detected."""
+    """Upload a DOCX, TXT, RTF, or Markdown document. Source language is auto-detected."""
     filename, file_type = validate_file(file)
 
     industry_val = (industry.strip() or None) if industry else None

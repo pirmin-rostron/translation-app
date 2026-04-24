@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 MAX_ZIP_FILES = 20
-ALLOWED_INNER_EXTENSIONS = {".docx", ".txt", ".rtf"}
+ALLOWED_INNER_EXTENSIONS = {".docx", ".txt", ".rtf", ".md", ".markdown"}
 
 
 def unpack_zip(file_bytes: bytes) -> tuple[list[tuple[str, bytes]], list[str]]:

@@ -130,6 +130,12 @@ class TranslationJobResponse(BaseModel):
     created_at: datetime
     due_date: date | None = None
     deleted_at: datetime | None = None
+    token_count_input: int | None = None
+    token_count_output: int | None = None
+    estimated_api_cost_usd: float | None = None
+    tokens_last_updated: datetime | None = None
+    exported_at: datetime | None = None
+    locked: bool = False
     document_name: str | None = None
     project_id: int | None = None
     project_name: str | None = None

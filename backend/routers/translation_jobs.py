@@ -1408,6 +1408,7 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
         for res in block_provider_results.values():
             job.token_count_input = (job.token_count_input or 0) + res.input_tokens
             job.token_count_output = (job.token_count_output or 0) + res.output_tokens
+        job.tokens_last_updated = datetime.utcnow()
         db.commit()
 
     translate_end_time = datetime.utcnow()
@@ -1826,6 +1827,8 @@ def approve_safe_segments(
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.locked:
+        raise HTTPException(status_code=403, detail="This job has been exported and locked. Create a new translation to make changes.")
     if job.status == JOB_STATUS_EXPORTED:
         raise HTTPException(status_code=400, detail="Cannot approve segments after export")
 
@@ -1866,6 +1869,8 @@ def approve_all_segments(
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.locked:
+        raise HTTPException(status_code=403, detail="This job has been exported and locked. Create a new translation to make changes.")
     if job.status == JOB_STATUS_EXPORTED:
         raise HTTPException(status_code=400, detail="Cannot approve segments after export")
 
@@ -1997,7 +2002,17 @@ def export_translation_job(
         export_mode=effective_export_mode,
     )
     job.status = JOB_STATUS_EXPORTED
+    job.exported_at = exported_at
+    job.locked = True
     job.last_saved_at = exported_at
+    # Definitive cost calculation at export time
+    if job.token_count_input or job.token_count_output:
+        from pricing import calculate_api_cost as _calc_cost
+        job.estimated_api_cost_usd = _calc_cost(
+            model=job.translation_provider or "claude-sonnet-4-20250514",
+            input_tokens=job.token_count_input or 0,
+            output_tokens=job.token_count_output or 0,
+        )
     from services.events import record_job_event
     record_job_event(db, job.id, "export_complete", f"Exported as {normalized_export_format}", {"filename": filename, "format": normalized_export_format, "mode": effective_export_mode})
     db.commit()
@@ -2371,6 +2386,8 @@ def update_translation_result(
     job = db.query(TranslationJob).filter(TranslationJob.id == result.job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
+    if job.locked:
+        raise HTTPException(status_code=403, detail="This job has been exported and locked. Create a new translation to make changes.")
     if job.status == JOB_STATUS_EXPORTED:
         raise HTTPException(status_code=400, detail="Job is exported. Re-open review to edit.")
 
@@ -2565,6 +2582,101 @@ def delete_translation_job(
     db.delete(job)
     db.commit()
     logger.info("Deleted translation_job_id=%d (document preserved, document_id=%d)", job_id, document_id)
+
+
+class RetranslateBlockRequest(BaseModel):
+    chosen_option: str = Field(..., min_length=1, max_length=2000)
+
+
+class RetranslateBlockResponse(BaseModel):
+    segment_id: int
+    final_translation: str
+    primary_translation: str
+
+
+@router.post("/{job_id}/blocks/{block_id}/retranslate-ambiguity", response_model=RetranslateBlockResponse)
+def retranslate_block_ambiguity(
+    job_id: int,
+    block_id: int,
+    body: RetranslateBlockRequest,
+    db: Session = Depends(get_db),
+    current_org: Organisation = Depends(get_current_org),
+):
+    """Re-translate a single block with a chosen ambiguity option locked in.
+
+    Instead of asking users to manually edit target-language text they may not
+    understand, this endpoint re-runs the translation for one block while
+    constraining the ambiguous term to the user's chosen option.  Only the
+    affected segment is updated; no other blocks or segments are touched.
+    """
+    job = (
+        db.query(TranslationJob)
+        .filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None))
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Translation job not found")
+
+    block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id, DocumentBlock.document_id == job.document_id).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+
+    # Find the ambiguous segment in this block
+    segments = db.query(DocumentSegment).filter(DocumentSegment.block_id == block_id).order_by(DocumentSegment.segment_index).all()
+    results = {
+        r.segment_id: r
+        for r in db.query(TranslationResult).filter(
+            TranslationResult.job_id == job_id,
+            TranslationResult.segment_id.in_([s.id for s in segments]),
+        ).all()
+    }
+    ambiguous_segment = None
+    ambiguous_result = None
+    for seg in segments:
+        result = results.get(seg.id)
+        if result and result.ambiguity_detected:
+            ambiguous_segment = seg
+            ambiguous_result = result
+            break
+
+    if not ambiguous_segment or not ambiguous_result:
+        raise HTTPException(status_code=404, detail="No ambiguous segment found in this block")
+
+    # Re-translate with the chosen option locked in
+    provider, provider_name = get_translation_provider()
+    source_lang = job.source_language or "English"
+    target_lang = job.target_language or "German"
+    style = job.translation_style or "natural"
+
+    constrained_result = provider.translate(
+        source_text=ambiguous_segment.source_text,
+        source_language=source_lang,
+        target_language=target_lang,
+        translation_style=style,
+        context_before=f"CONSTRAINT: The ambiguous term must be translated as '{body.chosen_option}'. Do not flag this as ambiguous. Keep all other content identical to a normal translation. Preserve formatting, tone, and sentence structure.",
+    )
+
+    new_translation = constrained_result.primary_translation
+    ambiguous_result.primary_translation = new_translation
+    ambiguous_result.final_translation = new_translation
+    ambiguous_result.ambiguity_detected = False
+    ambiguous_result.ambiguity_details = None
+    block.text_translated = " ".join(
+        (results.get(s.id).final_translation if s.id != ambiguous_segment.id else new_translation)
+        for s in segments
+        if results.get(s.id)
+    )
+    db.commit()
+
+    logger.info(
+        "Retranslated block=%d segment=%d job=%d with chosen_option=%r",
+        block_id, ambiguous_segment.id, job_id, body.chosen_option,
+    )
+    return RetranslateBlockResponse(
+        segment_id=ambiguous_segment.id,
+        final_translation=new_translation,
+        primary_translation=new_translation,
+    )
 
 
 @router.post("/{job_id}/retranslate", response_model=TranslationJobResponse)
