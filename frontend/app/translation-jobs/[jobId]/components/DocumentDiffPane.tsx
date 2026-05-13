@@ -26,6 +26,7 @@ type SegmentRef = {
     alternatives: Array<{ meaning: string; translation: string }>;
   } | null;
   ambiguity_options?: Array<{ meaning: string; translation: string }>;
+  untranslated_words?: string[] | null;
 };
 
 type DiffBlock = { block_index: number; segments: SegmentRef[] };
@@ -138,6 +139,18 @@ function InsightBadge({ segment }: { segment: SegmentRef }) {
     );
   }
 
+  if (segment.untranslated_words?.length) {
+    badges.push(
+      <span
+        key="en-words"
+        title={`May need translation: ${segment.untranslated_words.join(", ")}`}
+        className="inline-flex items-center gap-1 rounded-full bg-status-warningBg px-2 py-0.5 text-[0.625rem] font-medium text-status-warning ring-1 ring-inset ring-status-warning/20"
+      >
+        EN word · {segment.untranslated_words.length}
+      </span>
+    );
+  }
+
   if (badges.length === 0) return null;
   return <div className="mt-3 flex flex-wrap items-center gap-1.5">{badges}</div>;
 }
@@ -215,6 +228,17 @@ export function DocumentDiffPane({
                 b.push(
                   <span key={`m-${s.id}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[0.625rem] font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
                     <span className="font-mono">{pct != null ? `${pct}%` : "TM"}</span> memory
+                  </span>
+                );
+              }
+              if (s.untranslated_words?.length) {
+                b.push(
+                  <span
+                    key={`en-${s.id}`}
+                    title={`May need translation: ${s.untranslated_words.join(", ")}`}
+                    className="inline-flex items-center gap-1 rounded-full bg-status-warningBg px-2 py-0.5 text-[0.625rem] font-medium text-status-warning ring-1 ring-inset ring-status-warning/20"
+                  >
+                    EN word · {s.untranslated_words.length}
                   </span>
                 );
               }

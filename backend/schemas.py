@@ -268,6 +268,7 @@ class ReviewSegmentResponse(BaseModel):
     ambiguity_details: dict | None
     glossary_applied: bool = False
     glossary_matches: GlossaryMatchesResponse | None = None
+    untranslated_words: list[str] | None = None
     annotations: list[SegmentAnnotationResponse]
 
 

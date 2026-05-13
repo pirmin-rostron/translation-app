@@ -56,6 +56,7 @@ from services.glossary import glossary_match_in_text, glossary_term_to_match, no
 from services.usage import AMBIGUITY_RESOLVED, JOB_CREATED, JOB_EXPORTED, TRANSLATION_EDITED, WORDS_TRANSLATED, record_event
 from services.webhook import deliver_webhook
 from services.translation import SegmentContext, get_translation_provider
+from services.untranslated_detection import detect_untranslated_english
 from services.translation_memory import (
     TranslationMemoryMatch,
     find_exact_memory_match,
@@ -719,6 +720,7 @@ def _serialize_review_segment(
         ambiguity_details=getattr(result, "ambiguity_details", None),
         glossary_applied=getattr(result, "glossary_applied", False) or False,
         glossary_matches=_normalize_glossary_matches_payload(getattr(result, "glossary_matches", None)),
+        untranslated_words=getattr(result, "untranslated_words", None),
         annotations=[SegmentAnnotationResponse.model_validate(annotation) for annotation in annotations],
     )
 
@@ -1401,6 +1403,17 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
                         glossary_matches=_build_glossary_matches_payload(seg_glossary_matches),
                     )
                 )
+        # Post-translation quality check: detect untranslated English words
+        glossary_source_terms = [g.source_term for g in glossary_candidates]
+        for result in block_results:
+            flagged = detect_untranslated_english(
+                translated_text=result.final_translation,
+                source_language=source_lang,
+                glossary_source_terms=glossary_source_terms,
+            )
+            if flagged:
+                result.untranslated_words = flagged
+
         db.add_all(block_results)
         completed_count += len(block_segs)
         job.progress_completed_segments = completed_count

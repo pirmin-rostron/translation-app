@@ -98,6 +98,7 @@ type ReviewSegment = {
   ambiguity_details: AmbiguityDetails | null;
   glossary_applied: boolean;
   glossary_matches: GlossaryMatches | null;
+  untranslated_words: string[] | null;
   annotations: SegmentAnnotation[];
 };
 
@@ -833,6 +834,36 @@ function TranslationReviewPageInner() {
     return true;
   }
 
+  function highlightUntranslatedWords(text: string, words: string[]): React.ReactNode[] {
+    if (!words.length) return [text];
+    // Build a regex that matches any of the flagged words (case-insensitive, word boundary)
+    const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const pattern = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      parts.push(
+        <span
+          key={`en-hl-${key++}`}
+          title="This word may not have been translated"
+          className="border-b-2 border-status-warning/60 bg-status-warningBg/60 rounded-sm px-0.5"
+        >
+          {match[0]}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    return parts;
+  }
+
   function renderInlineSegments(block: DocumentBlock, side: "source" | "target") {
     const handleClick = () => {
       const defaultSegmentId = block.segments[0]?.id;
@@ -894,6 +925,10 @@ function TranslationReviewPageInner() {
             : undefined;
 
           if (!ambiguityAnnotation) {
+            // Highlight untranslated English words in target text
+            if (side === "target" && segment.untranslated_words?.length) {
+              return <span key={segment.id}>{highlightUntranslatedWords(text, segment.untranslated_words)}</span>;
+            }
             return <span key={segment.id}>{text}</span>;
           }
 

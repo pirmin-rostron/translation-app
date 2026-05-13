@@ -90,6 +90,7 @@ export type ReviewSegment = {
   ambiguity_details: Record<string, unknown> | null;
   glossary_applied: boolean;
   glossary_matches: { matches: { source_term: string; target_term: string }[] } | null;
+  untranslated_words: string[] | null;
   annotations: unknown[];
 };
 

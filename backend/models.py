@@ -114,6 +114,7 @@ class TranslationResult(Base):
     ambiguity_details = Column(JSONB, nullable=True)
     glossary_applied = Column(Boolean, nullable=False, default=False)
     glossary_matches = Column(JSONB, nullable=True)
+    untranslated_words = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     job = relationship("TranslationJob", back_populates="results")
