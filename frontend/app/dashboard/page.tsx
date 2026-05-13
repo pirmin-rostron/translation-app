@@ -16,7 +16,6 @@ import { useProjects, useOrgStats, useGlossaryTerms, useDocuments } from "../hoo
 import { translationJobsApi, queryKeys } from "../services/api";
 import type { ProjectResponse, PaginatedJobsResponse, TranslationJobListItem } from "../services/api";
 import { AppShell } from "../components/AppShell";
-import { NewTranslationModal } from "./NewTranslationModal";
 import { NewProjectModal } from "./NewProjectModal";
 import { Icons } from "../components/Icons";
 import { getLanguageCode } from "../utils/language";
@@ -393,13 +392,18 @@ export default function DashboardPage() {
   const openProjectModal = useDashboardStore((s) => s.openProjectModal);
   const projectModalOpen = useDashboardStore((s) => s.projectModalOpen);
   const translationModalOpen = useDashboardStore((s) => s.translationModalOpen);
-  const { data: projects = [], isLoading: projectsLoading } = useProjects();
-  const { data: documents = [] } = useDocuments();
-  const { data: orgStats } = useOrgStats();
-  const { data: glossaryTerms } = useGlossaryTerms();
 
   // Pause polling while a modal is open to prevent re-renders that clear modal inputs
   const anyModalOpen = projectModalOpen || translationModalOpen;
+
+  const { data: projects = [], isLoading: projectsLoading } = useProjects({
+    refetchInterval: anyModalOpen ? false : 30_000,
+  });
+  const { data: documents = [], isLoading: documentsLoading } = useDocuments({
+    refetchInterval: anyModalOpen ? false : 15_000,
+  });
+  const { data: orgStats } = useOrgStats();
+  const { data: glossaryTerms } = useGlossaryTerms();
 
   // Fetch all jobs to derive processing and review counts
   const { data: jobsData, isLoading: jobsLoading } = useQuery<PaginatedJobsResponse>({
@@ -412,7 +416,7 @@ export default function DashboardPage() {
   });
 
   const allJobs = jobsData?.jobs ?? [];
-  const isLoading = projectsLoading || jobsLoading;
+  const isLoading = projectsLoading || jobsLoading || documentsLoading;
 
   const processingJobs = useMemo(
     () => allJobs.filter((j) => isProcessing(j.status)),
@@ -582,7 +586,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <NewTranslationModal projects={projects} />
       <NewProjectModal />
     </AppShell>
   );

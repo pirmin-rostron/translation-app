@@ -20,7 +20,6 @@ import type {
 import { AppShell } from "../../components/AppShell";
 import { StatusBadge, toJobStatus } from "../../components/StatusBadge";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { ModalOverlay } from "../../dashboard/ModalOverlay";
 import { Icons } from "../../components/Icons";
 import {
@@ -785,7 +784,6 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      <NewTranslationModal projects={project ? [project] : []} />
       <EditProjectModal
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}

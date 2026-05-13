@@ -169,12 +169,12 @@ export type ExportResponse = {
 // Query hooks
 // ---------------------------------------------------------------------------
 
-export function useDocuments() {
+export function useDocuments(opts?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: queryKeys.documents.all(),
     queryFn: () => documentsApi.list<Document[]>(),
     staleTime: 15_000,
-    refetchInterval: 15_000,
+    refetchInterval: opts?.refetchInterval ?? 15_000,
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });
@@ -361,12 +361,12 @@ export function useTier() {
   });
 }
 
-export function useProjects() {
+export function useProjects(opts?: { refetchInterval?: number | false }) {
   return useQuery<ProjectResponse[]>({
     queryKey: ["projects"],
     queryFn: () => projectsApi.list(),
     staleTime: 30_000,
-    refetchInterval: 30_000,
+    refetchInterval: opts?.refetchInterval ?? 30_000,
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });

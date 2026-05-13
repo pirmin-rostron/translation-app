@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
+import { NewTranslationModal } from "../dashboard/NewTranslationModal";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </footer>
         </main>
       </div>
+      <NewTranslationModal projects={[]} />
     </div>
   );
 }

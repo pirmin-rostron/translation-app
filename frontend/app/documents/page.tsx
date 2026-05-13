@@ -19,7 +19,6 @@ import type {
 } from "../services/api";
 import { useProjects } from "../hooks/queries";
 import { AppShell } from "../components/AppShell";
-import { NewTranslationModal } from "../dashboard/NewTranslationModal";
 import { Icons } from "../components/Icons";
 import { getLanguageCode } from "../utils/language";
 
@@ -410,7 +409,6 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      <NewTranslationModal projects={projects} />
     </AppShell>
   );
 }

@@ -15,7 +15,6 @@ import type { DocumentDetail, OverviewResponse } from "../../services/api";
 import { AppShell } from "../../components/AppShell";
 import { StatusBadge, toJobStatus } from "../../components/StatusBadge";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { NewTranslationModal } from "../../dashboard/NewTranslationModal";
 import { getLanguageCode, getLanguageDisplayName, getLanguageFlag } from "../../utils/language";
 import { SegmentedControl } from "../../components/SegmentedControl";
 
@@ -433,7 +432,6 @@ export default function DocumentDetailPage() {
         </div>
       </div>
 
-      <NewTranslationModal projects={[]} />
       <ConfirmDialog open={deleteConfirmOpen} title="Delete this document permanently?" description="This will remove the uploaded file and all translations. This cannot be undone." confirmLabel="Delete" onConfirm={() => { void handleDeleteDocument(); }} onCancel={() => setDeleteConfirmOpen(false)} loading={deleting} variant="destructive" />
     </AppShell>
   );

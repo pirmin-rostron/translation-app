@@ -287,7 +287,7 @@ export default function GlossaryPage() {
 
         {/* AI suggestions */}
         {pendingSuggestions.length > 0 && (
-          <section className="mb-6 overflow-hidden rounded-2xl border border-brand-accent/30 bg-brand-surface shadow-card">
+          <section className="mb-6 overflow-hidden rounded-xl border border-brand-accent/30 bg-brand-surface shadow-card">
             <header className="flex items-center justify-between border-b border-brand-borderSoft px-5 pb-3 pt-4">
               <div className="flex items-center gap-2">
                 <Icons.Sparkle className="h-4 w-4 text-brand-accent" />
@@ -305,9 +305,9 @@ export default function GlossaryPage() {
                 Add all
               </button>
             </header>
-            <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+            <ul className="m-0 list-none p-0">
               {pendingSuggestions.map((s) => (
-                <li key={s.id} className="flex items-center gap-4 bg-brand-accentSoft/20 px-5 py-3 transition-colors hover:bg-brand-accentSoft/40">
+                <li key={s.id} className="flex items-center gap-4 border-b border-brand-borderSoft bg-brand-accentSoft/20 px-5 py-3 transition-colors last:border-0 hover:bg-brand-accentSoft/40">
                   <span className="inline-flex items-center rounded-full border border-brand-accent/30 bg-brand-surface px-2 py-0.5 text-[0.625rem] font-medium uppercase tracking-[0.1em] text-brand-accent">AI</span>
                   <span className="min-w-0 flex-1 text-sm font-medium text-brand-text">{s.source_term}</span>
                   <Icons.Arrow className="h-3 w-3 text-brand-hint" />
@@ -343,7 +343,7 @@ export default function GlossaryPage() {
 
         {/* Add term panel */}
         {showAddPanel && (
-          <section className="mb-6 rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card animate-fadein">
+          <section className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6 shadow-card animate-fadein">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="m-0 font-display text-[1.0625rem] font-semibold tracking-display text-brand-text">Add term</h2>
               <button type="button" onClick={() => setShowAddPanel(false)} className="text-brand-subtle hover:text-brand-text">
@@ -377,7 +377,7 @@ export default function GlossaryPage() {
 
         {/* Import CSV panel */}
         {showImportPanel && (
-          <section className="mb-6 rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card animate-fadein">
+          <section className="mb-6 rounded-xl border border-brand-border bg-brand-surface p-6 shadow-card animate-fadein">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="m-0 font-display text-[1.0625rem] font-semibold tracking-display text-brand-text">Import CSV</h2>
               <button type="button" onClick={() => setShowImportPanel(false)} className="text-brand-subtle hover:text-brand-text"><span className="text-lg">x</span></button>
@@ -413,7 +413,7 @@ export default function GlossaryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search terms..."
-              className="w-full rounded-full border border-brand-border bg-brand-surface py-2 pl-9 pr-3.5 text-[0.8125rem] text-brand-text shadow-card placeholder:text-brand-subtle focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/15"
+              className="w-full rounded-lg border border-brand-border bg-brand-surface py-2 pl-9 pr-3.5 text-[0.8125rem] text-brand-text placeholder:text-brand-subtle focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/20 transition-colors"
             />
           </div>
           {langPairs.length >= 2 && (
@@ -438,12 +438,13 @@ export default function GlossaryPage() {
         {/* Main content: table + detail panel */}
         <div className="flex gap-6">
           {/* Terms table */}
-          <section className={`overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card ${selectedTerm ? "flex-1" : "w-full"}`}>
-            <header className="grid grid-cols-[2fr_2fr_0.8fr_0.7fr_0.7fr_0.5fr] gap-4 border-b border-brand-borderSoft bg-brand-sunken/50 px-5 py-2.5 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">
+          <section className={`overflow-hidden rounded-xl border border-brand-border bg-brand-surface ${selectedTerm ? "flex-1" : "w-full"}`}>
+            <header className="grid grid-cols-[2fr_2fr_0.7fr_0.5fr_0.7fr_0.7fr_44px] gap-4 border-b border-brand-border px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">
               <span>Source term</span>
               <span>Translation</span>
               {!singleLangActive && <span>Languages</span>}
               {singleLangActive && <span />}
+              <span>Usage</span>
               <span>Status</span>
               <span>Scope</span>
               <span />
@@ -474,7 +475,7 @@ export default function GlossaryPage() {
             ) : displayedTerms.length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-brand-subtle">No terms match your search or filter.</div>
             ) : (
-              <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
+              <ul className="m-0 list-none p-0">
                 {displayedTerms.map((term) => {
                   const isEditing = editingId === term.id;
                   const isSelected = selectedTermId === term.id;
@@ -483,8 +484,8 @@ export default function GlossaryPage() {
                     <li
                       key={term.id}
                       onClick={() => !isEditing && setSelectedTermId(isSelected ? null : term.id)}
-                      className={`group/row grid cursor-pointer grid-cols-[2fr_2fr_0.8fr_0.7fr_0.7fr_0.5fr] items-center gap-4 px-5 py-3.5 shadow-card transition-all hover:shadow-raised ${
-                        isSelected ? "bg-brand-accentMid/20" : "hover:bg-brand-sunken/60"
+                      className={`group/row grid cursor-pointer grid-cols-[2fr_2fr_0.7fr_0.5fr_0.7fr_0.7fr_44px] items-center gap-4 border-b border-brand-border px-5 py-3.5 transition-colors last:border-0 ${
+                        isSelected ? "bg-brand-accentMid/20" : "hover:bg-brand-bg"
                       }`}
                     >
                       {/* Source */}
@@ -507,6 +508,10 @@ export default function GlossaryPage() {
                       <span className="font-mono text-[0.6875rem] text-brand-muted">
                         {toLangCode(term.source_language)} → {toLangCode(term.target_language)}
                       </span>
+                      {/* Usage */}
+                      <span className="font-mono text-[0.6875rem] tabular-nums text-brand-muted">
+                        {term.usage_count ?? 0}
+                      </span>
                       {/* Status */}
                       <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium ${
                         status === "locked" ? "bg-brand-sunken text-brand-text"
@@ -517,10 +522,11 @@ export default function GlossaryPage() {
                           <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="5" width="7" height="5" rx="1" /><path d="M4 5V3.5a2 2 0 0 1 4 0V5" /></svg>
                         )}
                         {status === "enforced" && <span className="h-1.5 w-1.5 rounded-full bg-status-success" />}
+                        {status === "suggested" && <Icons.Sparkle className="h-2.5 w-2.5" />}
                         {status === "locked" ? "Locked" : status === "enforced" ? "Enforced" : "Suggested"}
                       </span>
                       {/* Scope */}
-                      <span className="rounded-full bg-brand-sunken px-2 py-0.5 text-[0.6875rem] font-medium text-brand-subtle">
+                      <span className="inline-flex w-fit rounded-full bg-brand-sunken px-2 py-0.5 text-[0.6875rem] font-medium text-brand-subtle">
                         Master
                       </span>
                       {/* Actions */}
@@ -547,7 +553,7 @@ export default function GlossaryPage() {
 
           {/* Right-side detail panel */}
           {selectedTerm && (
-            <aside className="w-[340px] shrink-0 animate-fadein rounded-2xl border border-brand-border bg-brand-surface p-6 shadow-card self-start">
+            <aside className="w-[340px] shrink-0 animate-fadein rounded-xl border border-brand-border bg-brand-surface p-6 shadow-card self-start">
               <div className="mb-5 flex items-start justify-between">
                 <div>
                   <p className="m-0 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-brand-subtle">Term detail</p>
@@ -578,6 +584,7 @@ export default function GlossaryPage() {
                     : deriveTermStatus(selectedTerm) === "enforced" ? "bg-status-successBg text-status-success"
                     : "bg-brand-accentSoft text-brand-accent"
                   }`}>
+                    {deriveTermStatus(selectedTerm) === "suggested" && <Icons.Sparkle className="h-2.5 w-2.5" />}
                     {deriveTermStatus(selectedTerm) === "locked" ? "Locked" : deriveTermStatus(selectedTerm) === "enforced" ? "Enforced" : "Suggested"}
                   </span>
                 </div>
@@ -593,6 +600,22 @@ export default function GlossaryPage() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Usage history — placeholder until backend endpoint exists */}
+              <div className="mt-5 border-t border-brand-borderSoft pt-4">
+                <p className="m-0 mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">Usage history</p>
+                <p className="m-0 text-xs text-brand-subtle">
+                  Applied {selectedTerm.usage_count ?? 0} times across all translations.
+                </p>
+              </div>
+
+              {/* Project overrides — placeholder until project-scoped terms exist */}
+              <div className="mt-4 border-t border-brand-borderSoft pt-4">
+                <p className="m-0 mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-brand-subtle">Project overrides</p>
+                <p className="m-0 text-xs text-brand-subtle">
+                  No project-level overrides. This term applies globally.
+                </p>
               </div>
 
               <div className="mt-6 flex items-center gap-3 border-t border-brand-borderSoft pt-5">
