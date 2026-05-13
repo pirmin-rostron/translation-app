@@ -5,9 +5,9 @@
  * per file) and Jobs (one row per translation). Search + project/status filters.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { documentsApi, translationJobsApi, queryKeys } from "../services/api";
 import type {
@@ -109,9 +109,149 @@ function FilterSelect({ value, onChange, children }: {
   );
 }
 
+// ── Inline project picker ──────────────────────────────────────────────────
+
+function ProjectPicker({
+  doc,
+  projects,
+}: {
+  doc: GroupedDocument;
+  projects: ProjectResponse[];
+}) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const currentProjectId = doc.jobs[0]?.project_id ?? null;
+  const currentProjectName = doc.jobs[0]?.project_name ?? null;
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleSelect = useCallback(
+    (projectId: number | null, projectName: string | null) => {
+      setOpen(false);
+      if (projectId === currentProjectId) return;
+
+      // Optimistic update: patch the cached grouped documents
+      queryClient.setQueryData<GroupedDocumentsResponse>(
+        [...queryKeys.documents.all(), "grouped"],
+        (prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            documents: prev.documents.map((d) =>
+              d.id === doc.id
+                ? {
+                    ...d,
+                    jobs: d.jobs.map((j) => ({
+                      ...j,
+                      project_id: projectId,
+                      project_name: projectName,
+                    })),
+                  }
+                : d
+            ),
+          };
+        }
+      );
+
+      // Fire API call for each job on this document
+      for (const job of doc.jobs) {
+        void translationJobsApi
+          .updateProject(job.id, projectId)
+          .catch((err) => {
+            console.error("[ProjectPicker] update failed:", err);
+            // Revert on failure
+            void queryClient.invalidateQueries({
+              queryKey: [...queryKeys.documents.all(), "grouped"],
+            });
+          });
+      }
+
+      // Also invalidate jobs and projects so other views stay in sync
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.translationJobs.all(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.all(),
+      });
+    },
+    [currentProjectId, doc.id, doc.jobs, queryClient]
+  );
+
+  return (
+    <div
+      ref={ref}
+      className="relative min-w-0"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="m-0 w-full truncate rounded-lg px-1.5 py-1 text-left text-[0.8125rem] transition-colors hover:bg-brand-sunken"
+      >
+        {currentProjectName ? (
+          <span className="text-brand-text">{currentProjectName}</span>
+        ) : (
+          <span className="text-brand-subtle">No project</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-brand-border bg-brand-surface shadow-raised">
+          <div className="max-h-64 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => handleSelect(null, null)}
+              className={`block w-full px-3.5 py-2 text-left text-[0.8125rem] transition-colors hover:bg-brand-sunken ${
+                currentProjectId === null
+                  ? "font-medium text-brand-text"
+                  : "text-brand-subtle"
+              }`}
+            >
+              No project
+            </button>
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelect(p.id, p.name)}
+                className={`block w-full truncate px-3.5 py-2 text-left text-[0.8125rem] transition-colors hover:bg-brand-sunken ${
+                  currentProjectId === p.id
+                    ? "font-medium text-brand-text"
+                    : "text-brand-muted"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Documents table ─────────────────────────────────────────────────────────
 
-function DocumentsTable({ rows }: { rows: GroupedDocument[] }) {
+function DocumentsTable({
+  rows,
+  projects,
+}: {
+  rows: GroupedDocument[];
+  projects: ProjectResponse[];
+}) {
   const router = useRouter();
   return (
     <section className="overflow-hidden rounded-2xl border border-brand-border bg-brand-surface shadow-card">
@@ -125,12 +265,11 @@ function DocumentsTable({ rows }: { rows: GroupedDocument[] }) {
       <ul className="m-0 list-none divide-y divide-brand-borderSoft p-0">
         {rows.map((d) => {
           const reviewCount = d.jobs.filter((j) => j.status === "in_review" || j.status === "review").length;
-          const projectName = d.jobs[0]?.project_name ?? "—";
           return (
             <li key={d.id}>
-              <button
+              <div
                 onClick={() => router.push(`/documents/${d.id}`)}
-                className="group grid w-full grid-cols-[2.2fr_1.6fr_0.8fr_1.6fr_0.7fr] items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-brand-sunken/60"
+                className="group grid w-full cursor-pointer grid-cols-[2.2fr_1.6fr_0.8fr_1.6fr_0.7fr] items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-brand-sunken/60"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <FileIcon name={d.filename} />
@@ -141,7 +280,7 @@ function DocumentsTable({ rows }: { rows: GroupedDocument[] }) {
                     </p>
                   </div>
                 </div>
-                <p className="m-0 truncate text-[0.8125rem] text-brand-muted">{projectName}</p>
+                <ProjectPicker doc={d} projects={projects} />
                 <p className="m-0 text-right font-mono text-xs tabular-nums text-brand-muted">
                   {d.word_count.toLocaleString()}
                 </p>
@@ -163,7 +302,7 @@ function DocumentsTable({ rows }: { rows: GroupedDocument[] }) {
                 <p className="m-0 text-right text-[0.6875rem] text-brand-subtle">
                   {formatDate(d.uploaded_at)}
                 </p>
-              </button>
+              </div>
             </li>
           );
         })}
@@ -392,7 +531,7 @@ export default function DocumentsPage() {
         {/* Table */}
         {mode === "documents" ? (
           filteredDocs.length > 0 ? (
-            <DocumentsTable rows={filteredDocs} />
+            <DocumentsTable rows={filteredDocs} projects={projects} />
           ) : null
         ) : (
           filteredJobs.length > 0 ? (
