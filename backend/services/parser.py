@@ -149,6 +149,21 @@ def _is_rtf_header_noise(text: str) -> bool:
     return False
 
 
+_BOLD_OFF_NEEDS_BREAK = re.compile(r"\\b0\s*(?!\\par)")
+
+
+def _ensure_breaks_at_bold_boundaries(rtf: str) -> str:
+    """Insert \\par after \\b0 when not already followed by one.
+
+    Some RTF editors emit \\b0 immediately followed by body text without a
+    paragraph break.  striprtf consumes the delimiter space after \\b0, so the
+    heading and body text get concatenated (e.g. "Standard SentencesThe system
+    is operating normally.").  Inserting \\par ensures a newline in the decoded
+    output.
+    """
+    return _BOLD_OFF_NEEDS_BREAK.sub(r"\\b0 \\par ", rtf)
+
+
 def _decode_rtf_text(raw: str) -> str:
     """Decode RTF to plain text, handling double-wrapped RTF files.
 
@@ -156,9 +171,9 @@ def _decode_rtf_text(raw: str) -> str:
     envelope.  After the first decode the output is still valid RTF — detect
     this and decode a second time.
     """
-    text = rtf_to_text(raw)
+    text = rtf_to_text(_ensure_breaks_at_bold_boundaries(raw))
     if text.lstrip().startswith("{\\rtf"):
-        text = rtf_to_text(text)
+        text = rtf_to_text(_ensure_breaks_at_bold_boundaries(text))
     return text
 
 
