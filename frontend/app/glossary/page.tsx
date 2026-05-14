@@ -7,7 +7,7 @@
  * Redesigned to match the Helvara design system (PIR-131).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
@@ -63,6 +63,14 @@ function deriveTermStatus(term: GlossaryTerm): "locked" | "enforced" | "suggeste
 // ── Main page ───────────────────────────────────────────────────────────────
 
 export default function GlossaryPage() {
+  return (
+    <Suspense>
+      <GlossaryPageContent />
+    </Suspense>
+  );
+}
+
+function GlossaryPageContent() {
   const searchParams = useSearchParams();
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [form, setForm] = useState<GlossaryForm>(INITIAL_FORM);
