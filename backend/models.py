@@ -115,6 +115,7 @@ class TranslationResult(Base):
     glossary_applied = Column(Boolean, nullable=False, default=False)
     glossary_matches = Column(JSONB, nullable=True)
     untranslated_words = Column(JSONB, nullable=True)
+    glossary_violations = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     job = relationship("TranslationJob", back_populates="results")

@@ -57,6 +57,7 @@ from services.usage import AMBIGUITY_RESOLVED, JOB_CREATED, JOB_EXPORTED, TRANSL
 from services.webhook import deliver_webhook
 from services.translation import SegmentContext, get_translation_provider
 from services.untranslated_detection import detect_untranslated_english
+from services.glossary_compliance import check_glossary_compliance
 from services.translation_memory import (
     TranslationMemoryMatch,
     find_exact_memory_match,
@@ -1413,6 +1414,14 @@ def _execute_translation_stage(db: Session, translation_job_id: int):
             )
             if flagged:
                 result.untranslated_words = flagged
+        # Post-translation quality check: glossary compliance verification
+        for result in block_results:
+            violations = check_glossary_compliance(
+                translated_text=result.final_translation,
+                glossary_matches=result.glossary_matches,
+            )
+            if violations:
+                result.glossary_violations = violations
 
         db.add_all(block_results)
         completed_count += len(block_segs)

@@ -91,6 +91,7 @@ export type ReviewSegment = {
   glossary_applied: boolean;
   glossary_matches: { matches: { source_term: string; target_term: string }[] } | null;
   untranslated_words: string[] | null;
+  glossary_violations: { source_term: string; expected_target: string; found_in_output: boolean }[] | null;
   annotations: unknown[];
 };
 

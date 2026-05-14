@@ -269,6 +269,7 @@ class ReviewSegmentResponse(BaseModel):
     glossary_applied: bool = False
     glossary_matches: GlossaryMatchesResponse | None = None
     untranslated_words: list[str] | None = None
+    glossary_violations: list[dict] | None = None
     annotations: list[SegmentAnnotationResponse]
 
 

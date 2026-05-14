@@ -27,6 +27,7 @@ type SegmentRef = {
   } | null;
   ambiguity_options?: Array<{ meaning: string; translation: string }>;
   untranslated_words?: string[] | null;
+  glossary_violations?: { source_term: string; expected_target: string; found_in_output: boolean }[] | null;
 };
 
 type DiffBlock = { block_index: number; segments: SegmentRef[] };
@@ -151,6 +152,21 @@ function InsightBadge({ segment }: { segment: SegmentRef }) {
     );
   }
 
+  if (segment.glossary_violations?.length) {
+    const tipLines = segment.glossary_violations
+      .map((v) => `Expected "${v.expected_target}" but not found`)
+      .join("; ");
+    badges.push(
+      <span
+        key="glossary-miss"
+        title={tipLines}
+        className="inline-flex items-center gap-1 rounded-full bg-brand-accentSoft px-2 py-0.5 text-[0.625rem] font-medium text-brand-accent ring-1 ring-inset ring-brand-accent/20"
+      >
+        {segment.glossary_violations.length} glossary {segment.glossary_violations.length === 1 ? "miss" : "misses"}
+      </span>
+    );
+  }
+
   if (badges.length === 0) return null;
   return <div className="mt-3 flex flex-wrap items-center gap-1.5">{badges}</div>;
 }
@@ -239,6 +255,20 @@ export function DocumentDiffPane({
                     className="inline-flex items-center gap-1 rounded-full bg-status-warningBg px-2 py-0.5 text-[0.625rem] font-medium text-status-warning ring-1 ring-inset ring-status-warning/20"
                   >
                     EN word · {s.untranslated_words.length}
+                  </span>
+                );
+              }
+              if (s.glossary_violations?.length) {
+                const tipLines = s.glossary_violations
+                  .map((v) => `Expected "${v.expected_target}" but not found`)
+                  .join("; ");
+                b.push(
+                  <span
+                    key={`gv-${s.id}`}
+                    title={tipLines}
+                    className="inline-flex items-center gap-1 rounded-full bg-brand-accentSoft px-2 py-0.5 text-[0.625rem] font-medium text-brand-accent ring-1 ring-inset ring-brand-accent/20"
+                  >
+                    {s.glossary_violations.length} glossary {s.glossary_violations.length === 1 ? "miss" : "misses"}
                   </span>
                 );
               }
