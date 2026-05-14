@@ -58,6 +58,7 @@ from services.webhook import deliver_webhook
 from services.translation import SegmentContext, get_translation_provider
 from services.untranslated_detection import detect_untranslated_english
 from services.glossary_compliance import check_glossary_compliance
+from services.glossary_promotion import maybe_promote_to_suggestion
 from services.translation_memory import (
     TranslationMemoryMatch,
     find_exact_memory_match,
@@ -2443,6 +2444,19 @@ def update_translation_result(
             industry=job.industry,
             domain=job.domain,
         )
+        # Auto-promote short noun phrases to glossary suggestions (non-blocking)
+        try:
+            maybe_promote_to_suggestion(
+                db=db,
+                source_text=segment.source_text,
+                target_text=final_translation,
+                source_language=job.source_language,
+                target_language=job.target_language,
+                org_id=job.org_id or 0,
+                job_id=job.id,
+            )
+        except Exception:
+            logger.exception("Glossary auto-promotion failed for result_id=%d", result.id)
 
     _replace_segment_annotations(db, segment, result)
     if segment.block_id is not None:

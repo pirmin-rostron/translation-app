@@ -163,6 +163,7 @@ class GlossaryTermSuggestion(Base):
     target_language = Column(String(50), nullable=False)
     frequency = Column(Integer, nullable=False, default=1)
     status = Column(String(20), nullable=False, default="pending")
+    suggestion_source = Column(String(50), nullable=False, server_default="ai_extraction")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

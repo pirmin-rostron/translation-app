@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "../components/AppShell";
 import { PageHeader } from "../components/PageHeader";
 import { Icons } from "../components/Icons";
@@ -62,6 +63,7 @@ function deriveTermStatus(term: GlossaryTerm): "locked" | "enforced" | "suggeste
 // ── Main page ───────────────────────────────────────────────────────────────
 
 export default function GlossaryPage() {
+  const searchParams = useSearchParams();
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [form, setForm] = useState<GlossaryForm>(INITIAL_FORM);
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,20 @@ export default function GlossaryPage() {
       .then(setPendingSuggestions)
       .catch(() => { /* non-critical */ });
   }, []);
+
+  // Pre-fill form from URL params (e.g. from "Add to glossary" link on review page)
+  useEffect(() => {
+    const srcTerm = searchParams.get("source_term");
+    const tgtTerm = searchParams.get("target_term");
+    if (srcTerm || tgtTerm) {
+      setForm((prev) => ({
+        ...prev,
+        source_term: srcTerm ?? prev.source_term,
+        target_term: tgtTerm ?? prev.target_term,
+      }));
+      setShowAddPanel(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!message) return;

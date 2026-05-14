@@ -413,6 +413,23 @@ export function DocumentDiffPane({
                     </div>
                   )}
 
+                  {/* Add to glossary — shown on approved blocks with glossary matches */}
+                  {blockState === "approved" && segments.some((s: SegmentRef) => s.glossary_applied && s.glossary_matches?.matches?.length) && (() => {
+                    const firstMatch = segments.flatMap((s: SegmentRef) => s.glossary_matches?.matches ?? []).find(Boolean);
+                    if (!firstMatch) return null;
+                    return (
+                      <div className="mt-3 flex items-center">
+                        <a
+                          href={`/glossary?source_term=${encodeURIComponent(firstMatch.source_term)}&target_term=${encodeURIComponent(firstMatch.target_term)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[0.6875rem] font-medium text-brand-accent no-underline transition-colors hover:text-brand-accentHov"
+                        >
+                          + Add to glossary
+                        </a>
+                      </div>
+                    );
+                  })()}
+
                   {/* Footer actions — only for non-approved blocks */}
                   {blockState !== "approved" && isActive && !isReadOnly && (
                     <div className="mt-4 flex items-center justify-between">
