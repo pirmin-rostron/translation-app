@@ -490,6 +490,13 @@ function TranslationReviewPageInner() {
   const [sourceThresholdExceeded, setSourceThresholdExceeded] = useState(false);
   const reviewCompleteState = Boolean(reviewSummary?.review_complete);
 
+  // Auto-dismiss status messages after 3 seconds
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(""), 3000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
   const allSegments = useMemo(
     () =>
       blocks
@@ -1877,23 +1884,16 @@ function TranslationReviewPageInner() {
           >
             Preview
           </button>
-          <div className="relative">
-            {reviewCompleteState && (
-              <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.625rem] font-medium text-brand-accent">
-                Ready to export
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleOpenExportModal}
-              disabled={!reviewComplete && workflowStatus !== "ready_for_export" && workflowStatus !== "exported"}
-              className={`rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50 ${
-                reviewCompleteState ? "ring-2 ring-brand-accent ring-offset-1" : ""
-              }`}
-            >
-              Export
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleOpenExportModal}
+            disabled={!reviewComplete && workflowStatus !== "ready_for_export" && workflowStatus !== "exported"}
+            className={`rounded-full bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accentHov disabled:opacity-50 ${
+              reviewCompleteState ? "ring-2 ring-brand-accent ring-offset-1" : ""
+            }`}
+          >
+            Export
+          </button>
         </div>
         </div>
         {/* Density toggle pills */}
