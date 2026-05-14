@@ -1819,7 +1819,14 @@ def get_review_summary(
     job = db.query(TranslationJob).filter(TranslationJob.id == job_id, TranslationJob.org_id == current_org.id, TranslationJob.deleted_at.is_(None)).first()
     if not job:
         raise HTTPException(status_code=404, detail="Translation job not found")
-    return _calculate_review_summary(db, job)
+    summary = _calculate_review_summary(db, job)
+    # Auto-correct stale job status: if review is complete but job is still
+    # in_review (e.g. a previous status transition was missed), fix it now.
+    if summary.review_complete and job.status == JOB_STATUS_IN_REVIEW:
+        job.status = JOB_STATUS_REVIEW_COMPLETE
+        db.commit()
+        summary = _calculate_review_summary(db, job)
+    return summary
 
 
 @router.post("/{job_id}/save-draft", response_model=ReviewSummaryResponse)
@@ -1869,7 +1876,7 @@ def approve_safe_segments(
         result.review_status = "approved"
         changed += 1
 
-    if changed > 0 and job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
+    if job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
         summary = _calculate_review_summary(db, job)
         job.status = JOB_STATUS_REVIEW_COMPLETE if summary.review_complete else JOB_STATUS_IN_REVIEW
 
@@ -1907,7 +1914,7 @@ def approve_all_segments(
         result.review_status = "approved"
         changed += 1
 
-    if changed > 0 and job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
+    if job.status not in {JOB_STATUS_READY_FOR_EXPORT, JOB_STATUS_EXPORTED}:
         summary = _calculate_review_summary(db, job)
         job.status = JOB_STATUS_REVIEW_COMPLETE if summary.review_complete else JOB_STATUS_IN_REVIEW
 
